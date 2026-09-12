@@ -35,3 +35,4 @@ lerna-debug.log*
 # Local Codex/project artifacts
 .agents/
 generated-assets/
+skills-lock.json

@@ -1,3 +1,4 @@
+import './confirmation-dialog.css'
 import * as Dialog from '@radix-ui/react-dialog'
 import { useRef } from 'react'
 import { Button } from './button'

@@ -1,0 +1,181 @@
+.chart-workspace { padding-top: 22px; }
+.chart-breadcrumb { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; color: var(--secondary); font-size: 12px; margin-bottom: 13px; }
+.chart-breadcrumb a:hover { color: var(--blue); text-decoration: underline; }
+.chart-workspace .page-heading { margin-bottom: 18px; }
+.chart-patient-banner { position: sticky; top: 84px; z-index: 11; padding: 16px; margin-bottom: 14px; }
+.chart-patient-row { display: flex; gap: 14px; align-items: center; }
+.chart-patient-row > .avatar { height: 46px; width: 46px; font-size: 15px; }
+.chart-patient-name { flex: 1; min-width: 0; }
+.chart-patient-name h2 { font-size: 20px; }
+.chart-patient-name p { font-size: 12px; color: var(--secondary); line-height: 1.65; margin-top: 3px; }
+.chart-context { display: flex; align-items: center; gap: 10px; border-left: 1px solid var(--border); padding-left: 16px; font-size: 12px; max-width: 235px; }
+.chart-context svg { color: var(--secondary); }
+.chart-context small { display: block; color: var(--secondary); font-size: 11px; margin-bottom: 5px; }
+.chart-alert { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 9px 12px; border-radius: 6px; margin-top: 13px; font-size: 12px; line-height: 1.5; }
+.chart-alert strong { font-weight: 500; }
+.chart-alert > span { margin-left: auto; font-size: 11px; }
+.chart-provisional { font-size: 12px; color: #986014; padding-top: 8px; }
+.chart-scope-note { display: flex; gap: 8px; align-items: center; color: #3d5b89; margin: 14px 0; font-size: 12px; }
+.chart-tabs { display: flex; gap: 19px; border-bottom: 1px solid var(--border); margin-bottom: 18px; }
+.chart-tabs button { padding: 13px 3px; border-bottom: 2px solid transparent; font-size: 12px; font-weight: 500; color: var(--secondary); white-space: nowrap; }
+.chart-tabs button[aria-selected='true'] { color: var(--blue); border-color: var(--blue); }
+.chart-tabs button:hover { color: var(--blue); background: #edf4ff; }
+.chart-section-select { display: none; }
+.chart-grid { display: grid; grid-template-columns: minmax(0,1.4fr) minmax(0,1fr); gap: 18px; align-items: start; }
+.chart-stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.chart-panel { padding: 18px; min-width: 0; }
+.chart-panel > header { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; margin-bottom: 16px; }
+.chart-panel > header h2 { flex: 1; font-size: 16px; }
+.chart-panel-icon { display: grid; place-items: center; color: var(--blue); }
+.chart-panel-icon svg { width: 19px; height: 19px; }
+.chart-panel h3 { font-size: 13px; line-height: 1.5; }
+.chart-panel p { font-size: 12px; line-height: 1.65; }
+.chart-caption { font-size: 12px; line-height: 1.6; color: var(--secondary); margin: 6px 0; }
+.chart-panel .chart-source, .chart-source { font-size: 11px; color: var(--secondary); line-height: 1.7; margin: 12px 0; }
+.chart-source-link { margin-top: 10px; }
+.chart-panel .text-link { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; }
+.chart-panel .text-link svg { width: 15px; }
+.chart-problem-list { margin-top: 10px; }
+.chart-problem-list > div { display: grid; grid-template-columns: minmax(0,1fr) 52px 85px; align-items: center; gap: 12px; border-bottom: 1px solid var(--border); padding: 10px 0; font-size: 12px; }
+.chart-problem-list strong { font-weight: 400; }
+.chart-problem-list > div > span:last-child { color: var(--secondary); font-size: 11px; }
+.chart-subheading { margin-top: 20px; margin-bottom: 6px; }
+.chart-history { margin: 0; }
+.chart-history > div { display: grid; grid-template-columns: 110px minmax(0,1fr); gap: 14px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 12px; line-height: 1.6; }
+.chart-history dd { margin: 0; color: var(--secondary); overflow-wrap: anywhere; }
+.chart-search { display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); padding: 0 10px; border-radius: 7px; background: #f9fafd; }
+.chart-search svg { width: 16px; color: var(--secondary); }
+.chart-search input { width: 100%; height: 38px; background: transparent; font-size: 12px; }
+.chart-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+.chart-filters button { border-radius: 6px; padding: 8px 10px; font-size: 11px; background: #f2f5f9; color: #52627b; }
+.chart-filters button[aria-pressed='true'] { background: var(--blue); color: white; }
+.chart-timeline > button { display: flex; align-items: center; width: 100%; gap: 14px; padding: 15px 0; border-top: 1px solid var(--border); text-align: left; }
+.chart-timeline > button:hover strong { color: var(--blue); }
+.chart-timeline time { width: 75px; flex-shrink: 0; font-size: 11px; color: var(--secondary); }
+.chart-timeline button > span { flex: 1; }
+.chart-timeline strong { font-size: 12px; font-weight: 500; line-height: 1.5; }
+.chart-timeline small { display: block; color: var(--secondary); font-size: 11px; margin-top: 5px; line-height: 1.5; }
+.chart-timeline svg { width: 16px; color: var(--secondary); }
+.chart-visit-title { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+.chart-visit-action { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; border-top: 1px solid var(--border); margin-top: 14px; padding-top: 14px; font-size: 11px; color: var(--secondary); }
+.chart-observations { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); margin: 0; gap: 9px; }
+.chart-observations > div { border-right: 1px solid var(--border); }
+.chart-observations > div:last-child { border: 0; }
+.chart-observations dt { font-size: 10px; color: var(--secondary); margin-bottom: 6px; }
+.chart-observations dd { font-size: 20px; font-weight: 600; margin: 0; font-variant-numeric: tabular-nums; }
+.chart-observations small { display: block; font-size: 10px; color: var(--secondary); font-weight: 400; margin-top: 3px; }
+.chart-empty { padding: 24px 12px; text-align: center; color: var(--secondary); }
+.chart-empty > svg { margin: 0 auto 12px; }
+.chart-empty h3 { color: var(--color-foreground); margin-bottom: 8px; }
+.chart-empty p { max-width: 65ch; margin: auto; line-height: 1.7; }
+.chart-record-row { display: flex; align-items: center; gap: 20px; justify-content: space-between; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.chart-record-row p { color: var(--secondary); margin-top: 6px; }
+.chart-record-row .badge { margin-top: 10px; }
+.chart-statuses { display: flex; flex-wrap: wrap; gap: 8px; }
+.chart-disabled-action { margin-top: 15px; }
+.chart-outline-link { border: 1px solid var(--border); border-radius: 7px; background: white; padding: 11px 14px; font-size: 12px; }
+.encounter-context { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin: 12px 0 8px; }
+.encounter-context > span { display: flex; align-items: center; gap: 6px; color: var(--secondary); font-size: 11px; }
+.encounter-context svg { width: 13px; }
+.encounter-boundary { font-size: 11px; }
+.encounter-grid { display: grid; grid-template-columns: minmax(0,1.7fr) minmax(0,1fr); gap: 18px; align-items: start; }
+.encounter-grid > div { min-width: 0; }
+.encounter-template { display: flex; gap: 7px; align-items: center; font-size: 11px; padding: 7px 9px; border: 1px solid var(--border); border-radius: 6px; }
+.encounter-template svg { width: 13px; }
+.encounter-author { display: flex; gap: 8px; justify-content: space-between; flex-wrap: wrap; color: var(--secondary); font-size: 11px; padding-bottom: 20px; }
+.encounter-author [role='status'] { color: #986014; }
+.encounter-form { display: flex; flex-direction: column; gap: 20px; }
+.encounter-form label { display: flex; flex-direction: column; gap: 8px; font-size: 12px; font-weight: 500; }
+.encounter-form input, .encounter-form textarea, .encounter-form select, .chart-section-select select { width: 100%; padding: 10px 12px; border: 1px solid #cdd8e7; border-radius: 6px; font: inherit; font-weight: 400; background: white; line-height: 1.6; }
+.encounter-form textarea { resize: vertical; min-height: 90px; }
+.encounter-form input::placeholder, .encounter-form textarea::placeholder, .chart-search input::placeholder { color: #65738b; opacity: 1; }
+.encounter-form textarea:focus-visible, .encounter-form select:focus-visible, .chart-section-select select:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
+.encounter-form small { color: var(--secondary); font-size: 11px; font-weight: 400; }
+.encounter-form fieldset { min-width: 0; padding: 0; border: 0; }
+.encounter-form legend { font-size: 12px; font-weight: 600; margin-bottom: 10px; }
+.encounter-two-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+.encounter-diagnosis-entry { display: flex; gap: 8px; margin: 10px 0; }
+.encounter-diagnoses { display: flex; flex-wrap: wrap; gap: 7px; }
+.encounter-diagnoses > span { display: inline-flex; align-items: center; gap: 8px; padding: 5px 8px; background: #edf4ff; border-radius: 6px; font-size: 12px; overflow-wrap: anywhere; }
+.encounter-diagnoses button { display: grid; place-items: center; width: 32px; height: 32px; }
+.encounter-diagnoses svg { width: 14px; }
+.encounter-field-error { color: #bd3646; }
+.encounter-review-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.encounter-review-row:last-child { border: 0; padding-bottom: 0; }
+.encounter-review-row:first-of-type { padding-top: 0; }
+.encounter-review-row strong { font-size: 12px; font-weight: 500; }
+.encounter-review-row small { display: block; color: #986014; margin-top: 4px; font-size: 11px; }
+.chart-reference-row { display: flex; align-items: center; gap: 10px; justify-content: space-between; font-size: 12px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+.encounter-visit-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.encounter-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-top: 20px; padding: 18px 0 8px; border-top: 1px solid var(--border); color: var(--secondary); }
+.encounter-actions > div:last-child { display: flex; gap: 8px; flex-wrap: wrap; }
+.encounter-actions p { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+.encounter-actions svg { width: 14px; }
+.encounter-actions small { display: block; margin-top: 6px; font-size: 11px; }
+@media (max-width: 1200px) {
+  .chart-clinician { display: none; }
+  .chart-tabs { gap: 12px; }
+  .chart-grid, .encounter-grid { grid-template-columns: minmax(0,1.25fr) minmax(0,1fr); }
+  .chart-observations { grid-template-columns: 1fr 1fr; gap: 14px; }
+  .chart-observations > div:nth-child(2) { border: 0; }
+  .encounter-diagnosis-entry { flex-wrap: wrap; }
+}
+@media (max-width: 1000px) {
+  .chart-grid, .encounter-grid { grid-template-columns: 1fr; }
+  .chart-stack { gap: 16px; }
+  .chart-tabs { gap: 15px; overflow-x: auto; }
+  .chart-tabs button { flex-shrink: 0; }
+  .chart-context { max-width: 210px; }
+  .chart-alert > span { margin-left: 28px; }
+  .chart-observations { grid-template-columns: repeat(4,minmax(0,1fr)); }
+  .chart-observations > div:nth-child(2) { border-right: 1px solid var(--border); }
+}
+@media (max-width: 600px) {
+  .chart-workspace .page-heading { align-items: flex-start; gap: 14px; flex-direction: column; }
+  .chart-workspace h1 { font-size: 25px; }
+  .chart-patient-banner { top: 69px; padding: 12px; }
+  .chart-patient-row { flex-wrap: wrap; gap: 9px; }
+  .chart-patient-name h2 { font-size: 17px; }
+  .chart-patient-row > .avatar { width: 34px; height: 34px; font-size: 12px; }
+  .chart-patient-name p { font-size: 11px; }
+  .chart-context { max-width: none; padding-left: 0; border: 0; font-size: 11px; }
+  .chart-context small { display: none; }
+  .chart-context svg { width: 14px; height: 14px; }
+  .chart-alert { margin-top: 9px; padding: 8px; gap: 5px; font-size: 11px; }
+  .chart-alert svg { width: 16px; height: 16px; }
+  .chart-alert > span { font-size: 10px; margin-left: 21px; }
+  .chart-tabs { display: none; }
+  .chart-section-select { display: flex; flex-direction: column; gap: 7px; font-size: 12px; font-weight: 500; margin: 18px 0; }
+  .chart-panel { padding: 15px; }
+  .chart-problem-list > div { grid-template-columns: minmax(0,1fr) 48px; gap: 6px; }
+  .chart-problem-list > div > span:last-child { grid-column: 1 / -1; }
+  .chart-timeline > button { gap: 10px; }
+  .chart-timeline time { width: 60px; }
+  .chart-observations { gap: 6px; }
+  .chart-observations dd { font-size: 18px; }
+  .chart-record-row { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .chart-history > div { grid-template-columns: 90px minmax(0,1fr); gap: 10px; }
+  .encounter-two-fields { grid-template-columns: 1fr; }
+  .encounter-template { width: 100%; justify-content: space-between; min-height: 40px; }
+  .encounter-actions > div:last-child { width: 100%; }
+  .encounter-actions button { flex: 1; }
+  .encounter-actions { padding-bottom: 20px; }
+  .encounter-context > span { line-height: 1.6; }
+  .chart-filters button, .chart-panel .text-link { min-height: 40px; align-content: center; }
+}
+
+/* Preserve encounter dates and full patient identity in the shared mobile shell. */
+.chart-workspace .page-heading p { display: block; }
+@media (max-width: 1200px) and (min-width: 701px) {
+  .chart-clinician { display: flex; font-size: 11px; }
+  .chart-patient-row { flex-wrap: wrap; }
+  .chart-patient-name { flex-basis: calc(100% - 65px); }
+  .chart-context { border-left: 0; padding-left: 0; max-width: none; }
+}
+@media (max-width: 700px) {
+  .chart-clinician { display: flex; }
+  .chart-patient-name { flex-basis: calc(100% - 50px); }
+  .chart-context { flex-basis: 100%; }
+  .chart-patient-banner { scroll-margin-top: 130px; }
+}
+.chart-workspace input, .chart-workspace textarea, .chart-workspace select, .chart-workspace button, .chart-workspace a { scroll-margin-top: 370px; scroll-margin-bottom: 100px; }

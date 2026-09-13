@@ -8,9 +8,9 @@ Build a doctor-centric Philippine outpatient Electronic Patient Record (EPR) for
 
 Repository baseline as of 2026-09-13:
 
-- `web/` contains a responsive React/TypeScript/Vite Dashboard and My Patients directory with explicit synthetic fixtures, practice-scoped directory search/filtering/pagination, add/edit patient forms with in-memory demo saves, patient previews, global patient search, queue previews, and inbox filters. It does not implement persisted clinical workflows.
+- `web/` contains a responsive React/TypeScript/Vite Dashboard, doctor schedule workspace, and My Patients directory with explicit synthetic fixtures, practice-scoped directory search/filtering/pagination, add/edit patient forms with in-memory demo saves, patient previews, global patient search, queue previews, inbox filters, practice-scoped patient charts, and historical encounter screens with guarded in-memory note editing. The schedule provides a practice-filtered day agenda, appointment details, and explicit non-persistent scheduling states. It does not implement persisted clinical workflows.
 - TanStack Query, Zod, and Zustand are installed. Check `web/package.json` and its lockfile for actual dependencies and scripts.
-- Backend, database migrations, infrastructure, and authentication have not been scaffolded. Vitest covers dashboard/directory display selectors, patient-form validation, and in-memory demo save guards; there is no committed browser or backend test suite.
+- Backend, database migrations, infrastructure, and authentication have not been scaffolded. Vitest covers dashboard/directory and schedule display selectors, patient-form validation and in-memory demo save guards, and chart/encounter fixture scoping; there is no committed browser or backend test suite.
 - `generated-assets/` contains plans, image concepts, and generation prompts. `.agents/skills/` contains local skill references. Both directories are currently Git-ignored and may be absent in another checkout.
 
 Do not describe a planned component, control, or release gate as implemented. Keep these instructions current when the repository structure or verified commands change.

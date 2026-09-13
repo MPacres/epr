@@ -20,7 +20,7 @@ export function Logo() {
 export function WorkspaceShell({ children, readyCount, inboxCount, onNavigate, onSearchOpen, activeDestination = 'dashboard' }: {
   children: ReactNode; readyCount: number; inboxCount: number; onNavigate: (destination: Destination) => void
   onSearchOpen: () => void
-  activeDestination?: 'dashboard' | 'patients'
+  activeDestination?: Destination
 }) {
   function navButton(item: typeof navigation[number], mobile = false) {
     const Icon = item.icon

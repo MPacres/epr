@@ -78,7 +78,7 @@ export function MyPatients() {
     const patient = dialogPatient ?? selected
     if (!patient) return
     setSelectedKey(patientKey(patient))
-    remember(patient); showDialog('overview')
+    remember(patient); navigate(`/patients/${encodeURIComponent(patient.practiceId)}/${encodeURIComponent(patient.id)}/chart`)
   }
   return <main id="main-content" className="dashboard patients-workspace" tabIndex={-1}>
     <div className="page-heading patients-heading"><div><h1>My Patients</h1><p>Find a patient and continue their care.</p></div><div className="registration-action"><Button onClick={() => navigate(`/patients/new?practice=${encodeURIComponent(practiceId)}`)}><Plus aria-hidden="true" />New patient</Button></div></div>

@@ -1,0 +1,29 @@
+name: epr-backend-development
+
+services:
+  postgres:
+    build:
+      context: ./docker/postgresql
+    image: epr-postgresql:17.11
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${EPR_DB_NAME:-epr}
+      POSTGRES_USER: ${EPR_DB_OWNER_USERNAME:-epr_owner}
+      POSTGRES_PASSWORD: ${EPR_DB_OWNER_PASSWORD:-epr-owner-local-only}
+      EPR_DB_MIGRATION_USERNAME: ${EPR_DB_MIGRATION_USERNAME:-epr_migrator}
+      EPR_DB_MIGRATION_PASSWORD: ${EPR_DB_MIGRATION_PASSWORD:-epr-migrator-local-only}
+      EPR_DB_USERNAME: ${EPR_DB_USERNAME:-epr_app}
+      EPR_DB_PASSWORD: ${EPR_DB_PASSWORD:-epr-app-local-only}
+    ports:
+      - "127.0.0.1:${EPR_DB_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready --username=\"$${POSTGRES_USER}\" --dbname=\"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  postgres-data:

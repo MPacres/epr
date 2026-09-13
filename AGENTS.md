@@ -21,6 +21,7 @@ Read the relevant sections before implementation; paths below are relative to th
 
 | Source | Use |
 | --- | --- |
+| `docs/architecture/session-and-client-authentication.md` | Accepted browser-session, horizontal-scaling, native-client authentication, offline-boundary, and deferred-Redis decisions. |
 | `generated-assets/doctor-centric-epr-plan.md` | Product scope; domain model; canonical workflows; roles; clinical integrity; delivery phases and acceptance criteria. Start with sections 3–7, then the feature-specific sections and sections 22–23. |
 | `generated-assets/epr-technical-architecture-plan.md` | Selected stack, modular boundaries, tenancy, initial online behavior, staged offline roadmap, infrastructure and release tests. |
 | `generated-assets/epr-patient-forms-v2-notes.md` | Current registration/edit form structure and optional PhilHealth fields; supersedes the v1 form concepts. |
@@ -75,12 +76,14 @@ The following is the selected target, not a claim that these services exist:
 | Frontend | React + Vite + TypeScript; React Router; React Hook Form + Zod; Tailwind CSS + shadcn/ui; TanStack Query. See `web/AGENTS.md`. |
 | Backend | Java 25, Spring Boot 4.1, Maven, Spring Modulith 2.1 modular monolith. Verify compatibility and pin tested patches when scaffolding. |
 | Data | PostgreSQL 17 on Amazon RDS; shared tenant tables with RLS from launch; JPA/Hibernate plus explicit SQL where needed; Flyway migrations. |
-| Identity/API | Cognito with MFA; Spring Security and Spring Session JDBC; secure HttpOnly browser session cookies and CSRF protection; REST/OpenAPI with generated TypeScript contracts. |
+| Identity/API | Cognito with MFA; Spring Security; Spring Session JDBC for the browser; secure HttpOnly cookies and CSRF protection; REST/OpenAPI with generated TypeScript contracts. Future native clients use Cognito bearer tokens through a separate security adapter. |
 | Live updates | Server-Sent Events with polling fallback; authorized subscriptions, event deduplication and server reconciliation after reconnect. |
 | Hosting | Docker Compose on EC2 behind Nginx; private S3; KMS, Secrets Manager, CloudWatch; Terraform and GitHub Actions/ECR. |
 | Verification | JUnit, Testcontainers, Modulith/ArchUnit; Vitest and Playwright, introduced as the corresponding implementation is added. |
 
 Keep business modules separate: identity/tenancy, patient registry, scheduling/queue, clinical chart, encounters/templates, prescribing, orders/results, care coordination, documents/communication, and platform operations. Add synchronization later. Modules own persistence and expose application interfaces; no cross-module repository imports or direct table mutations. Enforce acyclic dependencies. Use a single transaction for critical workflows and durable PostgreSQL-backed events/jobs for retryable side effects.
+
+Use the shared PostgreSQL-backed Spring Session repository for browser login from launch; it supports multiple application instances without sticky sessions and does not require Redis. Limit HTTP session contents to authentication and CSRF concerns. Do not store selected practice, active clinical session, permissions, clinical drafts, or workflow state in the session. Map both browser sessions and future native-client bearer tokens into one transport-neutral authenticated-actor/application authorization boundary, and resolve current practice membership for consequential requests. Redis is an optional later optimization for measured session, rate-limit, cache, or cross-instance fan-out load; it is never the clinical source of truth or the durability mechanism for critical commands and events.
 
 Use `/api/v1/practices/{practiceId}/...` with independently authorized practice context. Establish client-generatable UUIDs distinct from display record numbers, optimistic versions, original idempotency keys on retry, explicit state transitions, versioned contracts, and separate occurrence/client/server-receipt timestamps. Isolate UI from transport through application services/repositories. Avoid silent last-write-wins for clinical or identity conflicts.
 

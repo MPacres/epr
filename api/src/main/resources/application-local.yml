@@ -1,0 +1,14 @@
+spring:
+  datasource:
+    url: ${EPR_DB_URL:jdbc:postgresql://localhost:5432/epr}
+    username: ${EPR_DB_USERNAME:epr_app}
+    password: ${EPR_DB_PASSWORD:epr-app-local-only}
+  flyway:
+    user: ${EPR_DB_MIGRATION_USERNAME:epr_migrator}
+    password: ${EPR_DB_MIGRATION_PASSWORD:epr-migrator-local-only}
+
+server:
+  servlet:
+    session:
+      cookie:
+        secure: ${EPR_SECURE_COOKIES:false}

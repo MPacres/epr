@@ -1,0 +1,59 @@
+spring:
+  application:
+    name: backend-api
+  datasource:
+    url: ${EPR_DB_URL:jdbc:postgresql://localhost:5432/epr}
+    username: ${EPR_DB_USERNAME:epr_app}
+    password: ${EPR_DB_PASSWORD:}
+  flyway:
+    enabled: true
+    user: ${EPR_DB_MIGRATION_USERNAME:${EPR_DB_USERNAME:epr_app}}
+    password: ${EPR_DB_MIGRATION_PASSWORD:${EPR_DB_PASSWORD:}}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  modulith:
+    detection-strategy: explicitly-annotated
+    events:
+      jdbc:
+        schema-initialization:
+          enabled: false
+    runtime:
+      verification-enabled: true
+  session:
+    jdbc:
+      initialize-schema: never
+    timeout: 30m
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+  mvc:
+    problemdetails:
+      enabled: true
+
+server:
+  shutdown: graceful
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        name: EPR_SESSION
+        same-site: lax
+        secure: ${EPR_SECURE_COOKIES:true}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui

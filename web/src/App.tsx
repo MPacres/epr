@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect } from 'react'
 import { createHashRouter, matchPath, RouterProvider, useLocation, useNavigate } from 'react-router-dom'
 import { Dashboard } from './features/dashboard/Dashboard'
+import { Login } from './features/auth/Login'
 const PatientForm = lazy(() => import('./features/patients/PatientForm').then(module => ({ default: module.PatientForm })))
 import { PatientPreviewProvider } from './features/patients/PatientPreviewProvider'
 const PatientChart = lazy(() => import('./features/chart/PatientChart').then(module => ({ default: module.PatientChart })))
@@ -31,7 +32,10 @@ function WorkspaceRoute() {
   const unavailable = !isSchedule && !chart && !encounter && !isNew && !edit && !isDirectory && !isDashboard ? <main id="main-content" className="dashboard" tabIndex={-1}><h1>Page unavailable</h1><p>This workspace page could not be found.</p><Button onClick={() => navigate('/patients')}>Go to My Patients</Button></main> : undefined
   return <Dashboard key={location.pathname + (isNew ? location.search : '')} view={view} onViewChange={next => navigate(`/${next}`)} content={workspace ? <Suspense fallback={<main className="dashboard" id="main-content" tabIndex={-1}><p role="status">Loading workspace…</p></main>}>{workspace}</Suspense> : unavailable} />
 }
-const router = createHashRouter([{path:'*',element:<WorkspaceRoute />}])
+const router = createHashRouter([
+  { path: '/login', element: <Login /> },
+  { path: '*', element: <WorkspaceRoute /> },
+])
 export default function App() {
   return <PatientPreviewProvider><RouterProvider router={router} /></PatientPreviewProvider>
 }

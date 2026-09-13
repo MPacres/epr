@@ -6,11 +6,11 @@ These instructions apply throughout this repository. Before working under `web/`
 
 Build a doctor-centric Philippine outpatient Electronic Patient Record (EPR) for authorized work across practices and sites. Complete outpatient care includes registration, scheduling, queues, longitudinal charts, encounters, prescribing, orders/results, clinical inbox, referrals, documents, and follow-up. A queue-only demonstration is not a complete EPR.
 
-Repository baseline as of 2026-09-12:
+Repository baseline as of 2026-09-13:
 
-- `web/` contains a React/TypeScript/Vite starter, not implemented clinical workflows.
+- `web/` contains a responsive React/TypeScript/Vite Dashboard and My Patients directory with explicit synthetic fixtures, practice-scoped directory search/filtering/pagination, add/edit patient forms with in-memory demo saves, patient previews, global patient search, queue previews, and inbox filters. It does not implement persisted clinical workflows.
 - TanStack Query, Zod, and Zustand are installed. Check `web/package.json` and its lockfile for actual dependencies and scripts.
-- Backend, database migrations, infrastructure, authentication, and automated test suites have not been scaffolded.
+- Backend, database migrations, infrastructure, and authentication have not been scaffolded. Vitest covers dashboard/directory display selectors, patient-form validation, and in-memory demo save guards; there is no committed browser or backend test suite.
 - `generated-assets/` contains plans, image concepts, and generation prompts. `.agents/skills/` contains local skill references. Both directories are currently Git-ignored and may be absent in another checkout.
 
 Do not describe a planned component, control, or release gate as implemented. Keep these instructions current when the repository structure or verified commands change.
@@ -28,7 +28,7 @@ Read the relevant sections before implementation; paths below are relative to th
 | `generated-assets/epr-portrait-design-prompts-v1.md` | Tablet and phone layout references. |
 | Adjacent `*-prompt.txt` files and PNGs | Visual reference for the relevant screen; illustrative data rather than runtime specifications. |
 
-Within the planning material, use the product plan for clinical behavior, the technical plan for selected architecture and connectivity phases, and the latest explicit screen revision for presentation. Product safety, authorization, and canonical state rules take precedence over mockup labels, sample counts, or aesthetics. Explain material discrepancies instead of silently changing clinical behavior.
+Within the planning material, use the product plan for clinical behavior and the technical plan for selected architecture and connectivity phases. The current implemented Dashboard is the shared visual and interaction baseline for new and updated frontend views; follow the design authority and mandatory three-layout verification rules in [web/AGENTS.md](web/AGENTS.md). Screen concepts inform feature-specific composition and content but must be adapted to that baseline unless the user explicitly requests a different design. Product safety, authorization, and canonical state rules take precedence over mockup labels, sample counts, or aesthetics. Explain material discrepancies instead of silently changing clinical behavior.
 
 In particular, the product plan's general offline-tolerance ideas do not authorize offline persistence or issuance in the initial release. Follow the technical plan's online-first release and later Stage A/Stage B gates.
 
@@ -112,7 +112,7 @@ Resolve deployment-specific governance and PhilHealth/YAKAP/GAMOT/NHDR applicabi
 1. Inspect existing code, relevant plans, scoped instructions, and applicable skills before edits. Prefer established components and conventions; introduce only dependencies needed for the requested slice.
 2. Preserve unrelated work. Keep changes focused and distinguish functional mocks from connected behavior. Do not implement success-only mocks as production persistence or authorization.
 3. Add meaningful tests for changed domain behavior: isolation, transition guards, duplicate retries/concurrent starts, conflicting edits, signed-record immutability, patient context, or continuity of ownership as applicable. Do not substitute UI visibility tests for backend authorization tests.
-4. For frontend code/configuration changes, run the actual lint/build scripts and the rendered checks in `web/AGENTS.md`. For future backend work, add and document real verification commands when scaffolding; do not claim nonexistent suites passed.
+4. For frontend code/configuration changes, run the actual lint/build scripts and the rendered checks in `web/AGENTS.md`. Every rendered UI change must be verified on all three layouts: desktop web, portrait tablet, and mobile. A desktop-only check or passing build does not satisfy this requirement. For future backend work, add and document real verification commands when scaffolding; do not claim nonexistent suites passed.
 5. Before an online pilot, cover the product plan's section 23 and technical release gates, including two-practice access, later results/follow-up, timeout retries, template changes, restore/downtime drills, clinician-approved outputs, and representative load (approximately 50 concurrent users in the plan).
 6. Documentation-only changes require source/path/command consistency checks and whitespace review; no application build or Playwright run is needed unless behavior also changed.
 7. Report what changed, verification actually performed, and material remaining gaps. Do not equate a passing build with clinical validation or readiness for real patients.

@@ -1,0 +1,41 @@
+import { ChevronDown, CreditCard, FileText, MapPin, Paperclip, Phone, ShieldCheck, UserRound, Users, type LucideIcon } from 'lucide-react'
+import { useFormContext, useWatch } from 'react-hook-form'
+import { Button } from '../../components/ui/button'
+import { FormCheckbox, FormField, SecretField } from './PatientFormField'
+import { fullPatientName, type FormSection, type PatientDraft } from './patient-form-model'
+import { formatPatientDate } from './model'
+
+const formSections: { id: FormSection; title: string; icon: LucideIcon }[] = [
+  { id:'demographics', title:'Demographics', icon:UserRound }, { id:'contact', title:'Contact & Preferences', icon:Phone },
+  { id:'address', title:'Address', icon:MapPin }, { id:'philhealth', title:'PhilHealth', icon:CreditCard },
+  { id:'representatives', title:'Representatives & Emergency Contacts', icon:Users }, { id:'identifiers', title:'Identifiers', icon:FileText },
+]
+const accuracy = [{value:'exact',label:'Exact'}, {value:'estimated',label:'Estimated'}, {value:'unknown',label:'Unknown'}]
+export function PatientFormSections({ openSections, onToggle, mrn, practice }: { openSections: FormSection[]; onToggle:(section:FormSection)=>void; mrn?: string; practice: string }) {
+  const { control } = useFormContext<PatientDraft>()
+  const draft = useWatch({ control }) as PatientDraft
+  const summaries: Record<FormSection, string> = {
+    demographics: [fullPatientName(draft) || 'Name and identity details', draft.birthAccuracy === 'unknown' ? 'Birth date unknown' : draft.birthDate ? `${draft.birthAccuracy === 'estimated' ? 'Estimated ' : ''}${formatPatientDate(draft.birthDate)}` : 'Birth date not entered', draft.sex].join(' · '),
+    contact: [draft.phone || 'No phone number', draft.language || 'Language not recorded', draft.communication].join(' · '),
+    address: draft.city ? `${draft.city} · ${draft.street || 'Street not provided'}` : 'Street, barangay, city and province · Optional',
+    philhealth: `${draft.philhealthRole} · ${draft.pinUnavailable || !draft.pin ? 'PIN not provided' : 'PIN recorded'} · Not verified`,
+    representatives: draft.representativeName || draft.emergencyName ? `${draft.representativeName || 'No representative'} · ${draft.emergencyName || 'No emergency contact'}` : 'Contact person, relationship and representative authority',
+    identifiers: mrn ? `${mrn} · ${practice} · Other IDs optional` : 'Demo patient ID assigned after saving · Other IDs optional',
+  }
+  return <div className="patient-form-sections">{formSections.map(({id,title,icon:Icon}) => {
+    const expanded = openSections.includes(id)
+    return <section className="surface patient-form-section" key={id} aria-labelledby={`section-heading-${id}`}>
+      <h2 id={`section-heading-${id}`}><button type="button" aria-expanded={expanded} aria-controls={`section-content-${id}`} onClick={() => onToggle(id)}><Icon aria-hidden="true" /><span>{title}{id === 'philhealth' ? <small>Optional</small> : null}{!expanded ? <span className="section-summary">{summaries[id]}</span> : null}</span><ChevronDown aria-hidden="true" /></button></h2>
+      <div className="patient-section-content" id={`section-content-${id}`} hidden={!expanded}>
+        {id === 'demographics' ? <><div className="form-grid name-grid"><FormField name="firstName" /><FormField name="middleName" label="Middle name (optional)" /><FormField name="lastName" /><FormField name="suffix" label="Suffix (optional)" placeholder="e.g. Jr." /></div><p className="form-help">Enter at least one name. Leave unavailable name parts blank.</p><div className="form-grid three-column"><FormField name="birthDate" type="date" disabled={draft.birthAccuracy === 'unknown'} required={draft.birthAccuracy !== 'unknown'} /><FormField name="birthAccuracy" options={accuracy} /><FormField name="sex" options={['Not recorded','Female','Male']} /></div><p className="form-help">Estimated and unknown birth dates are supported. Estimated dates stay labeled in the directory.</p><FormCheckbox name="provisional"><span>Provisional identity <small>Identity details need confirmation.</small></span></FormCheckbox></> : null}
+        {id === 'contact' ? <><p className="form-help section-intro">All contact details are optional. Recording a preference does not record consent to send messages.</p><div className="form-grid"><FormField name="phone" label="Mobile / phone (optional)" type="tel" placeholder="Include country code if known" /><FormField name="email" label="Email (optional)" type="email" /><FormField name="language" label="Preferred language (optional)" placeholder="e.g. Filipino" /><FormField name="communication" options={['Not recorded','In person','Phone call','SMS','Email']} /></div></> : null}
+        {id === 'address' ? <><p className="form-help section-intro">Optional. Record only the address details provided by the patient.</p><div className="form-grid"><FormField name="street" wide label="Street / house number (optional)" placeholder="Street address" /><FormField name="barangay" label="Barangay (optional)" /><FormField name="city" label="City / municipality (optional)" /><FormField name="province" label="Province / region (optional)" placeholder="e.g. Metro Manila" /><FormField name="postalCode" label="Postal code (optional)" /></div></> : null}
+        {id === 'philhealth' ? <><div className="form-grid"><FormField name="philhealthRole" options={['Unknown','Member','Dependent']} /><div><SecretField name="pin" disabled={draft.pinUnavailable} /><FormCheckbox name="pinUnavailable">PIN unavailable</FormCheckbox></div><FormField name="contributor" options={['Unknown','Direct contributor','Indirect contributor']} /><FormField name="informationSource" options={['Not recorded','Patient reported','Representative reported','Document presented']} /></div>
+          {draft.philhealthRole === 'Dependent' ? <div className="dependent-fields"><h3>Principal member</h3><p className="form-help">Keep the principal member’s details separate from this patient’s own PIN. Leave unknown details blank.</p><div className="form-grid"><FormField name="principalName" label="Principal member name (optional)" /><SecretField name="principalPin" /><FormField name="principalRelationship" wide label="Relationship to principal member (optional)" placeholder="e.g. Child" /></div></div> : null}
+          <div className="philhealth-status"><span className="badge amber"><ShieldCheck aria-hidden="true" />Not verified</span><span>Eligibility not checked</span></div><div className="attachment-unavailable"><Button variant="outline" disabled><Paperclip aria-hidden="true" />Attach supporting document</Button><span>Optional · Document upload is not connected.</span></div></> : null}
+        {id === 'representatives' ? <><h3 className="form-subheading">Patient representative</h3><p className="form-help">Authority has not been reviewed. These details alone do not grant access to the patient’s chart.</p><div className="form-grid"><FormField name="representativeName" label="Representative name (optional)" /><FormField name="representativeRelationship" label="Relationship (optional)" /><FormField name="representativePhone" label="Representative phone (optional)" type="tel" /><FormField name="representativeAuthority" options={['Not recorded','Patient nominated','Parent / guardian','Other — requires review']} /></div><h3 className="form-subheading contact-subheading">Emergency contact</h3><div className="form-grid"><FormField name="emergencyName" label="Emergency contact name (optional)" /><FormField name="emergencyRelationship" label="Emergency relationship (optional)" /><FormField name="emergencyPhone" label="Emergency contact phone (optional)" type="tel" /></div></> : null}
+        {id === 'identifiers' ? <><dl className="form-record-identifiers"><div><dt>Practice patient ID</dt><dd>{mrn ?? 'Assigned after adding the demo patient'}</dd></div><div><dt>Practice</dt><dd>{practice}</dd></div></dl><p className="form-help">The practice ID is read-only and separate from PhilHealth and other identifiers.</p><div className="form-grid"><FormField name="otherIdType" label="Other identifier type (optional)" placeholder="e.g. External hospital MRN" /><FormField name="otherIdIssuer" label="Identifier issuer (optional)" /><SecretField name="otherIdValue" /></div></> : null}
+      </div>
+    </section>
+  })}</div>
+}

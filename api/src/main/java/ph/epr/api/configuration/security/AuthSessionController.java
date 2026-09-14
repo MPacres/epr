@@ -37,10 +37,16 @@ class AuthSessionController {
 	record CsrfResponse(String headerName, String token) {
 	}
 
-	record SessionResponse(String username, String displayName, List<String> roles) {
+	record SessionResponse(
+		String username,
+		String displayName,
+		List<String> roles,
+		boolean passwordResetRequired
+	) {
 		static SessionResponse from(ph.epr.api.identitytenancy.PlatformUser account) {
-			return new SessionResponse(account.username(), account.displayName(), List.of(account.role().name()));
+			return new SessionResponse(
+				account.username(), account.displayName(), List.of(account.role().name()), account.passwordResetRequired()
+			);
 		}
 	}
 }
-

@@ -20,6 +20,7 @@
 .provider-scope { min-height: 40px; padding: 0 12px; border: 1px solid #bed4fa; border-radius: 8px; background: #edf4ff; color: #245bd4; font-size: 12px; text-transform: uppercase; letter-spacing: .3px; }
 .provider-scope svg, .provider-health svg, .provider-session svg { width: 17px; height: 17px; }
 .provider-search { display: flex; min-height: 42px; max-width: 520px; flex: 1; align-items: center; gap: 10px; margin: 0 auto; padding: 0 14px; border: 1px solid var(--border); border-radius: 8px; background: #fafbfe; color: #5f6f88; }
+.provider-search:hover { border-color: #c7d6ef; background: #f6f9ff; color: #315caa; }
 .provider-search span { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .provider-search strong { margin-left: auto; color: #52627b; font-size: 11px; font-weight: 500; white-space: nowrap; }
 .provider-health { color: #27664f; font-size: 12px; }
@@ -52,6 +53,7 @@
 .provider-empty h2 { margin-top: 20px; color: #10234a; font-size: 23px; }
 .provider-empty > p { max-width: 660px; margin-top: 9px; color: #65738b; font-size: 14px; line-height: 1.65; }
 .provider-start > .button { margin-top: 22px; }
+.provider-start-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 22px; }
 .provider-empty dl { display: grid; grid-template-columns: repeat(3, minmax(130px, 1fr)); width: min(100%, 620px); margin: 30px 0 0; padding-top: 24px; border-top: 1px solid var(--border); }
 .provider-empty dl > div { display: grid; gap: 6px; padding: 0 18px; }
 .provider-empty dl > div + div { border-left: 1px solid var(--border); }

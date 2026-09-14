@@ -6,6 +6,7 @@ const authUserSchema = z.object({
   username: z.string(),
   displayName: z.string(),
   roles: z.array(authRoleSchema),
+  passwordResetRequired: z.boolean(),
 })
 const csrfSchema = z.object({ headerName: z.string(), token: z.string() })
 const loginErrorSchema = z.object({ message: z.string() })
@@ -13,17 +14,18 @@ const loginErrorSchema = z.object({ message: z.string() })
 export type AuthRole = z.infer<typeof authRoleSchema>
 export type AuthUser = z.infer<typeof authUserSchema>
 export type LoginCommand = { username: string; password: string; remember: boolean }
+export type PasswordChangeCommand = { newPassword: string; confirmPassword: string; idempotencyKey: string }
 
 export class AuthRequestError extends Error {
-  readonly kind: 'credentials' | 'network' | 'server'
+  readonly kind: 'credentials' | 'authorization' | 'network' | 'server'
 
-  constructor(kind: 'credentials' | 'network' | 'server', message: string) {
+  constructor(kind: 'credentials' | 'authorization' | 'network' | 'server', message: string) {
     super(message)
     this.kind = kind
   }
 }
 
-async function requestCsrf(): Promise<z.infer<typeof csrfSchema>> {
+export async function fetchCsrfToken(): Promise<z.infer<typeof csrfSchema>> {
   const response = await fetch('/api/v1/auth/csrf', { credentials: 'include' })
   if (!response.ok) throw new AuthRequestError('server', 'Secure sign-in could not be prepared. Try again.')
   return csrfSchema.parse(await response.json())
@@ -44,7 +46,7 @@ export async function fetchSession(signal?: AbortSignal): Promise<AuthUser | nul
 
 export async function createSession(command: LoginCommand): Promise<AuthUser> {
   try {
-    const csrf = await requestCsrf()
+    const csrf = await fetchCsrfToken()
     const response = await fetch('/api/v1/auth/login', {
       method: 'POST',
       credentials: 'include',
@@ -54,6 +56,10 @@ export async function createSession(command: LoginCommand): Promise<AuthUser> {
     if (response.status === 401) {
       const error = loginErrorSchema.safeParse(await response.json())
       throw new AuthRequestError('credentials', error.success ? error.data.message : 'The username or password is incorrect.')
+    }
+    if (response.status === 403) {
+      const error = loginErrorSchema.safeParse(await response.json())
+      throw new AuthRequestError('authorization', error.success ? error.data.message : 'This account cannot use this portal.')
     }
     if (!response.ok) throw new AuthRequestError('server', 'Sign-in could not be completed. Try again.')
     return authUserSchema.parse(await response.json())
@@ -66,7 +72,7 @@ export async function createSession(command: LoginCommand): Promise<AuthUser> {
 
 export async function deleteSession(): Promise<void> {
   try {
-    const csrf = await requestCsrf()
+    const csrf = await fetchCsrfToken()
     const response = await fetch('/api/v1/auth/logout', {
       method: 'POST',
       credentials: 'include',
@@ -79,11 +85,36 @@ export async function deleteSession(): Promise<void> {
   }
 }
 
+export async function changeRequiredPassword(command: PasswordChangeCommand): Promise<AuthUser> {
+  try {
+    const csrf = await fetchCsrfToken()
+    const response = await fetch('/api/v1/auth/password-change', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'Idempotency-Key': command.idempotencyKey,
+        [csrf.headerName]: csrf.token,
+      },
+      body: JSON.stringify({ newPassword: command.newPassword, confirmPassword: command.confirmPassword }),
+    })
+    if (!response.ok) {
+      const problem = z.object({ detail: z.string().optional() }).safeParse(await response.json().catch(() => ({})))
+      throw new AuthRequestError('server', problem.success ? problem.data.detail ?? 'The password could not be changed.' : 'The password could not be changed.')
+    }
+    return authUserSchema.parse(await response.json())
+  } catch (error) {
+    if (error instanceof AuthRequestError) throw error
+    if (error instanceof TypeError) throw new AuthRequestError('network', 'The EPR service could not be reached. Check the connection and try again.')
+    throw new AuthRequestError('server', 'The password change response could not be verified.')
+  }
+}
+
 export function homePathFor(user: AuthUser, surface: PortalSurface = 'combined'): string | null {
   const isProvider = user.roles.some(role => role === 'SUPERADMIN' || role === 'PROVIDER_SUPPORT')
-  const isClinician = user.roles.includes('CLINICIAN')
+  const isTenant = user.roles.some(role => role === 'PRACTICE_STAFF' || role === 'CLINICIAN')
   if (surface === 'support') return isProvider ? '/provider' : null
-  if (surface === 'clinical') return isClinician ? '/dashboard' : null
+  if (surface === 'clinical') return isTenant ? '/dashboard' : null
   if (isProvider) return '/provider'
-  return isClinician ? '/dashboard' : null
+  return isTenant ? '/dashboard' : null
 }

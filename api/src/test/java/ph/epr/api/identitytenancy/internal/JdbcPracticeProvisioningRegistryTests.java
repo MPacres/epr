@@ -22,8 +22,10 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 import ph.epr.api.identitytenancy.PracticeProvisioningConflictException;
+import ph.epr.api.identitytenancy.PracticeAdministrationConflictException;
 import ph.epr.api.identitytenancy.PracticeProvisioningRequest;
 import ph.epr.api.identitytenancy.PracticeProvisioningStatus;
+import ph.epr.api.identitytenancy.PracticeServiceStatus;
 import ph.epr.api.identitytenancy.TenantDatabaseRoute;
 
 @Testcontainers
@@ -59,7 +61,7 @@ class JdbcPracticeProvisioningRegistryTests {
 		jdbcClient = JdbcClient.create(dataSource);
 		registry = new JdbcPracticeProvisioningRegistry(jdbcClient);
 		transaction = new TransactionTemplate(new DataSourceTransactionManager(dataSource));
-		jdbcClient.sql("TRUNCATE tenant_provisioning_event, local_tenant_database_credential, practice_role_assignment, practice_membership, practice_tenant_registry, platform_user_account CASCADE")
+		jdbcClient.sql("TRUNCATE practice_administration_event, tenant_provisioning_event, local_tenant_database_credential, practice_role_assignment, practice_membership, practice_tenant_registry, platform_user_account CASCADE")
 			.update();
 		requesterId = insertUser("requester", "SUPERADMIN", true);
 		administratorId = insertUser("administrator", "PRACTICE_STAFF", true);
@@ -103,6 +105,42 @@ class JdbcPracticeProvisioningRegistryTests {
 		assertThat(jdbcClient.sql("SELECT event_type FROM tenant_provisioning_event ORDER BY occurred_at")
 			.query(String.class)
 			.list()).containsExactly("PROVISIONING_STARTED", "PROVISIONING_SUCCEEDED");
+	}
+
+	@Test
+	void listsSearchesAndSafelyChangesPracticeServiceAccess() {
+		var request = request(UUID.randomUUID(), UUID.randomUUID(), "santos-clinic", "9".repeat(64));
+		inTransaction(() -> registry.claim(request, NOW));
+		var route = new TenantDatabaseRoute(
+			"epr_t_santos", "jdbc:postgresql://server/epr_t_santos", "runtime-ref", "migration-ref", "2"
+		);
+		var active = inTransaction(() -> registry.activate(
+			request.practiceId(), request.idempotencyKey(), 1, requesterId, route, NOW.plusSeconds(1)
+		));
+		var suspensionKey = UUID.randomUUID();
+		var suspended = inTransaction(() -> registry.changeServiceStatus(
+			request.practiceId(), PracticeServiceStatus.SUSPENDED, "Practice requested temporary closure.",
+			active.version(), suspensionKey, requesterId, NOW.plusSeconds(2)
+		));
+		var retry = inTransaction(() -> registry.changeServiceStatus(
+			request.practiceId(), PracticeServiceStatus.SUSPENDED, "Practice requested temporary closure.",
+			active.version(), suspensionKey, requesterId, NOW.plusSeconds(3)
+		));
+
+		assertThat(suspended.tenant().serviceStatus()).isEqualTo(PracticeServiceStatus.SUSPENDED);
+		assertThat(suspended.tenant().isRoutable()).isFalse();
+		assertThat(retry.tenant().version()).isEqualTo(suspended.tenant().version());
+		assertThat(registry.list("santos", null, PracticeServiceStatus.SUSPENDED, 0, 25).items())
+			.extracting(item -> item.tenant().practiceId())
+			.containsExactly(request.practiceId());
+		assertThat(jdbcClient.sql("SELECT count(*) FROM practice_administration_event")
+			.query(Integer.class).single()).isEqualTo(1);
+
+		assertThatThrownBy(() -> inTransaction(() -> registry.updateDisplayName(
+			request.practiceId(), "Santos Family Practice", active.version(), UUID.randomUUID(),
+			requesterId, NOW.plusSeconds(4)
+		))).isInstanceOf(PracticeAdministrationConflictException.class)
+			.hasMessageContaining("changed after it was loaded");
 	}
 
 	@Test
@@ -238,6 +276,38 @@ class JdbcPracticeProvisioningRegistryTests {
 			UUID.randomUUID(),
 			requesterId,
 			"5".repeat(64)
+		);
+
+		assertThat(inTransaction(() -> registry.claim(request, NOW)).provisioningRequired()).isTrue();
+	}
+
+	@Test
+	void acceptsALegacyPasswordNotIssuedAccountPreparedForThisPracticeOnly() {
+		var practiceId = UUID.randomUUID();
+		var invitedUserId = insertUser("prepared-invitee", "PRACTICE_STAFF", false);
+		jdbcClient.sql("""
+			INSERT INTO practice_administrator_setup (
+				id, practice_id, user_id, email, display_name, setup_status,
+				requested_by_user_id, created_at, updated_at
+			) VALUES (
+				:id, :practiceId, :userId, 'prepared@example.test', 'Prepared Account', 'PASSWORD_NOT_ISSUED',
+				:requesterId, :now, :now
+			)
+			""")
+			.param("id", UUID.randomUUID())
+			.param("practiceId", practiceId)
+			.param("userId", invitedUserId)
+			.param("requesterId", requesterId)
+			.param("now", NOW)
+			.update();
+		var request = new PracticeProvisioningRequest(
+			practiceId,
+			"prepared-invitee-clinic",
+			"Prepared Invitee Clinic",
+			invitedUserId,
+			UUID.randomUUID(),
+			requesterId,
+			"3".repeat(64)
 		);
 
 		assertThat(inTransaction(() -> registry.claim(request, NOW)).provisioningRequired()).isTrue();

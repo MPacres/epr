@@ -15,14 +15,20 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.session.ChangeSessionIdAuthenticationStrategy;
 import org.springframework.security.web.authentication.session.SessionAuthenticationStrategy;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.session.web.http.DefaultCookieSerializer;
+import ph.epr.api.identitytenancy.PlatformUserDirectory;
 
 @Configuration(proxyBeanMethods = false)
 @EnableMethodSecurity
 class SecurityConfiguration {
 
 	@Bean
-	SecurityFilterChain apiSecurityFilterChain(HttpSecurity http) throws Exception {
+	SecurityFilterChain apiSecurityFilterChain(
+		HttpSecurity http,
+		PlatformUserDirectory users
+	) throws Exception {
+		var requiredPasswordChangeFilter = new RequiredPasswordChangeFilter(users);
 		http
 			.authorizeHttpRequests(authorize -> authorize
 				.requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
@@ -37,6 +43,7 @@ class SecurityConfiguration {
 				.logoutSuccessHandler((request, response, authentication) -> response.setStatus(HttpStatus.NO_CONTENT.value())))
 			.formLogin(formLogin -> formLogin.disable())
 			.httpBasic(httpBasic -> httpBasic.disable());
+		http.addFilterBefore(requiredPasswordChangeFilter, AuthorizationFilter.class);
 
 		return http.build();
 	}

@@ -22,6 +22,7 @@ import ph.epr.api.identitytenancy.TenantDatabaseRoute;
 import ph.epr.api.platformoperations.application.TenantDatabaseManager;
 import ph.epr.api.platformoperations.application.TenantProvisioningException;
 import ph.epr.api.platformoperations.configuration.TenantProvisioningProperties;
+import ph.epr.api.platformoperations.domain.InitialTenantSite;
 import ph.epr.api.platformoperations.domain.TenantIdentifierPolicy;
 
 @Component
@@ -46,7 +47,7 @@ class JdbcTenantDatabaseManager implements TenantDatabaseManager {
 	}
 
 	@Override
-	public TenantDatabaseRoute provision(PracticeTenant tenant) {
+	public TenantDatabaseRoute provision(PracticeTenant tenant, InitialTenantSite initialSite) {
 		if (tenant.status() != PracticeProvisioningStatus.PROVISIONING
 			|| tenant.isRoutable()) {
 			throw new IllegalArgumentException("Only a non-routable provisioning claim can create a tenant database.");
@@ -71,8 +72,8 @@ class JdbcTenantDatabaseManager implements TenantDatabaseManager {
 			createOrVerifyDatabase(databaseName, migration.username(), runtime.username());
 			prepareTenantPrivileges(tenantJdbcUrl, migration, runtime.username());
 			var schemaVersion = migrate(tenantJdbcUrl, migration);
-			initializeTenantIdentity(tenantJdbcUrl, migration, runtime.username(), tenant);
-			verifyRuntimeRoute(tenantJdbcUrl, runtime, tenant, databaseName);
+			initializeTenantIdentity(tenantJdbcUrl, migration, runtime.username(), tenant, initialSite);
+			verifyRuntimeRoute(tenantJdbcUrl, runtime, tenant, initialSite, databaseName);
 			return new TenantDatabaseRoute(
 				databaseName,
 				tenantJdbcUrl,
@@ -188,7 +189,8 @@ class JdbcTenantDatabaseManager implements TenantDatabaseManager {
 		String tenantJdbcUrl,
 		TenantDatabaseCredential migration,
 		String runtimeRole,
-		PracticeTenant tenant
+		PracticeTenant tenant,
+		InitialTenantSite initialSite
 	) throws SQLException {
 		try (var connection = DriverManager.getConnection(tenantJdbcUrl, migration.username(), migration.password())) {
 			connection.setAutoCommit(false);
@@ -228,6 +230,7 @@ class JdbcTenantDatabaseManager implements TenantDatabaseManager {
 					statement.setObject(3, OffsetDateTime.now(clock));
 					statement.executeUpdate();
 				}
+				insertOrVerifyInitialSite(connection, tenant, initialSite);
 				execute(connection, "REVOKE INSERT, UPDATE, DELETE ON TABLE tenant_practice FROM "
 					+ identifier(runtimeRole));
 				execute(connection, "REVOKE INSERT, UPDATE, DELETE ON TABLE tenant_administrator_reference FROM "
@@ -245,6 +248,7 @@ class JdbcTenantDatabaseManager implements TenantDatabaseManager {
 		String tenantJdbcUrl,
 		TenantDatabaseCredential runtime,
 		PracticeTenant tenant,
+		InitialTenantSite initialSite,
 		String databaseName
 	) throws SQLException {
 		try (var connection = DriverManager.getConnection(tenantJdbcUrl, runtime.username(), runtime.password())) {
@@ -262,6 +266,83 @@ class JdbcTenantDatabaseManager implements TenantDatabaseManager {
 					throw new TenantProvisioningException(
 						"TENANT_DATABASE_VERIFICATION_FAILED",
 						"Tenant route verification failed closed."
+					);
+				}
+			}
+			try (var statement = connection.prepareStatement("""
+				SELECT practice_id, name, country_code, region_psgc_code,
+					province_area_psgc_code, locality_psgc_code, time_zone
+				FROM practice_site
+				WHERE site_id = ?
+				""")) {
+				statement.setObject(1, initialSite.siteId());
+				try (var resultSet = statement.executeQuery()) {
+					if (!resultSet.next()
+						|| !tenant.practiceId().equals(resultSet.getObject(1, UUID.class))
+						|| !initialSite.name().equals(resultSet.getString(2))
+						|| !initialSite.countryCode().equals(resultSet.getString(3))
+						|| !initialSite.regionCode().equals(resultSet.getString(4))
+						|| !initialSite.provinceAreaCode().equals(resultSet.getString(5))
+						|| !initialSite.localityCode().equals(resultSet.getString(6))
+						|| !"Asia/Manila".equals(resultSet.getString(7))
+						|| resultSet.next()) {
+						throw new TenantProvisioningException(
+							"TENANT_SITE_VERIFICATION_FAILED",
+							"Initial Practice site verification failed closed."
+						);
+					}
+				}
+			}
+		}
+	}
+
+	private void insertOrVerifyInitialSite(
+		Connection connection,
+		PracticeTenant tenant,
+		InitialTenantSite site
+	) throws SQLException {
+		try (var statement = connection.prepareStatement("""
+			INSERT INTO practice_site (
+				site_id, practice_id, name, facility_name, contact_number,
+				country_code, region_psgc_code, province_area_psgc_code,
+				locality_psgc_code, time_zone, created_at, updated_at
+			) VALUES (?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), ?, ?, ?, ?, 'Asia/Manila', ?, ?)
+			ON CONFLICT (site_id) DO NOTHING
+			""")) {
+			var now = OffsetDateTime.now(clock);
+			statement.setObject(1, site.siteId());
+			statement.setObject(2, tenant.practiceId());
+			statement.setString(3, site.name());
+			statement.setString(4, site.facilityName());
+			statement.setString(5, site.contactNumber());
+			statement.setString(6, site.countryCode());
+			statement.setString(7, site.regionCode());
+			statement.setString(8, site.provinceAreaCode());
+			statement.setString(9, site.localityCode());
+			statement.setObject(10, now);
+			statement.setObject(11, now);
+			statement.executeUpdate();
+		}
+		try (var statement = connection.prepareStatement("""
+			SELECT practice_id, name, COALESCE(facility_name, ''), COALESCE(contact_number, ''),
+				country_code, region_psgc_code, province_area_psgc_code, locality_psgc_code
+			FROM practice_site
+			WHERE site_id = ?
+			""")) {
+			statement.setObject(1, site.siteId());
+			try (var resultSet = statement.executeQuery()) {
+				if (!resultSet.next()
+					|| !tenant.practiceId().equals(resultSet.getObject(1, UUID.class))
+					|| !site.name().equals(resultSet.getString(2))
+					|| !site.facilityName().equals(resultSet.getString(3))
+					|| !site.contactNumber().equals(resultSet.getString(4))
+					|| !site.countryCode().equals(resultSet.getString(5))
+					|| !site.regionCode().equals(resultSet.getString(6))
+					|| !site.provinceAreaCode().equals(resultSet.getString(7))
+					|| !site.localityCode().equals(resultSet.getString(8))) {
+					throw new TenantProvisioningException(
+						"TENANT_SITE_IDENTITY_MISMATCH",
+						"The initial Practice site does not match the provisioning request."
 					);
 				}
 			}

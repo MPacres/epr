@@ -136,12 +136,16 @@ export function Login({ surface = 'combined' }: { surface?: PortalSurface }) {
     document.title = `${portalLabel(surface)} sign in · EPR`
     if (auth.status === 'authenticated' && !isSubmitting) {
       const destination = homePathFor(auth.user, surface)
-      if (destination) navigate(destination, { replace: true })
-      else if (!notice) {
-        void auth.signOut()
-          .then(() => setNotice({ tone: 'error', message: wrongPortalMessage(surface) }))
-          .catch(() => setNotice({ tone: 'error', message: 'This account is not authorized for this portal. Sign out and use the correct portal.' }))
+      if (!destination) {
+        if (!notice) {
+          void auth.signOut()
+            .then(() => setNotice({ tone: 'error', message: wrongPortalMessage(surface) }))
+            .catch(() => setNotice({ tone: 'error', message: 'This account is not authorized for this portal. Sign out and use the correct portal.' }))
+        }
+        return
       }
+      if (auth.user.passwordResetRequired) navigate('/password-reset', { replace: true })
+      else if (destination) navigate(destination, { replace: true })
     } else {
       usernameRef.current?.focus({ preventScroll: true })
     }
@@ -155,6 +159,10 @@ export function Login({ surface = 'combined' }: { surface?: PortalSurface }) {
       if (!destination) {
         await auth.signOut()
         setNotice({ tone: 'error', message: wrongPortalMessage(surface) })
+        return
+      }
+      if (user.passwordResetRequired) {
+        navigate('/password-reset', { replace: true })
         return
       }
       navigate(destination, { replace: true })

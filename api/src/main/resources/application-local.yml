@@ -14,6 +14,9 @@ server:
         secure: ${EPR_SECURE_COOKIES:false}
 
 epr:
+  portal:
+    clinical-hostname: ${EPR_CLINICAL_HOSTNAME:epr.test}
+    support-hostname: ${EPR_SUPPORT_HOSTNAME:support.epr.test}
   local-auth:
     superadmin:
       username: ${EPR_LOCAL_SUPERADMIN_USERNAME:superadmin}

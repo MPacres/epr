@@ -6,6 +6,7 @@ import { PatientPreviewProvider } from './features/patients/PatientPreviewProvid
 import { portalSurfaceForHostname } from './features/auth/portal-surface'
 const Dashboard = lazy(() => import('./features/dashboard/Dashboard').then(module => ({ default: module.Dashboard })))
 const Login = lazy(() => import('./features/auth/Login').then(module => ({ default: module.Login })))
+const PasswordReset = lazy(() => import('./features/auth/PasswordReset').then(module => ({ default: module.PasswordReset })))
 const ProviderPortal = lazy(() => import('./features/provider/ProviderPortal').then(module => ({ default: module.ProviderPortal })))
 const PatientForm = lazy(() => import('./features/patients/PatientForm').then(module => ({ default: module.PatientForm })))
 const PatientChart = lazy(() => import('./features/chart/PatientChart').then(module => ({ default: module.PatientChart })))
@@ -42,13 +43,14 @@ const portalSurface = portalSurfaceForHostname(
   import.meta.env.VITE_SUPPORT_HOSTNAME,
 )
 const loginRoute = { path: '/login', element: <Login surface={portalSurface} /> }
+const passwordResetRoute = { path: '/password-reset', element: <PasswordReset surface={portalSurface} /> }
 const providerRoute = { path: '/provider/*', element: <RequireAuth roles={['SUPERADMIN', 'PROVIDER_SUPPORT']}><ProviderPortal /></RequireAuth> }
-const clinicalRoute = { path: '*', element: <RequireAuth roles={['CLINICIAN']}><PatientPreviewProvider><WorkspaceRoute /></PatientPreviewProvider></RequireAuth> }
+const clinicalRoute = { path: '*', element: <RequireAuth roles={['PRACTICE_STAFF', 'CLINICIAN']}><PatientPreviewProvider><WorkspaceRoute /></PatientPreviewProvider></RequireAuth> }
 const router = createHashRouter(portalSurface === 'support'
-  ? [loginRoute, providerRoute, { path: '*', element: <Navigate to="/provider" replace /> }]
+  ? [loginRoute, passwordResetRoute, providerRoute, { path: '*', element: <Navigate to="/provider" replace /> }]
   : portalSurface === 'clinical'
-    ? [loginRoute, { path: '/provider/*', element: <Navigate to="/dashboard" replace /> }, clinicalRoute]
-    : [loginRoute, providerRoute, clinicalRoute])
+    ? [loginRoute, passwordResetRoute, { path: '/provider/*', element: <Navigate to="/dashboard" replace /> }, clinicalRoute]
+    : [loginRoute, passwordResetRoute, providerRoute, clinicalRoute])
 export default function App() {
   return <AuthProvider><Suspense fallback={<main className="auth-status-page"><span className="auth-status-mark" aria-hidden="true" /><h1>Loading EPR</h1><p role="status">Preparing your workspace…</p></main>}><RouterProvider router={router} /></Suspense></AuthProvider>
 }

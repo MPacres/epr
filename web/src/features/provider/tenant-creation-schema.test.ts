@@ -7,8 +7,10 @@ const validPractice = {
   administratorEmail: 'alex.reyes@example.test',
   siteName: 'Santos Clinic · Makati',
   facilityName: 'Makati Medical Arts Building',
-  cityMunicipality: 'Makati City',
-  province: 'Metro Manila',
+  countryCode: 'PH',
+  regionCode: '1300000000',
+  provinceCode: '1300000000',
+  cityMunicipalityCode: '1380300000',
   contactNumber: '+63 917 000 0000',
 }
 
@@ -36,5 +38,34 @@ describe('tenantCreationSchema', () => {
 
   it('keeps the shared physical facility optional', () => {
     expect(tenantCreationSchema.safeParse({ ...validPractice, facilityName: '' })).toMatchObject({ success: true })
+  })
+
+  it('rejects a city or municipality outside the selected province area', () => {
+    const result = tenantCreationSchema.safeParse({
+      ...validPractice,
+      regionCode: '0300000000',
+      provinceCode: '0304900000',
+    })
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.flatten().fieldErrors.cityMunicipalityCode).toEqual([
+        'Select a city or municipality within the chosen province or area.',
+      ])
+    }
+  })
+
+  it('rejects a province area outside the selected region', () => {
+    const result = tenantCreationSchema.safeParse({
+      ...validPractice,
+      regionCode: '0300000000',
+    })
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.flatten().fieldErrors.provinceCode).toEqual([
+        'Select a province or independent area within the chosen region.',
+      ])
+    }
   })
 })

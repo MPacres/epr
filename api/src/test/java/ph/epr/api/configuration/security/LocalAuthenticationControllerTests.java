@@ -44,7 +44,9 @@ class LocalAuthenticationControllerTests {
 
 	@Test
 	void createsRememberedSessionOnlyAfterSuccessfulAuthentication() {
-		var account = new PlatformUser(UUID.randomUUID(), "superadmin", "Local Superadmin", "hash", PlatformRole.SUPERADMIN, true);
+		var account = new PlatformUser(
+			UUID.randomUUID(), "superadmin", "Local Superadmin", "hash", PlatformRole.SUPERADMIN, true, false
+		);
 		var authentication = UsernamePasswordAuthenticationToken.authenticated(
 			"superadmin",
 			null,
@@ -54,6 +56,7 @@ class LocalAuthenticationControllerTests {
 		when(users.findByUsername("superadmin")).thenReturn(Optional.of(account));
 		var controller = controller();
 		var request = new MockHttpServletRequest();
+		request.setServerName("support.epr.test");
 		var response = new MockHttpServletResponse();
 
 		var result = controller.login(
@@ -63,10 +66,73 @@ class LocalAuthenticationControllerTests {
 		);
 
 		assertThat(result.getStatusCode().value()).isEqualTo(200);
+		assertThat(((AuthSessionController.SessionResponse) result.getBody()).passwordResetRequired()).isFalse();
 		assertThat(request.getAttribute(LocalAuthenticationController.REMEMBER_ME_ATTRIBUTE)).isEqualTo(Boolean.TRUE);
 		assertThat(request.getSession().getMaxInactiveInterval()).isEqualTo(30 * 24 * 60 * 60);
 		verify(sessionAuthenticationStrategy).onAuthentication(authentication, request, response);
 		verify(securityContextRepository).saveContext(any(), any(), any());
+	}
+
+	@Test
+	void allowsPracticeStaffToCreateASessionOnTheClinicalHost() {
+		var account = account("tenant@example.test", PlatformRole.PRACTICE_STAFF, true);
+		var authentication = authentication(account);
+		when(authenticationManager.authenticate(any())).thenReturn(authentication);
+		when(users.findByUsername(account.username())).thenReturn(Optional.of(account));
+		var request = new MockHttpServletRequest();
+		request.setServerName("epr.test");
+
+		var result = controller().login(
+			new LocalAuthenticationController.LoginRequest(account.username(), "correct", false),
+			request,
+			new MockHttpServletResponse()
+		);
+
+		assertThat(result.getStatusCode().value()).isEqualTo(200);
+		verify(sessionAuthenticationStrategy).onAuthentication(any(), any(), any());
+		verify(securityContextRepository).saveContext(any(), any(), any());
+	}
+
+	@Test
+	void rejectsPracticeStaffOnTheSupportHostWithoutCreatingASession() {
+		var account = account("tenant@example.test", PlatformRole.PRACTICE_STAFF, true);
+		when(authenticationManager.authenticate(any())).thenReturn(authentication(account));
+		when(users.findByUsername(account.username())).thenReturn(Optional.of(account));
+		var request = new MockHttpServletRequest();
+		request.setServerName("support.epr.test");
+
+		var result = controller().login(
+			new LocalAuthenticationController.LoginRequest(account.username(), "correct", false),
+			request,
+			new MockHttpServletResponse()
+		);
+
+		assertThat(result.getStatusCode().value()).isEqualTo(403);
+		assertThat(((LocalAuthenticationController.LoginError) result.getBody()).code())
+			.isEqualTo("PORTAL_ACCESS_DENIED");
+		assertThat(request.getSession(false)).isNull();
+		verify(sessionAuthenticationStrategy, never()).onAuthentication(any(), any(), any());
+		verify(securityContextRepository, never()).saveContext(any(), any(), any());
+	}
+
+	@Test
+	void rejectsProviderAccountsOnTheClinicalHostWithoutCreatingASession() {
+		var account = account("superadmin", PlatformRole.SUPERADMIN, false);
+		when(authenticationManager.authenticate(any())).thenReturn(authentication(account));
+		when(users.findByUsername(account.username())).thenReturn(Optional.of(account));
+		var request = new MockHttpServletRequest();
+		request.setServerName("epr.test");
+
+		var result = controller().login(
+			new LocalAuthenticationController.LoginRequest(account.username(), "correct", false),
+			request,
+			new MockHttpServletResponse()
+		);
+
+		assertThat(result.getStatusCode().value()).isEqualTo(403);
+		assertThat(request.getSession(false)).isNull();
+		verify(sessionAuthenticationStrategy, never()).onAuthentication(any(), any(), any());
+		verify(securityContextRepository, never()).saveContext(any(), any(), any());
 	}
 
 	@Test
@@ -89,6 +155,22 @@ class LocalAuthenticationControllerTests {
 	}
 
 	private LocalAuthenticationController controller() {
-		return new LocalAuthenticationController(authenticationManager, securityContextRepository, sessionAuthenticationStrategy, users);
+		return new LocalAuthenticationController(
+			authenticationManager,
+			securityContextRepository,
+			sessionAuthenticationStrategy,
+			users,
+			new PortalHostAccessPolicy("epr.test", "support.epr.test")
+		);
+	}
+
+	private PlatformUser account(String username, PlatformRole role, boolean passwordResetRequired) {
+		return new PlatformUser(UUID.randomUUID(), username, "Test User", "hash", role, true, passwordResetRequired);
+	}
+
+	private UsernamePasswordAuthenticationToken authentication(PlatformUser account) {
+		return UsernamePasswordAuthenticationToken.authenticated(
+			account.username(), null, List.of(new SimpleGrantedAuthority("ROLE_" + account.role().name()))
+		);
 	}
 }

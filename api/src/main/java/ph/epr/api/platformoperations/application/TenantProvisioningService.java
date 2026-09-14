@@ -10,6 +10,8 @@ import org.springframework.stereotype.Service;
 
 import ph.epr.api.identitytenancy.PlatformRole;
 import ph.epr.api.identitytenancy.PlatformUser;
+import ph.epr.api.identitytenancy.PlatformUserDirectory;
+import ph.epr.api.identitytenancy.PracticeAdministratorSetup;
 import ph.epr.api.identitytenancy.PracticeProvisioningRegistry;
 import ph.epr.api.identitytenancy.PracticeProvisioningRequest;
 import ph.epr.api.identitytenancy.PracticeTenant;
@@ -23,37 +25,47 @@ public class TenantProvisioningService {
 	private static final String FAILURE_MESSAGE = "Tenant database provisioning did not complete; the tenant remains quarantined.";
 
 	private final PracticeProvisioningRegistry registry;
+	private final PlatformUserDirectory users;
 	private final TenantDatabaseManager databaseManager;
 	private final Clock clock;
 
 	public TenantProvisioningService(
 		PracticeProvisioningRegistry registry,
+		PlatformUserDirectory users,
 		TenantDatabaseManager databaseManager,
 		Clock clock
 	) {
 		this.registry = registry;
+		this.users = users;
 		this.databaseManager = databaseManager;
 		this.clock = clock;
 	}
 
 	public ProvisioningResult provision(PlatformUser actor, TenantCreationRequest request) {
 		requireSuperadmin(actor);
+		var administrator = users.preparePracticeAdministrator(
+			request.practiceId(),
+			request.administratorName(),
+			request.administratorEmail(),
+			actor.id(),
+			now()
+		);
 		var registryRequest = new PracticeProvisioningRequest(
 			request.practiceId(),
 			request.practiceCode(),
 			request.displayName(),
-			request.initialAdministratorUserId(),
+			administrator.userId(),
 			request.idempotencyKey(),
 			actor.id(),
 			request.fingerprint()
 		);
 		var claim = registry.claim(registryRequest, now());
 		if (!claim.provisioningRequired()) {
-			return new ProvisioningResult(claim.tenant(), false);
+			return new ProvisioningResult(claim.tenant(), false, administrator);
 		}
 
 		try {
-			var route = databaseManager.provision(claim.tenant());
+			var route = databaseManager.provision(claim.tenant(), request.initialSite());
 			return new ProvisioningResult(
 				registry.activate(
 					request.practiceId(),
@@ -63,7 +75,8 @@ public class TenantProvisioningService {
 					route,
 					now()
 				),
-				true
+				true,
+				administrator
 			);
 		}
 		catch (RuntimeException exception) {
@@ -106,6 +119,10 @@ public class TenantProvisioningService {
 		return OffsetDateTime.now(clock);
 	}
 
-	public record ProvisioningResult(PracticeTenant tenant, boolean provisioningPerformed) {
+	public record ProvisioningResult(
+		PracticeTenant tenant,
+		boolean provisioningPerformed,
+		PracticeAdministratorSetup administrator
+	) {
 	}
 }

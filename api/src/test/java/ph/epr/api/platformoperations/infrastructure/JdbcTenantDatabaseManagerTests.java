@@ -19,8 +19,10 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 import ph.epr.api.identitytenancy.PracticeProvisioningStatus;
+import ph.epr.api.identitytenancy.PracticeServiceStatus;
 import ph.epr.api.identitytenancy.PracticeTenant;
 import ph.epr.api.platformoperations.configuration.TenantProvisioningProperties;
+import ph.epr.api.platformoperations.domain.InitialTenantSite;
 import ph.epr.api.platformoperations.domain.TenantIdentifierPolicy;
 
 @Testcontainers
@@ -38,14 +40,16 @@ class JdbcTenantDatabaseManagerTests {
 		var first = tenant("makati-family-clinic", "Makati Family Clinic");
 		var second = tenant("quezon-primary-care", "Quezon Primary Care");
 
-		var firstRoute = manager.provision(first);
-		var repeatedRoute = manager.provision(first);
-		var secondRoute = manager.provision(second);
+		var firstSite = site("Makati Clinic");
+		var secondSite = site("Quezon Clinic");
+		var firstRoute = manager.provision(first, firstSite);
+		var repeatedRoute = manager.provision(first, firstSite);
+		var secondRoute = manager.provision(second, secondSite);
 
 		assertThat(repeatedRoute).isEqualTo(firstRoute);
 		assertThat(firstRoute.databaseName()).isNotEqualTo(secondRoute.databaseName());
-		assertThat(firstRoute.schemaVersion()).isEqualTo("1");
-		assertThat(secondRoute.schemaVersion()).isEqualTo("1");
+		assertThat(firstRoute.schemaVersion()).isEqualTo("2");
+		assertThat(secondRoute.schemaVersion()).isEqualTo("2");
 
 		var firstRuntime = credentials.credential(first.practiceId(), TenantCredentialStore.CredentialPurpose.RUNTIME);
 		try (var connection = DriverManager.getConnection(
@@ -57,6 +61,20 @@ class JdbcTenantDatabaseManagerTests {
 			assertThat(resultSet.getObject(1, UUID.class)).isEqualTo(first.practiceId());
 			assertThat(resultSet.getString(2)).isEqualTo(first.code());
 			assertThat(resultSet.next()).isFalse();
+		}
+		try (var connection = DriverManager.getConnection(
+			firstRoute.jdbcUrl(), firstRuntime.username(), firstRuntime.password()
+		); var statement = connection.prepareStatement("""
+			SELECT practice_id, name, locality_psgc_code, time_zone FROM practice_site WHERE site_id = ?
+			""")) {
+			statement.setObject(1, firstSite.siteId());
+			try (var resultSet = statement.executeQuery()) {
+				assertThat(resultSet.next()).isTrue();
+				assertThat(resultSet.getObject(1, UUID.class)).isEqualTo(first.practiceId());
+				assertThat(resultSet.getString(2)).isEqualTo("Makati Clinic");
+				assertThat(resultSet.getString(3)).isEqualTo("1380300000");
+				assertThat(resultSet.getString(4)).isEqualTo("Asia/Manila");
+			}
 		}
 		assertThatThrownBy(() -> {
 			try (var connection = DriverManager.getConnection(
@@ -90,8 +108,15 @@ class JdbcTenantDatabaseManagerTests {
 			statement.execute("CREATE ROLE \"" + role + "\" LOGIN CREATEDB PASSWORD 'UnsafeRolePassword000000000000000000000000'");
 		}
 
-		assertThatThrownBy(() -> manager(new FakeTenantCredentialStore()).provision(tenant))
+		assertThatThrownBy(() -> manager(new FakeTenantCredentialStore()).provision(tenant, site("Unsafe Clinic")))
 			.hasMessage("A server-derived tenant role exists with unsafe privileges.");
+	}
+
+	private InitialTenantSite site(String name) {
+		return new InitialTenantSite(
+			UUID.randomUUID(), name, "Medical Arts Building", "+63 917 000 0000",
+			"PH", "1300000000", "1300000000", "1380300000"
+		);
 	}
 
 	private JdbcTenantDatabaseManager manager(TenantCredentialStore credentialStore) {
@@ -119,12 +144,16 @@ class JdbcTenantDatabaseManagerTests {
 			displayName,
 			UUID.randomUUID(),
 			PracticeProvisioningStatus.PROVISIONING,
+			PracticeServiceStatus.ENABLED,
 			null,
 			null,
 			null,
 			null,
 			null,
 			1,
+			null,
+			null,
+			null,
 			null,
 			null,
 			now,

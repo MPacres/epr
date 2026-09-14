@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
-import { createSession, deleteSession, fetchSession, type LoginCommand } from './auth-client'
+import { changeRequiredPassword, createSession, deleteSession, fetchSession, type LoginCommand, type PasswordChangeCommand } from './auth-client'
 import { AuthContext, type AuthState } from './auth-context'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -38,5 +38,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState({ status: 'unauthenticated', user: null, message: null })
   }, [])
 
-  return <AuthContext.Provider value={{ ...state, signIn, signOut, retry }}>{children}</AuthContext.Provider>
+  const changePassword = useCallback(async (command: PasswordChangeCommand) => {
+    const user = await changeRequiredPassword(command)
+    setState({ status: 'authenticated', user, message: null })
+    return user
+  }, [])
+
+  return <AuthContext.Provider value={{ ...state, signIn, signOut, changePassword, retry }}>{children}</AuthContext.Provider>
 }

@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react'
-import type { AuthUser, LoginCommand } from './auth-client'
+import type { AuthUser, LoginCommand, PasswordChangeCommand } from './auth-client'
 
 export type AuthState =
   | { status: 'loading'; user: null; message: null }
@@ -10,6 +10,7 @@ export type AuthState =
 export type AuthContextValue = AuthState & {
   signIn: (command: LoginCommand) => Promise<AuthUser>
   signOut: () => Promise<void>
+  changePassword: (command: PasswordChangeCommand) => Promise<AuthUser>
   retry: () => Promise<void>
 }
 
@@ -20,4 +21,3 @@ export function useAuth() {
   if (!context) throw new Error('Authentication requires AuthProvider')
   return context
 }
-

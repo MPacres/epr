@@ -18,6 +18,9 @@ export function RequireAuth({ children, roles }: { children: ReactNode; roles: A
   if (auth.status === 'unauthenticated') {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />
   }
+  if (auth.user.passwordResetRequired) {
+    return <Navigate to="/password-reset" replace />
+  }
   if (!roles.some(role => auth.user.roles.includes(role))) {
     return <Navigate to={homePathFor(auth.user) ?? '/login'} replace />
   }

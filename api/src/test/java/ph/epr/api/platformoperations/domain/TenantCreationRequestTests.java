@@ -12,12 +12,14 @@ class TenantCreationRequestTests {
 	@Test
 	void createsStableServerSideNamesAndRequestFingerprint() {
 		var practiceId = UUID.fromString("8fb6b6e2-0e49-4879-80d7-e48ef5ab1259");
-		var administratorId = UUID.fromString("2a570acc-39a0-4b50-91bc-8b6ca2df0f2d");
+		var site = site();
 		var request = new TenantCreationRequest(
 			practiceId,
 			"makati-family-clinic",
 			"Makati Family Clinic",
-			administratorId,
+			"Alex Reyes",
+			"Alex.Reyes@Example.Test",
+			site,
 			UUID.randomUUID()
 		);
 
@@ -32,7 +34,9 @@ class TenantCreationRequestTests {
 			practiceId,
 			"makati-family-clinic",
 			"Makati Family Clinic",
-			administratorId,
+			"Alex Reyes",
+			"alex.reyes@example.test",
+			site,
 			UUID.randomUUID()
 		).fingerprint());
 	}
@@ -52,8 +56,23 @@ class TenantCreationRequestTests {
 			UUID.randomUUID(),
 			code,
 			displayName,
-			UUID.randomUUID(),
+			"Alex Reyes",
+			"alex.reyes@example.test",
+			site(),
 			UUID.randomUUID()
+		);
+	}
+
+	private InitialTenantSite site() {
+		return new InitialTenantSite(
+			UUID.fromString("85a572b4-f3a4-49b0-99ba-1a819598c395"),
+			"Makati Clinic",
+			"Medical Arts Building",
+			"+63 917 000 0000",
+			"PH",
+			"1300000000",
+			"1300000000",
+			"1380300000"
 		);
 	}
 }

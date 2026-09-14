@@ -8,7 +8,7 @@ public record PlatformUser(
 	String displayName,
 	String passwordHash,
 	PlatformRole role,
-	boolean enabled
+	boolean enabled,
+	boolean passwordResetRequired
 ) {
 }
-

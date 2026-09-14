@@ -35,17 +35,20 @@ class LocalAuthenticationController {
 	private final SecurityContextRepository securityContextRepository;
 	private final SessionAuthenticationStrategy sessionAuthenticationStrategy;
 	private final PlatformUserDirectory users;
+	private final PortalHostAccessPolicy portalAccess;
 
 	LocalAuthenticationController(
 		AuthenticationManager authenticationManager,
 		SecurityContextRepository securityContextRepository,
 		SessionAuthenticationStrategy sessionAuthenticationStrategy,
-		PlatformUserDirectory users
+		PlatformUserDirectory users,
+		PortalHostAccessPolicy portalAccess
 	) {
 		this.authenticationManager = authenticationManager;
 		this.securityContextRepository = securityContextRepository;
 		this.sessionAuthenticationStrategy = sessionAuthenticationStrategy;
 		this.users = users;
+		this.portalAccess = portalAccess;
 	}
 
 	@PostMapping("/login")
@@ -58,6 +61,14 @@ class LocalAuthenticationController {
 			var authentication = authenticationManager.authenticate(
 				UsernamePasswordAuthenticationToken.unauthenticated(credentials.username(), credentials.password())
 			);
+			var account = users.findByUsername(authentication.getName()).orElse(null);
+			if (account == null || !account.enabled()) {
+				return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+			}
+			if (!portalAccess.permits(request.getServerName(), account.role())) {
+				return ResponseEntity.status(HttpStatus.FORBIDDEN)
+					.body(new LoginError("PORTAL_ACCESS_DENIED", portalAccess.denialMessage(request.getServerName())));
+			}
 			if (credentials.remember()) {
 				request.setAttribute(REMEMBER_ME_ATTRIBUTE, Boolean.TRUE);
 				request.getSession(true).setMaxInactiveInterval(REMEMBERED_SESSION_SECONDS);
@@ -68,9 +79,7 @@ class LocalAuthenticationController {
 			SecurityContextHolder.setContext(context);
 			securityContextRepository.saveContext(context, request, response);
 
-			return users.findByUsername(authentication.getName())
-				.map(account -> ResponseEntity.ok(AuthSessionController.SessionResponse.from(account)))
-				.orElseGet(() -> ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
+			return ResponseEntity.ok(AuthSessionController.SessionResponse.from(account));
 		}
 		catch (AuthenticationException exception) {
 			return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
@@ -84,4 +93,3 @@ class LocalAuthenticationController {
 	record LoginError(String code, String message) {
 	}
 }
-

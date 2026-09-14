@@ -79,11 +79,11 @@ password: ChangeMe123!
 
 Override them with `EPR_LOCAL_SUPERADMIN_USERNAME`, `EPR_LOCAL_SUPERADMIN_PASSWORD`, and `EPR_LOCAL_SUPERADMIN_DISPLAY_NAME`. The seeder hashes the configured password with BCrypt and updates the local account on each start. This adapter is not the production authentication design: Cognito authorization code flow with PKCE and MFA, tenant authorization/grants, clinical endpoints, and domain persistence remain to be implemented.
 
-The browser flow uses `/api/v1/auth/csrf`, `/api/v1/auth/login`, `/api/v1/auth/session`, and `/api/v1/auth/logout`. The `EPR_SESSION` cookie is `HttpOnly`; login/logout require the returned CSRF header and token. “Keep me signed in” extends the local session to 30 days and emits a persistent session cookie.
+The browser flow uses `/api/v1/auth/csrf`, `/api/v1/auth/login`, `/api/v1/auth/session`, `/api/v1/auth/password-change`, and `/api/v1/auth/logout`. The local login endpoint admits `PRACTICE_STAFF` and `CLINICIAN` accounts only on the configured clinical host, and `SUPERADMIN` and `PROVIDER_SUPPORT` accounts only on the configured support host; localhost and direct-IP development retain the combined compatibility surface. The `EPR_SESSION` cookie is `HttpOnly`; state-changing authentication requests require the returned CSRF header and token. “Keep me signed in” extends the local session to 30 days and emits a persistent session cookie.
 
 ## Create a Practice tenant locally
 
-Tenant creation is restricted to a currently enabled `SUPERADMIN` and requires a UUID idempotency key. The initial administrator must already be an enabled `CLINICIAN` or non-clinical `PRACTICE_STAFF` platform account; provider authority is never converted into Practice membership or chart access. The resulting `PRACTICE_ADMINISTRATOR` membership manages the workspace but does not itself grant clinical-record access. After login and CSRF setup, send:
+Tenant creation is restricted to a currently enabled `SUPERADMIN` and requires a UUID idempotency key. A matching enabled `CLINICIAN` or non-clinical `PRACTICE_STAFF` account is linked only when both email and display name match. Otherwise an enabled `PRACTICE_STAFF` identity is created with a generated temporary password that is returned once, persisted only as a BCrypt hash, and required to be replaced at first login. No email invitation is sent; support staff hand the credentials to the administrator personally. Provider authority is never converted into Practice membership or chart access. The resulting `PRACTICE_ADMINISTRATOR` membership manages the workspace but does not itself grant clinical-record access. After login and CSRF setup, send:
 
 ```http
 POST /api/v1/admin/practices
@@ -95,14 +95,50 @@ X-XSRF-TOKEN: <current token>
   "practiceId": "3b9c3672-142d-44e0-8404-e37faf43f870",
   "practiceCode": "makati-family-clinic",
   "displayName": "Makati Family Clinic",
-  "initialAdministratorUserId": "<enabled platform user UUID>"
+  "administratorName": "Alex Reyes",
+  "administratorEmail": "alex.reyes@example.test",
+  "initialSite": {
+    "siteId": "85a572b4-f3a4-49b0-99ba-1a819598c395",
+    "name": "Makati Clinic",
+    "facilityName": "Medical Arts Building",
+    "contactNumber": "+63 917 000 0000",
+    "countryCode": "PH",
+    "regionCode": "1300000000",
+    "provinceAreaCode": "1300000000",
+    "localityCode": "1380300000"
+  }
 }
 ```
 
-`201 Created` means role creation, database creation, the tenant Flyway migration, tenant-identity verification, registry activation, and initial membership creation all completed. Repeating the same request and idempotency key is safe. A request already in progress returns `202 Accepted`; inspect it with `GET /api/v1/admin/practices/{practiceId}`. Failures remain `QUARANTINED`, non-routable, and retryable with the original key. The response intentionally omits database names, JDBC routes, usernames, and secret references.
+`201 Created` means role creation, database creation, the tenant Flyway migrations, tenant and first-site verification, registry activation, and initial membership creation all completed. The creation response includes `temporaryPassword` only when a new password was generated; it is `null` for safe retries and existing-account links. Repeating the same request and idempotency key is safe. A request already in progress returns `202 Accepted`; inspect it with `GET /api/v1/admin/practices/{practiceId}`. Failures remain `QUARANTINED`, non-routable, and retryable with the original key. The response intentionally omits database names, JDBC routes, usernames, and secret references.
 
 Local provisioning uses the Compose database-owner credential for PostgreSQL administration and an AES-GCM-encrypted development credential store in the control plane. Set `EPR_TENANT_CREDENTIAL_ENCRYPTION_KEY` to a Base64-encoded 32-byte value before using shared development infrastructure. This adapter is not the production secret design: production enablement remains blocked until the AWS Secrets Manager adapter, restricted RDS provisioning role, fleet migration controller, and bounded runtime datasource pool are implemented and verified.
 
+## Manage Practice tenants locally
+
+The same enabled `SUPERADMIN` can list and search control-plane Practice records, inspect one record, edit its display name, and suspend or reactivate service access. These operations expose operational metadata only and never database routes, credentials, or patient records. Write requests require the current optimistic `version`, a UUID `Idempotency-Key`, and the CSRF header used elsewhere by the browser session.
+
+```http
+GET /api/v1/admin/practices?search=makati&serviceStatus=ENABLED&page=0&size=25
+GET /api/v1/admin/practices/{practiceId}
+
+PATCH /api/v1/admin/practices/{practiceId}
+Idempotency-Key: <uuid>
+Content-Type: application/json
+X-XSRF-TOKEN: <current token>
+
+{"displayName":"Makati Family Practice","version":2}
+
+POST /api/v1/admin/practices/{practiceId}/suspension
+Idempotency-Key: <uuid>
+Content-Type: application/json
+X-XSRF-TOKEN: <current token>
+
+{"reason":"Practice requested a temporary service hold.","version":3}
+```
+
+Use `/reactivation` with the same reason/version contract to restore access. Provisioning status and service status are intentionally separate. A suspended Practice remains preserved but `PracticeTenant.isRoutable()` returns false. Every successful name or lifecycle change records an append-only administration event with actor, before/after value, reason where required, idempotency key, resulting version, and occurrence time. Stale versions and reuse of a key for a different action return a conflict. Permanent decommission is not implemented; it remains blocked on verified export, retention, restore, membership, and unresolved-clinical-work preflight.
+
 ## Database migrations
 
-Flyway connects as `epr_migrator` and owns control-plane schema changes. The main datasource connects as `epr_app`; Hibernate runs with `ddl-auto: validate`. Control-plane migrations create framework tables, global platform users, the tenant registry, Practice memberships with separate multi-role assignments, append-only provisioning events, and the encrypted local credential adapter. Tenant migrations are kept separately under `db/tenant-migration` and currently create the verified tenant identity plus the initial administrator reference. Runtime tenant datasource lifecycle, AWS Secrets Manager, RDS/IAM administration, and controlled fleet migrations remain to be implemented before production use.
+Flyway connects as `epr_migrator` and owns control-plane schema changes. The main datasource connects as `epr_app`; Hibernate runs with `ddl-auto: validate`. Control-plane migrations create framework tables, global platform users, administrator credential setup state, the tenant registry, Practice memberships with separate multi-role assignments, independent service-access state, append-only provisioning and administration events, and the encrypted local credential adapter. Tenant migrations are kept separately under `db/tenant-migration` and currently create the verified tenant identity, initial administrator reference, and first Practice site. Runtime tenant datasource lifecycle, AWS Secrets Manager, RDS/IAM administration, controlled fleet migrations, and permanent decommission remain to be implemented before production use.

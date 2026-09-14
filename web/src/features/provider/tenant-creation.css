@@ -7,8 +7,12 @@
 .tenant-create-heading p { max-width: 720px; margin-top: 7px; color: #65738b; font-size: 15px; line-height: 1.5; }
 .tenant-draft-status { display: inline-flex; min-height: 36px; align-items: center; gap: 7px; padding: 0 11px; border-radius: 7px; background: #f0f4f9; color: #53627a; font-size: 11px; font-weight: 500; white-space: nowrap; }
 .tenant-draft-status svg { width: 16px; height: 16px; }
-.tenant-create-layout, .tenant-review-layout { display: grid; grid-template-columns: minmax(0, 1fr) 330px; align-items: start; gap: 18px; margin-top: 24px; }
-.tenant-form-sheet, .tenant-review-sheet { min-width: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; background: #fff; }
+.tenant-result-status { display: inline-flex; min-height: 36px; align-items: center; gap: 7px; padding: 0 11px; border-radius: 7px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.tenant-result-status svg { width: 16px; height: 16px; }
+.tenant-result-status.active { background: #eaf8f2; color: #087953; }
+.tenant-result-status.pending { background: #fff5e4; color: #86530f; }
+.tenant-create-layout, .tenant-review-layout, .tenant-result-layout { display: grid; grid-template-columns: minmax(0, 1fr) 330px; align-items: start; gap: 18px; margin-top: 24px; }
+.tenant-form-sheet, .tenant-review-sheet, .tenant-result-sheet { min-width: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; background: #fff; }
 .tenant-form-section { padding: 26px 28px 28px; }
 .tenant-form-section + .tenant-form-section { border-top: 1px solid var(--border); }
 .tenant-section-heading { display: flex; align-items: flex-start; gap: 13px; margin-bottom: 22px; }
@@ -22,11 +26,13 @@
 .tenant-field label { display: block; margin-bottom: 7px; color: #263854; font-size: 12px; font-weight: 600; line-height: 1.4; }
 .tenant-field label > span { color: #a52c3d; }
 .tenant-field label small { margin-left: 6px; color: #76839a; font-size: 11px; font-weight: 400; }
-.tenant-field input { width: 100%; min-height: 46px; padding: 0 13px; border: 1px solid #c6d1e0; border-radius: 8px; background: #fff; color: #192943; font-size: 14px; }
+.tenant-field input, .tenant-field select { width: 100%; min-height: 46px; padding: 0 13px; border: 1px solid #c6d1e0; border-radius: 8px; background: #fff; color: #192943; font-size: 14px; }
 .tenant-field input::placeholder { color: #8793a7; }
-.tenant-field input:hover { border-color: #9eb3d2; }
-.tenant-field input:focus { border-color: var(--blue); outline: 3px solid #dce9ff; outline-offset: 1px; }
-.tenant-field input[aria-invalid="true"] { border-color: #a52c3d; }
+.tenant-field select { cursor: pointer; text-overflow: ellipsis; }
+.tenant-field input:hover, .tenant-field select:hover:not(:disabled) { border-color: #9eb3d2; }
+.tenant-field input:focus, .tenant-field select:focus { border-color: var(--blue); outline: 3px solid #dce9ff; outline-offset: 1px; }
+.tenant-field input[aria-invalid="true"], .tenant-field select[aria-invalid="true"] { border-color: #a52c3d; }
+.tenant-field select:disabled { cursor: not-allowed; border-color: #d8dee8; background: #f4f6f9; color: #7b8799; opacity: 1; }
 .tenant-field-hint, .tenant-field-error { margin-top: 6px; font-size: 11px; line-height: 1.45; }
 .tenant-field-hint { color: #68768c; }
 .tenant-field-error { color: #a52c3d; font-weight: 500; }
@@ -57,6 +63,7 @@
 .tenant-scope-note p { font-size: 11px; line-height: 1.5; }
 .tenant-scope-note strong { display: block; margin-bottom: 2px; color: #2555a5; }
 .tenant-review-page:focus { outline: none; }
+.tenant-result-page:focus { outline: none; }
 .tenant-review-identity { display: flex; align-items: center; gap: 15px; padding: 27px 28px 24px; border-bottom: 1px solid var(--border); }
 .tenant-review-identity > span { display: grid; width: 48px; height: 50px; place-items: center; border-radius: 12px; background: #edf4ff; color: var(--blue); }
 .tenant-review-identity h2 { color: #10234a; font-size: 22px; letter-spacing: -.35px; }
@@ -75,11 +82,34 @@
 .tenant-provisioning-note { margin-top: 20px; padding: 14px; border-radius: 8px; background: #fff5e4; color: #86530f; }
 .tenant-provisioning-note strong { font-size: 12px; }
 .tenant-provisioning-note p { color: #785f3d; }
-.tenant-create-disabled { width: 100%; margin-top: 18px; }
+.tenant-create-error { display: flex; align-items: flex-start; gap: 10px; margin-top: 14px; padding: 13px; border-radius: 8px; background: #fff0f0; color: #a52c3d; }
+.tenant-create-error > svg { width: 18px; height: 18px; flex: 0 0 auto; margin-top: 1px; }
+.tenant-create-error strong { font-size: 12px; }
+.tenant-create-error p { margin-top: 4px; color: #7c3440; font-size: 11px; line-height: 1.5; }
+.tenant-create-action { width: 100%; margin-top: 18px; }
+.tenant-spinner { animation: tenant-spin .85s linear infinite; }
 .tenant-edit-link { width: 100%; min-height: 40px; margin-top: 5px; border-radius: 8px; color: var(--blue); font-size: 13px; font-weight: 500; text-align: center; }
 .tenant-edit-link:hover { background: #edf4ff; }
+.tenant-edit-link:disabled { cursor: not-allowed; opacity: .45; }
+.tenant-result-hero { display: flex; align-items: center; gap: 15px; padding: 28px; border-bottom: 1px solid var(--border); background: #f7fbf9; }
+.tenant-result-hero > span { display: grid; width: 48px; height: 50px; flex: 0 0 auto; place-items: center; border-radius: 12px; background: #eaf8f2; color: #087953; }
+.tenant-result-hero > span svg { width: 24px; height: 24px; }
+.tenant-result-hero h2 { color: #10234a; font-size: 22px; letter-spacing: -.35px; }
+.tenant-result-hero p { margin-top: 3px; color: #527064; font-size: 12px; }
+.tenant-result-actions { display: grid; gap: 14px; padding: 21px; border: 1px solid var(--border); border-radius: 12px; background: #fff; }
+.tenant-result-actions > .button { width: 100%; }
+.tenant-setup-result { display: flex; align-items: flex-start; gap: 10px; padding: 14px; border-radius: 8px; }
+.tenant-setup-result > svg { width: 19px; height: 19px; flex: 0 0 auto; margin-top: 1px; }
+.tenant-setup-result strong { font-size: 12px; }
+.tenant-setup-result p { margin-top: 5px; font-size: 11px; line-height: 1.5; }
+.tenant-setup-result.pending { background: #fff5e4; color: #86530f; }
+.tenant-setup-result.pending p { color: #785f3d; }
+.tenant-setup-result.linked { background: #eaf8f2; color: #087953; }
+.tenant-setup-result.linked p { color: #406b5c; }
+
+@keyframes tenant-spin { to { transform: rotate(360deg); } }
 @media (max-width: 1150px) {
-  .tenant-create-layout, .tenant-review-layout { grid-template-columns: 1fr; }
+  .tenant-create-layout, .tenant-review-layout, .tenant-result-layout { grid-template-columns: 1fr; }
   .tenant-setup-aside, .tenant-review-actions { position: static; }
   .tenant-setup-aside { display: grid; grid-template-columns: 220px 1fr; }
   .tenant-workspace-preview { align-content: center; }
@@ -91,14 +121,14 @@
   .tenant-create-heading { display: block; }
   .tenant-create-heading h1 { font-size: 29px; }
   .tenant-create-heading p { font-size: 13px; }
-  .tenant-draft-status { margin-top: 13px; }
-  .tenant-create-layout, .tenant-review-layout { margin-top: 18px; }
+  .tenant-draft-status, .tenant-result-status { margin-top: 13px; }
+  .tenant-create-layout, .tenant-review-layout, .tenant-result-layout { margin-top: 18px; }
   .tenant-form-section { padding: 22px 18px 24px; }
   .tenant-section-heading { margin-bottom: 19px; }
   .tenant-section-heading > span { width: 38px; height: 40px; }
   .tenant-section-heading p { font-size: 12px; }
   .tenant-field-grid { grid-template-columns: 1fr; gap: 17px; }
-  .tenant-field input { min-height: 48px; font-size: 16px; }
+  .tenant-field input, .tenant-field select { min-height: 48px; font-size: 16px; }
   .tenant-form-footer { align-items: stretch; flex-direction: column; padding: 18px; }
   .tenant-form-footer .button { width: 100%; }
   .tenant-setup-aside { display: block; }
@@ -107,4 +137,11 @@
   .tenant-review-identity h2 { font-size: 19px; }
   .tenant-review-list > div { grid-template-columns: 1fr; gap: 5px; padding: 14px 18px; }
   .tenant-review-actions { padding: 18px; }
+  .tenant-result-hero { padding: 22px 18px; }
+  .tenant-result-hero h2 { font-size: 19px; }
+  .tenant-result-actions { padding: 18px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tenant-spinner { animation-duration: 1.8s; }
 }

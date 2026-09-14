@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import ph.epr.api.identitytenancy.PracticeProvisioningConflictException;
+import ph.epr.api.identitytenancy.PracticeAdministrationConflictException;
 import ph.epr.api.platformoperations.application.TenantNotFoundException;
 import ph.epr.api.platformoperations.application.TenantProvisioningException;
 import ph.epr.api.platformoperations.application.TenantProvisioningForbiddenException;
@@ -18,6 +19,11 @@ class TenantProvisioningExceptionHandler {
 	@ExceptionHandler(PracticeProvisioningConflictException.class)
 	ProblemDetail conflict(PracticeProvisioningConflictException exception) {
 		return problem(HttpStatus.CONFLICT, "TENANT_PROVISIONING_CONFLICT", exception.getMessage());
+	}
+
+	@ExceptionHandler(PracticeAdministrationConflictException.class)
+	ProblemDetail administrationConflict(PracticeAdministrationConflictException exception) {
+		return problem(HttpStatus.CONFLICT, "PRACTICE_ADMINISTRATION_CONFLICT", exception.getMessage());
 	}
 
 	@ExceptionHandler(TenantProvisioningForbiddenException.class)

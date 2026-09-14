@@ -7,6 +7,7 @@ import ph.epr.api.identitytenancy.PracticeTenant;
 import ph.epr.api.identitytenancy.TenantDatabaseRoute;
 import ph.epr.api.platformoperations.application.TenantDatabaseManager;
 import ph.epr.api.platformoperations.application.TenantProvisioningException;
+import ph.epr.api.platformoperations.domain.InitialTenantSite;
 
 @Component
 @ConditionalOnProperty(
@@ -17,7 +18,7 @@ import ph.epr.api.platformoperations.application.TenantProvisioningException;
 class DisabledTenantDatabaseManager implements TenantDatabaseManager {
 
 	@Override
-	public TenantDatabaseRoute provision(PracticeTenant tenant) {
+	public TenantDatabaseRoute provision(PracticeTenant tenant, InitialTenantSite initialSite) {
 		throw new TenantProvisioningException(
 			"TENANT_PROVISIONING_DISABLED",
 			"Tenant database provisioning is not enabled on this server."

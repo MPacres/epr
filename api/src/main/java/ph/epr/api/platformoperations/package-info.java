@@ -3,6 +3,6 @@
  */
 @org.springframework.modulith.ApplicationModule(
     displayName = "Platform Operations",
-    allowedDependencies = {}
+    allowedDependencies = {"identitytenancy"}
 )
 package ph.epr.api.platformoperations;

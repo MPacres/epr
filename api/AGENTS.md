@@ -29,8 +29,10 @@ These instructions apply under `api/` in addition to the repository-level `AGENT
 ## Persistence, tenancy, and security
 
 - PostgreSQL 17 and Flyway are authoritative. Hibernate schema generation remains disabled.
-- Tenant-owned tables require `tenant_id`, tenant-consistent foreign keys, RLS read/write policies, and `FORCE ROW LEVEL SECURITY`. Set tenant context transaction-locally only after current membership authorization; missing context must fail closed.
-- Runtime and migration database roles are separate outside local development. Runtime credentials must not own tables or bypass RLS.
+- Resolve authorized `practiceId` values through the control-plane registry to server-owned tenant database routes. Clients never select database names, URLs, schemas, endpoints, or credentials; missing, disabled, migrating, or mismatched routes fail closed.
+- Each Practice has a separate logical PostgreSQL database with distinct runtime and migration roles. Retain `practice_id` and tenant-consistent foreign keys for defense-in-depth and audit/export integrity. Runtime credentials must not own tables or connect to another tenant database.
+- Bound aggregate tenant datasource connections, lazily create and evict pools, and test route/pool reuse for tenant leakage. Use `FORCE ROW LEVEL SECURITY` on shared tenant-scoped control-plane or operational tables.
+- Run Flyway as a canaried, observable tenant-fleet operation with per-tenant schema status and quarantined failures. Do not design critical workflows around distributed transactions across control-plane and tenant databases.
 - Keep HTTP sessions limited to authentication and CSRF concerns. Map browser and future bearer-token authentication into a transport-neutral authenticated actor before invoking application services.
 - All practice-scoped endpoints live under `/api/v1/practices/{practiceId}/...` and independently authorize the path practice.
 - Preserve client-generated UUIDs, optimistic versions, idempotency keys, occurrence/client/server timestamps, immutable signed history, and explicit transitions in new persisted workflows.

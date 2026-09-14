@@ -1,9 +1,13 @@
 import { lazy, Suspense, useEffect } from 'react'
-import { createHashRouter, matchPath, RouterProvider, useLocation, useNavigate } from 'react-router-dom'
-import { Dashboard } from './features/dashboard/Dashboard'
-import { Login } from './features/auth/Login'
-const PatientForm = lazy(() => import('./features/patients/PatientForm').then(module => ({ default: module.PatientForm })))
+import { createHashRouter, matchPath, Navigate, RouterProvider, useLocation, useNavigate } from 'react-router-dom'
+import { AuthProvider } from './features/auth/AuthProvider'
+import { RequireAuth } from './features/auth/RequireAuth'
 import { PatientPreviewProvider } from './features/patients/PatientPreviewProvider'
+import { portalSurfaceForHostname } from './features/auth/portal-surface'
+const Dashboard = lazy(() => import('./features/dashboard/Dashboard').then(module => ({ default: module.Dashboard })))
+const Login = lazy(() => import('./features/auth/Login').then(module => ({ default: module.Login })))
+const ProviderPortal = lazy(() => import('./features/provider/ProviderPortal').then(module => ({ default: module.ProviderPortal })))
+const PatientForm = lazy(() => import('./features/patients/PatientForm').then(module => ({ default: module.PatientForm })))
 const PatientChart = lazy(() => import('./features/chart/PatientChart').then(module => ({ default: module.PatientChart })))
 const Encounter = lazy(() => import('./features/chart/Encounter').then(module => ({ default: module.Encounter })))
 const Schedule = lazy(() => import('./features/schedule/Schedule').then(module => ({ default: module.Schedule })))
@@ -32,10 +36,19 @@ function WorkspaceRoute() {
   const unavailable = !isSchedule && !chart && !encounter && !isNew && !edit && !isDirectory && !isDashboard ? <main id="main-content" className="dashboard" tabIndex={-1}><h1>Page unavailable</h1><p>This workspace page could not be found.</p><Button onClick={() => navigate('/patients')}>Go to My Patients</Button></main> : undefined
   return <Dashboard key={location.pathname + (isNew ? location.search : '')} view={view} onViewChange={next => navigate(`/${next}`)} content={workspace ? <Suspense fallback={<main className="dashboard" id="main-content" tabIndex={-1}><p role="status">Loading workspace…</p></main>}>{workspace}</Suspense> : unavailable} />
 }
-const router = createHashRouter([
-  { path: '/login', element: <Login /> },
-  { path: '*', element: <WorkspaceRoute /> },
-])
+const portalSurface = portalSurfaceForHostname(
+  window.location.hostname,
+  import.meta.env.VITE_CLINICAL_HOSTNAME,
+  import.meta.env.VITE_SUPPORT_HOSTNAME,
+)
+const loginRoute = { path: '/login', element: <Login surface={portalSurface} /> }
+const providerRoute = { path: '/provider/*', element: <RequireAuth roles={['SUPERADMIN', 'PROVIDER_SUPPORT']}><ProviderPortal /></RequireAuth> }
+const clinicalRoute = { path: '*', element: <RequireAuth roles={['CLINICIAN']}><PatientPreviewProvider><WorkspaceRoute /></PatientPreviewProvider></RequireAuth> }
+const router = createHashRouter(portalSurface === 'support'
+  ? [loginRoute, providerRoute, { path: '*', element: <Navigate to="/provider" replace /> }]
+  : portalSurface === 'clinical'
+    ? [loginRoute, { path: '/provider/*', element: <Navigate to="/dashboard" replace /> }, clinicalRoute]
+    : [loginRoute, providerRoute, clinicalRoute])
 export default function App() {
-  return <PatientPreviewProvider><RouterProvider router={router} /></PatientPreviewProvider>
+  return <AuthProvider><Suspense fallback={<main className="auth-status-page"><span className="auth-status-mark" aria-hidden="true" /><h1>Loading EPR</h1><p role="status">Preparing your workspace…</p></main>}><RouterProvider router={router} /></Suspense></AuthProvider>
 }

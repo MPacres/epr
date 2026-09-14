@@ -8,14 +8,16 @@ From the repository root:
 
 ```sh
 npm --prefix web ci
-npm --prefix web run dev -- --host 127.0.0.1
+npm --prefix web run dev
 npm --prefix web run lint
 npm --prefix web run test
 npm --prefix web run build
-npm --prefix web run preview -- --host 127.0.0.1
+npm --prefix web run preview -- --host 0.0.0.0
 ```
 
 `test` runs Vitest. TypeScript checks run as part of `build`. Rendered verification uses Playwright through temporary scripts; there is no committed e2e runner.
+
+For local domain routing, start the API and the `proxy` service from `api/compose.yaml`, then open `http://epr.test` for the physician workspace or `http://support.epr.test` for provider support. Vite listens on all interfaces so the Dockerized proxy can reach it, but its host allowlist accepts only the two EPR development domains, localhost, and IP-address development access. Nginx rejects unknown hostnames. `VITE_CLINICAL_HOSTNAME` and `VITE_SUPPORT_HOSTNAME` define the exact deployed host mapping; see `.env.example`.
 
 ## Implemented views
 
@@ -41,7 +43,7 @@ The blue/white references remain the visual basis. The implementation adds expli
 
 ## Data boundary
 
-The feature `demo-data.ts` files are explicit synthetic seeds. PatientPreviewProvider and PatientPreviewRepository keep demo additions, edits, revisions, retry outcomes, and before/after history in application memory until reload. Global search uses the same expanded directory identities; birth dates match existing dashboard fixture ages at the snapshot date. No backend, authentication, authorization enforcement, durable clinical persistence, live connection status, or offline patient storage exists. Opening a patient does not create an encounter. Results cannot be marked reviewed and notes cannot be signed. No result content or allergy absence is fabricated. Display selector tests do not establish server authorization or readiness for real patients.
+The feature `demo-data.ts` files are explicit synthetic seeds. PatientPreviewProvider and PatientPreviewRepository keep demo additions, edits, revisions, retry outcomes, and before/after history in application memory until reload. Global search uses the same expanded directory identities; birth dates match existing dashboard fixture ages at the snapshot date. The provider login uses the local API's CSRF-protected, JDBC-backed browser session and role guard. The API can provision a local Practice database, but this frontend's tenant-creation form remains review-only until it can select or invite a real initial administrator and persist the first clinic location without granting provider staff or Practice administrators chart access. Clinicians and their credentials are added separately from tenant creation. Runtime tenant authorization, durable clinical persistence, live connection status, offline patient storage, and production Cognito boundaries remain unimplemented. Opening a patient does not create an encounter. Results cannot be marked reviewed and notes cannot be signed. No result content or allergy absence is fabricated. Display selector tests do not establish server authorization or readiness for real patients.
 
 When connecting services, replace fixtures through typed repositories, establish independently authorized practice scopes, and use practice-scoped TanStack Query keys. Preserve active versus previewed session semantics and all root/scoped AGENTS.md invariants.
 

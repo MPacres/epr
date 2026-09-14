@@ -20,18 +20,13 @@
 
 .login-brand { display: flex; align-items: center; gap: 16px; color: var(--login-navy); }
 .login-brand-mark {
-  position: relative;
-  display: grid;
   place-items: center;
   width: 50px;
   height: 57px;
-  flex: 0 0 auto;
-  overflow: hidden;
   border-radius: 12px 12px 12px 4px;
-  color: #fff;
   background: var(--login-blue);
 }
-.login-brand-mark::after { content: ''; position: absolute; top: 0; right: 0; border-style: solid; border-width: 0 0 13px 13px; border-color: transparent transparent #cfe0ff transparent; }
+.login-brand-mark::after { border-width: 0 0 13px 13px; }
 .login-brand-mark svg { width: 34px; height: 34px; stroke-width: 3; }
 .login-brand-copy { display: grid; gap: 2px; }
 .login-brand-copy strong { font-size: 32px; line-height: 1; letter-spacing: -.8px; }
@@ -76,6 +71,8 @@
 .login-security, .login-notice { display: flex; align-items: flex-start; justify-content: center; gap: 10px; min-height: 26px; color: #5870b3; font-size: 14px; line-height: 1.5; text-align: left; }
 .login-security svg, .login-notice svg { width: 20px; height: 20px; margin-top: 1px; }
 .login-notice { justify-content: flex-start; padding: 12px 14px; border-radius: 9px; background: #edf4ff; color: #2f5598; }
+.login-notice.error { background: #fff0f0; color: #a52c3d; }
+.login-notice:focus { outline: none; }
 .login-footer { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; color: #526aa8; }
 .login-footer > div { display: flex; align-items: center; gap: 18px; }
 .login-footer > div > span { width: 1px; height: 18px; background: #8396cb; }
@@ -260,3 +257,21 @@
   .login-options { align-items: flex-start; }
   .remember-option, .login-link { font-size: 13px; }
 }
+
+.auth-status-page {
+  display: grid;
+  min-height: 100svh;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  padding: 32px;
+  background: #f6f8fc;
+  color: #10234a;
+  text-align: center;
+}
+.auth-status-page > svg { width: 38px; height: 38px; color: #245ce5; }
+.auth-status-page h1 { font-size: 26px; }
+.auth-status-page p { max-width: 460px; color: #65738b; line-height: 1.6; }
+.auth-status-page .button { margin-top: 8px; }
+.auth-status-mark { width: 34px; height: 34px; border: 3px solid #cfddf4; border-top-color: #245ce5; border-radius: 50%; animation: auth-spin 700ms linear infinite; }
+@keyframes auth-spin { to { transform: rotate(360deg); } }

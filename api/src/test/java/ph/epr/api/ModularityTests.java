@@ -44,8 +44,14 @@ class ModularityTests {
 	}
 
 	@Test
-	void requiresEveryCrossModuleDependencyToBeExplicitlyIntroduced() {
-		assertThat(modules.stream())
+	void allowsOnlyTheExplicitTenantProvisioningDependency() {
+		assertThat(modules.stream()
+			.filter(module -> !module.getIdentifier().toString().equals("platformoperations")))
 			.allMatch(module -> module.getAllowedDependencies(modules).isEmpty());
+
+		var platformOperations = modules.getModuleByName("platformoperations").orElseThrow();
+		assertThat(platformOperations.getAllowedDependencies(modules).stream()
+			.map(dependency -> dependency.getTargetModule().getIdentifier().toString()))
+			.containsExactly("identitytenancy");
 	}
 }

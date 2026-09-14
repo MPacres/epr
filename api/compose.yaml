@@ -1,6 +1,22 @@
 name: epr-backend-development
 
 services:
+  proxy:
+    image: nginx:1.30.4-alpine@sha256:dc5069ad14f19660b141b21236140b91656bf89bbc3e2417c70ae650cd66104c
+    restart: unless-stopped
+    ports:
+      - "${EPR_PROXY_PORT:-80}:80"
+    volumes:
+      - ./docker/nginx/epr-local.conf:/etc/nginx/conf.d/default.conf:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --spider --header='Host: epr.test' http://127.0.0.1/nginx-health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
   postgres:
     build:
       context: ./docker/postgresql

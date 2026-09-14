@@ -15,16 +15,21 @@ import {
   LockKeyhole,
   Mail,
   Pill,
-  Plus,
   ShieldCheck,
   Stethoscope,
+  TriangleAlert,
   UserRound,
   UsersRound,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
+import { useNavigate } from 'react-router-dom'
 import { Button } from '../../components/ui/button'
+import { EprMark } from '../../components/brand/epr-mark'
+import { AuthRequestError, homePathFor } from './auth-client'
+import { useAuth } from './auth-context'
 import { type LoginValues, loginSchema } from './login-schema'
+import { portalLabel, type PortalSurface } from './portal-surface'
 import './login.css'
 
 const journey = [
@@ -41,10 +46,11 @@ const chartRows = [
   { label: 'Care Plan', icon: ClipboardList, tone: 'amber' },
 ] as const
 
-function Brand({ inverse = false }: { inverse?: boolean }) {
-  return <div className={`login-brand ${inverse ? 'inverse' : ''}`} aria-label="EPR Clinical workspace">
-    <span className="login-brand-mark"><Plus aria-hidden="true" /></span>
-    <span className="login-brand-copy"><strong>EPR</strong><span>Clinical workspace</span></span>
+function Brand({ inverse = false, surface }: { inverse?: boolean; surface: PortalSurface }) {
+  const label = portalLabel(surface)
+  return <div className={`login-brand ${inverse ? 'inverse' : ''}`} aria-label={`EPR ${label}`}>
+    <EprMark className="login-brand-mark" />
+    <span className="login-brand-copy"><strong>EPR</strong><span>{label}</span></span>
   </div>
 }
 
@@ -63,12 +69,12 @@ function WorkflowJourney({ mobile = false }: { mobile?: boolean }) {
   </div>
 }
 
-function WorkflowPreview() {
+function WorkflowPreview({ surface }: { surface: PortalSurface }) {
   return <section className="login-visual" aria-labelledby="workflow-title">
-    <Brand inverse />
+    <Brand inverse surface={surface} />
     <FilePlus2 className="document-motif" aria-hidden="true" />
     <div className="workflow-canvas">
-      <header className="workflow-heading"><h2 id="workflow-title">A connected clinical day</h2><p>From scheduling to follow-up, all in one place.</p></header>
+      <header className="workflow-heading"><h2 id="workflow-title">Illustrative clinical workflow</h2><p>A preview of scheduling through follow-up.</p></header>
       <WorkflowJourney />
       <div className="workflow-previews">
         <section className="preview-region chart-preview" aria-labelledby="chart-preview-title">
@@ -102,15 +108,23 @@ function WorkflowPreview() {
       </div>
     </div>
     <div className="mobile-workflow">
-      <header><h2>A connected clinical day</h2><p>From scheduling to follow-up, all in one place.</p></header>
+      <header><h2>Illustrative clinical workflow</h2><p>A preview of scheduling through follow-up.</p></header>
       <WorkflowJourney mobile />
     </div>
   </section>
 }
 
-export function Login() {
+function wrongPortalMessage(surface: PortalSurface): string {
+  return surface === 'clinical'
+    ? 'This account cannot use the physician portal. Sign in at support.epr.test instead.'
+    : 'This account cannot use provider support. Sign in at epr.test instead.'
+}
+
+export function Login({ surface = 'combined' }: { surface?: PortalSurface }) {
+  const auth = useAuth()
+  const navigate = useNavigate()
   const [showPassword, setShowPassword] = useState(false)
-  const [notice, setNotice] = useState<string | null>(null)
+  const [notice, setNotice] = useState<{ tone: 'info' | 'error'; message: string } | null>(null)
   const usernameRef = useRef<HTMLInputElement | null>(null)
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
@@ -119,27 +133,51 @@ export function Login() {
   const { ref: usernameRegisterRef, ...usernameField } = register('username')
 
   useEffect(() => {
-    document.title = 'Sign in · EPR'
-    usernameRef.current?.focus({ preventScroll: true })
-  }, [])
+    document.title = `${portalLabel(surface)} sign in · EPR`
+    if (auth.status === 'authenticated' && !isSubmitting) {
+      const destination = homePathFor(auth.user, surface)
+      if (destination) navigate(destination, { replace: true })
+      else if (!notice) {
+        void auth.signOut()
+          .then(() => setNotice({ tone: 'error', message: wrongPortalMessage(surface) }))
+          .catch(() => setNotice({ tone: 'error', message: 'This account is not authorized for this portal. Sign out and use the correct portal.' }))
+      }
+    } else {
+      usernameRef.current?.focus({ preventScroll: true })
+    }
+  }, [auth, auth.status, auth.user, isSubmitting, navigate, notice, surface])
 
-  function submitPreview() {
-    setNotice('Authentication is not connected in this interface preview. Your credentials were not sent.')
+  async function submit(values: LoginValues) {
+    setNotice(null)
+    try {
+      const user = await auth.signIn(values)
+      const destination = homePathFor(user, surface)
+      if (!destination) {
+        await auth.signOut()
+        setNotice({ tone: 'error', message: wrongPortalMessage(surface) })
+        return
+      }
+      navigate(destination, { replace: true })
+    } catch (error) {
+      const message = error instanceof AuthRequestError ? error.message : 'Sign-in could not be completed. Try again.'
+      setNotice({ tone: 'error', message })
+      requestAnimationFrame(() => document.getElementById('login-feedback')?.focus())
+    }
   }
 
   function showUnavailable(label: string) {
-    setNotice(`${label} is not connected in this interface preview.`)
+    setNotice({ tone: 'info', message: `${label} is not connected yet. Contact your EPR administrator for help.` })
   }
 
   return <main className="login-page">
     <section className="login-panel" aria-labelledby="login-title">
-      <div className="desktop-login-brand"><Brand /></div>
+      <div className="desktop-login-brand"><Brand surface={surface} /></div>
       <div className="login-form-wrap">
         <header className="login-heading">
           <h1 id="login-title">Welcome back</h1>
-          <p>Sign in to continue to your clinical workspace.</p>
+          <p>{surface === 'clinical' ? 'Sign in to continue to your EPR clinical workspace.' : surface === 'support' ? 'Sign in to continue to EPR provider support.' : 'Sign in to continue to the EPR provider portal.'}</p>
         </header>
-        <form className="login-form" onSubmit={handleSubmit(submitPreview)} noValidate>
+        <form className="login-form" onSubmit={handleSubmit(submit)} noValidate>
           <div className="login-field">
             <label htmlFor="username">Username</label>
             <div className={`login-input ${errors.username ? 'invalid' : ''}`}>
@@ -166,15 +204,15 @@ export function Login() {
             <button type="button" className="login-link" onClick={() => showUnavailable('Password recovery')}>Forgot password?</button>
           </div>
           <Button className="login-submit" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Signing in…' : 'Sign in'}</Button>
-          {notice ? <p className="login-notice" role="status"><ShieldCheck aria-hidden="true" />{notice}</p> : <p className="login-security"><Info aria-hidden="true" />Interface preview only. Authentication and session protection are not connected.</p>}
+          {notice ? <p className={`login-notice ${notice.tone}`} id="login-feedback" role={notice.tone === 'error' ? 'alert' : 'status'} tabIndex={-1}>{notice.tone === 'error' ? <TriangleAlert aria-hidden="true" /> : <Info aria-hidden="true" />}{notice.message}</p> : <p className="login-security"><ShieldCheck aria-hidden="true" />Your session is protected and activity may be audited.</p>}
         </form>
       </div>
       <footer className="login-footer">
         <div><button type="button" className="login-link" onClick={() => showUnavailable('Privacy information')}>Privacy</button><span aria-hidden="true" />
         <button type="button" className="login-link" onClick={() => showUnavailable('Help')}>Help</button></div>
-        <small>Illustrative interface concept</small>
+        <small>{surface === 'clinical' ? 'Secure clinical access' : 'Secure provider access'}</small>
       </footer>
     </section>
-    <WorkflowPreview />
+    <WorkflowPreview surface={surface} />
   </main>
 }

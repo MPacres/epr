@@ -5,13 +5,22 @@ Date: 2026-09-13
 
 ## Decision
 
-Use Cognito and Spring Security for authentication. The React browser application uses a backend-managed session stored through Spring Session JDBC in the existing PostgreSQL service. Future native applications use Cognito bearer access tokens through a separate Spring Security resource-server adapter.
+Use Cognito and Spring Security for authentication. Serve the clinical application from `app.<product-domain>` and the provider workforce console from `support.<product-domain>`. Each origin uses a distinct Cognito application client and a separate backend-managed session stored through Spring Session JDBC in the control-plane PostgreSQL database. Future native applications use Cognito bearer access tokens through a separate Spring Security resource-server adapter.
 
 Both authentication mechanisms resolve into the same transport-neutral authenticated actor and application authorization boundary. Redis is not required for the initial release and is introduced only in response to measured operational needs.
 
 ## Browser flow
 
 Use authorization code flow with PKCE. The backend keeps Cognito access and refresh credentials out of React and returns a secure, `HttpOnly`, host-only session cookie. Cookie-authenticated state-changing requests require CSRF protection.
+
+The app and support origins must have separate callback/logout allowlists, session-cookie names, CSRF tokens and backend entry points. Never set a parent-domain cookie such as `Domain=.example.com`, never pass login tokens through URLs, and never provide silent single sign-on between support and clinical sessions. A provider employee enters delegated tenant administration through the support origin; a clinical user remains on the app origin.
+
+| Browser surface | Production entry point | Session boundary |
+| --- | --- | --- |
+| Physicians and authorized Practice staff | `https://app.<product-domain>/login` | App Cognito client and app-only host cookie |
+| SaaS provider workforce | `https://support.<product-domain>/login` | Support Cognito client and support-only host cookie |
+
+Each frontend should call a same-origin backend path such as `/api/v1/...`; Nginx or the load balancer routes that path to the correct backend entry point. Do not solve the split by enabling browser CORS between the app and support origins.
 
 The HTTP session is limited to authentication and CSRF concerns. It must not hold:
 
@@ -20,11 +29,11 @@ The HTTP session is limited to authentication and CSRF concerns. It must not hol
 - Patient records, clinical drafts, queue state, or workflow progress.
 - Authoritative application or domain state.
 
-Current practice membership and authorization for consequential operations are resolved from server-side records. Logging in establishes identity; it does not freeze authorization for the lifetime of the session.
+Current practice membership and authorization for consequential operations are resolved from control-plane records. After authorization, the server resolves the requested Practice to its tenant database through a trusted registry; clients never supply database routing details. Logging in establishes identity; it does not freeze authorization for the lifetime of the session or authorize a tenant database.
 
 ## Horizontal scaling
 
-All application instances share the Spring Session JDBC repository. A load balancer may route consecutive requests to different instances; sticky sessions are not required.
+All application instances share the control-plane Spring Session JDBC repository. Clinical and support sessions use separate namespaces and cookie names even if the same repository stores both. A load balancer may route consecutive requests to different instances; sticky sessions are not required.
 
 Instances must share compatible:
 
@@ -32,7 +41,7 @@ Instances must share compatible:
 - Session attribute and serialization contracts across rolling deployments.
 - Relevant token-encryption or cryptographic configuration.
 
-Session attributes should remain minimal. Aggregate application connection pools must stay within the PostgreSQL connection budget, and expired-session cleanup must be enabled and monitored.
+Session attributes should remain minimal. The control-plane session pool and aggregate tenant-database pools must stay within their PostgreSQL connection budgets, and expired-session cleanup must be enabled and monitored.
 
 Horizontal scaling outside session management remains separate work:
 
@@ -67,6 +76,7 @@ Redis must not be the source of truth for clinical records, encounter concurrenc
 
 - The initial deployment avoids Redis infrastructure cost and operational complexity.
 - Browser credentials remain outside JavaScript-accessible storage.
+- Clinical and provider-support browser sessions are origin-separated and cannot be replayed across the two portals.
 - Additional application instances can share sessions through PostgreSQL.
 - Native and offline development does not require replacing the browser authentication model.
 - Keeping authentication adapters outside application and domain logic is a required architectural boundary, not optional cleanup for the mobile phase.

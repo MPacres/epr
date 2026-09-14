@@ -5,6 +5,8 @@ node_modules/
 dist/
 dist-ssr/
 coverage/
+web/test-results/
+/test-results/
 
 # Logs
 logs/
@@ -36,3 +38,4 @@ lerna-debug.log*
 .agents/
 generated-assets/
 skills-lock.json
+.impeccable/review/

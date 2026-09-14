@@ -38,6 +38,9 @@ SELECT format(
 SELECT format('GRANT CONNECT ON DATABASE %I TO %I', current_database(), :'migration_username') \gexec
 SELECT format('GRANT CONNECT ON DATABASE %I TO %I', current_database(), :'runtime_username') \gexec
 
+SELECT format('REVOKE CONNECT, CREATE, TEMPORARY ON DATABASE %I FROM PUBLIC', current_database()) \gexec
+REVOKE CONNECT, CREATE, TEMPORARY ON DATABASE postgres FROM PUBLIC;
+
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 
 SELECT format('GRANT USAGE, CREATE ON SCHEMA public TO %I', :'migration_username') \gexec

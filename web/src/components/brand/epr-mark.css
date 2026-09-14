@@ -1,0 +1,23 @@
+.epr-mark {
+  position: relative;
+  display: grid;
+  width: 39px;
+  height: 43px;
+  flex: 0 0 auto;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 11px 11px 11px 3px;
+  background: var(--blue, #245ce5);
+  color: #fff;
+}
+.epr-mark::after {
+  position: absolute;
+  top: 0;
+  right: 0;
+  border-width: 0 0 10px 10px;
+  border-style: solid;
+  border-color: transparent transparent #cfe0ff transparent;
+  content: '';
+}
+.epr-mark svg { width: 29px; height: 29px; stroke-width: 3; }
+

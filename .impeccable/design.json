@@ -1,0 +1,255 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-13T15:48:42Z",
+  "title": "Design System: EPR",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Royal Action Blue",
+        "canonical": "#245ce5",
+        "tonalRamp": ["oklch(15% 0.16 264)", "oklch(26% 0.18 264)", "oklch(38% 0.20 264)", "oklch(50% 0.21 264)", "oklch(62% 0.18 264)", "oklch(73% 0.13 264)", "oklch(85% 0.07 264)", "oklch(95% 0.025 264)"]
+      },
+      "primary-hover": {
+        "role": "primary",
+        "displayName": "Pressed Royal Blue",
+        "canonical": "#184bc9",
+        "tonalRamp": ["oklch(15% 0.14 264)", "oklch(26% 0.17 264)", "oklch(38% 0.19 264)", "oklch(50% 0.19 264)", "oklch(62% 0.16 264)", "oklch(73% 0.12 264)", "oklch(85% 0.065 264)", "oklch(95% 0.022 264)"]
+      },
+      "ink-strong": {
+        "role": "neutral",
+        "displayName": "Threshold Navy",
+        "canonical": "#10234a",
+        "tonalRamp": ["oklch(15% 0.055 259)", "oklch(26% 0.06 259)", "oklch(38% 0.055 259)", "oklch(50% 0.048 259)", "oklch(62% 0.04 259)", "oklch(73% 0.03 259)", "oklch(85% 0.018 259)", "oklch(95% 0.007 259)"]
+      },
+      "foreground": {
+        "role": "neutral",
+        "displayName": "Clinical Ink",
+        "canonical": "#192943",
+        "tonalRamp": ["oklch(15% 0.04 255)", "oklch(26% 0.045 255)", "oklch(38% 0.042 255)", "oklch(50% 0.036 255)", "oklch(62% 0.03 255)", "oklch(73% 0.024 255)", "oklch(85% 0.014 255)", "oklch(95% 0.005 255)"]
+      },
+      "secondary-text": {
+        "role": "neutral",
+        "displayName": "Slate Annotation",
+        "canonical": "#65738b",
+        "tonalRamp": ["oklch(15% 0.025 255)", "oklch(26% 0.03 255)", "oklch(38% 0.032 255)", "oklch(50% 0.03 255)", "oklch(62% 0.026 255)", "oklch(73% 0.02 255)", "oklch(85% 0.012 255)", "oklch(95% 0.004 255)"]
+      },
+      "canvas": {
+        "role": "neutral",
+        "displayName": "Pale Clinical Canvas",
+        "canonical": "#f6f8fc",
+        "tonalRamp": ["oklch(15% 0.008 255)", "oklch(26% 0.009 255)", "oklch(38% 0.01 255)", "oklch(50% 0.01 255)", "oklch(62% 0.009 255)", "oklch(73% 0.008 255)", "oklch(85% 0.006 255)", "oklch(97% 0.004 255)"]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Working White",
+        "canonical": "#ffffff",
+        "tonalRamp": ["oklch(15% 0 0)", "oklch(26% 0 0)", "oklch(38% 0 0)", "oklch(50% 0 0)", "oklch(62% 0 0)", "oklch(73% 0 0)", "oklch(85% 0 0)", "oklch(100% 0 0)"]
+      },
+      "selection": {
+        "role": "neutral",
+        "displayName": "Selection Wash",
+        "canonical": "#edf4ff",
+        "tonalRamp": ["oklch(15% 0.025 255)", "oklch(26% 0.03 255)", "oklch(38% 0.034 255)", "oklch(50% 0.036 255)", "oklch(62% 0.033 255)", "oklch(73% 0.027 255)", "oklch(85% 0.018 255)", "oklch(96% 0.011 255)"]
+      },
+      "navigation-selection": {
+        "role": "neutral",
+        "displayName": "Navigation Selection",
+        "canonical": "#eaf1ff",
+        "tonalRamp": ["oklch(15% 0.028 255)", "oklch(26% 0.033 255)", "oklch(38% 0.038 255)", "oklch(50% 0.04 255)", "oklch(62% 0.036 255)", "oklch(73% 0.03 255)", "oklch(85% 0.02 255)", "oklch(95% 0.012 255)"]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Cool Hairline",
+        "canonical": "#e0e7f0",
+        "tonalRamp": ["oklch(15% 0.012 255)", "oklch(26% 0.016 255)", "oklch(38% 0.019 255)", "oklch(50% 0.02 255)", "oklch(62% 0.019 255)", "oklch(73% 0.016 255)", "oklch(85% 0.012 255)", "oklch(93% 0.008 255)"]
+      },
+      "input-border": {
+        "role": "neutral",
+        "displayName": "Field Blue Hairline",
+        "canonical": "#b8c9ec",
+        "tonalRamp": ["oklch(15% 0.026 263)", "oklch(26% 0.035 263)", "oklch(38% 0.045 263)", "oklch(50% 0.052 263)", "oklch(62% 0.05 263)", "oklch(73% 0.043 263)", "oklch(85% 0.032 263)", "oklch(92% 0.022 263)"]
+      },
+      "success": {
+        "role": "secondary",
+        "displayName": "Verified Green",
+        "canonical": "#087953",
+        "tonalRamp": ["oklch(15% 0.06 161)", "oklch(26% 0.075 161)", "oklch(38% 0.09 161)", "oklch(50% 0.1 161)", "oklch(62% 0.09 161)", "oklch(73% 0.07 161)", "oklch(85% 0.04 161)", "oklch(95% 0.015 161)"]
+      },
+      "success-soft": {
+        "role": "secondary",
+        "displayName": "Verified Mist",
+        "canonical": "#eaf8f2",
+        "tonalRamp": ["oklch(15% 0.04 161)", "oklch(26% 0.05 161)", "oklch(38% 0.058 161)", "oklch(50% 0.06 161)", "oklch(62% 0.052 161)", "oklch(73% 0.04 161)", "oklch(85% 0.026 161)", "oklch(96% 0.013 161)"]
+      },
+      "warning": {
+        "role": "secondary",
+        "displayName": "Caution Amber",
+        "canonical": "#986014",
+        "tonalRamp": ["oklch(15% 0.06 72)", "oklch(26% 0.08 72)", "oklch(38% 0.1 72)", "oklch(50% 0.11 72)", "oklch(62% 0.1 72)", "oklch(73% 0.08 72)", "oklch(85% 0.05 72)", "oklch(95% 0.02 72)"]
+      },
+      "warning-soft": {
+        "role": "secondary",
+        "displayName": "Caution Cream",
+        "canonical": "#fff5e4",
+        "tonalRamp": ["oklch(15% 0.035 72)", "oklch(26% 0.045 72)", "oklch(38% 0.055 72)", "oklch(50% 0.06 72)", "oklch(62% 0.055 72)", "oklch(73% 0.045 72)", "oklch(85% 0.03 72)", "oklch(96% 0.015 72)"]
+      },
+      "error": {
+        "role": "tertiary",
+        "displayName": "Clinical Error",
+        "canonical": "#a52c3d",
+        "tonalRamp": ["oklch(15% 0.07 18)", "oklch(26% 0.095 18)", "oklch(38% 0.12 18)", "oklch(50% 0.13 18)", "oklch(62% 0.115 18)", "oklch(73% 0.09 18)", "oklch(85% 0.05 18)", "oklch(95% 0.02 18)"]
+      },
+      "error-soft": {
+        "role": "tertiary",
+        "displayName": "Error Wash",
+        "canonical": "#fff0f0",
+        "tonalRamp": ["oklch(15% 0.035 18)", "oklch(26% 0.045 18)", "oklch(38% 0.055 18)", "oklch(50% 0.06 18)", "oklch(62% 0.055 18)", "oklch(73% 0.045 18)", "oklch(85% 0.03 18)", "oklch(96% 0.014 18)"]
+      },
+      "violet": {
+        "role": "tertiary",
+        "displayName": "Coordination Violet",
+        "canonical": "#7652c4",
+        "tonalRamp": ["oklch(15% 0.075 295)", "oklch(26% 0.1 295)", "oklch(38% 0.125 295)", "oklch(50% 0.14 295)", "oklch(62% 0.125 295)", "oklch(73% 0.095 295)", "oklch(85% 0.055 295)", "oklch(95% 0.02 295)"]
+      },
+      "violet-soft": {
+        "role": "tertiary",
+        "displayName": "Coordination Mist",
+        "canonical": "#f1edfc",
+        "tonalRamp": ["oklch(15% 0.035 295)", "oklch(26% 0.045 295)", "oklch(38% 0.055 295)", "oklch(50% 0.06 295)", "oklch(62% 0.055 295)", "oklch(73% 0.045 295)", "oklch(85% 0.03 295)", "oklch(95% 0.015 295)"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Provider sign-in welcome heading." },
+      "headline": { "displayName": "Headline", "purpose": "Major authenticated workspace heading." },
+      "title": { "displayName": "Title", "purpose": "Operational section and card headings." },
+      "body": { "displayName": "Body", "purpose": "Core explanations and control copy." },
+      "field": { "displayName": "Field", "purpose": "Authentication input values and placeholders." },
+      "label": { "displayName": "Label", "purpose": "Metadata, statuses, and compact controls." },
+      "action": { "displayName": "Action", "purpose": "Shared buttons and navigation rows." }
+    },
+    "shadows": [
+      { "name": "threshold-canvas", "value": "0 18px 38px #06183c24", "purpose": "Floating workflow illustration on the sign-in field." },
+      { "name": "primary-action", "value": "0 5px 14px #245ce521", "purpose": "Full-width sign-in action emphasis." },
+      { "name": "compact-action", "value": "0 3px 6px #245ce512", "purpose": "Low emphasis beneath compact consequential dashboard actions." }
+    ],
+    "motion": [
+      { "name": "field-state", "value": "160ms ease", "purpose": "Authentication field border and focus-halo transitions." },
+      { "name": "threshold-reveal", "value": "420ms cubic-bezier(.16, 1, .3, 1)", "purpose": "Single entrance for the illustrative sign-in workflow canvas." },
+      { "name": "reduced-motion", "value": "none", "purpose": "Disable animation, transition, and smooth scrolling when reduced motion is requested." }
+    ],
+    "breakpoints": [
+      { "name": "provider-rail", "value": "1100px" },
+      { "name": "login-stack", "value": "900px" },
+      { "name": "provider-mobile", "value": "700px" },
+      { "name": "login-mobile", "value": "600px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The default action control; reserve the full-width elevated form for sign-in.",
+      "html": "<button class=\"ds-btn-primary\">Sign in</button>",
+      "css": ".ds-btn-primary { display:inline-flex; min-height:40px; align-items:center; justify-content:center; gap:8px; padding:8px 16px; border:0; border-radius:8px; background:var(--color-primary, #245ce5); color:#fff; font:500 14px/1.4 Roboto,system-ui,sans-serif; transition:background-color 160ms ease; cursor:pointer; } .ds-btn-primary:hover { background:var(--color-primary-hover, #184bc9); } .ds-btn-primary:focus-visible { outline:3px solid var(--color-primary, #245ce5); outline-offset:3px; } .ds-btn-primary:active { background:#123fae; } .ds-btn-primary:disabled { opacity:.45; cursor:not-allowed; }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "A bounded secondary action on white operational surfaces.",
+      "html": "<button class=\"ds-btn-outline\">Review details</button>",
+      "css": ".ds-btn-outline { display:inline-flex; min-height:40px; align-items:center; justify-content:center; gap:8px; padding:8px 16px; border:1px solid var(--color-border, #e0e7f0); border-radius:8px; background:#fff; color:var(--color-foreground, #192943); font:500 14px/1.4 Roboto,system-ui,sans-serif; transition:background-color 160ms ease,border-color 160ms ease; cursor:pointer; } .ds-btn-outline:hover { background:var(--color-muted, #f6f8fc); border-color:#b8c9ec; } .ds-btn-outline:focus-visible { outline:3px solid var(--color-primary, #245ce5); outline-offset:3px; } .ds-btn-outline:active { background:#edf4ff; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "A low-emphasis action for top bars and adjacent utility controls.",
+      "html": "<button class=\"ds-btn-ghost\"><svg aria-hidden=\"true\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M10 17l5-5-5-5\"/><path d=\"M15 12H3\"/><path d=\"M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4\"/></svg>Sign out</button>",
+      "css": ".ds-btn-ghost { display:inline-flex; min-height:40px; align-items:center; justify-content:center; gap:8px; padding:8px 16px; border:0; border-radius:8px; background:transparent; color:var(--color-primary, #245ce5); font:500 14px/1.4 Roboto,system-ui,sans-serif; transition:background-color 160ms ease; cursor:pointer; } .ds-btn-ghost svg { width:17px; height:17px; } .ds-btn-ghost:hover { background:var(--color-accent, #edf4ff); } .ds-btn-ghost:focus-visible { outline:3px solid var(--color-primary, #245ce5); outline-offset:3px; } .ds-btn-ghost:active { background:#dceaff; }"
+    },
+    {
+      "name": "Authentication Field",
+      "kind": "input",
+      "refersTo": "input-auth",
+      "description": "A labelled, icon-led field with an explicit focus halo and room for preserved values.",
+      "html": "<label class=\"ds-field-label\" for=\"ds-username\">Username</label><div class=\"ds-field-shell\"><svg aria-hidden=\"true\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"8\" r=\"4\"/><path d=\"M4 21a8 8 0 0 1 16 0\"/></svg><input id=\"ds-username\" placeholder=\"Enter your username\"></div>",
+      "css": ".ds-field-label { display:inline-block; margin-bottom:10px; color:#10234a; font:500 16px/1.4 Roboto,system-ui,sans-serif; } .ds-field-shell { display:flex; min-height:58px; align-items:center; padding:0 16px; border:1px solid #b8c9ec; border-radius:10px; background:#fff; color:#627ac5; transition:border-color 160ms ease,box-shadow 160ms ease; } .ds-field-shell:focus-within { border-color:#1768ed; box-shadow:0 0 0 3px #1768ed1f; } .ds-field-shell svg { width:24px; height:24px; flex:0 0 auto; } .ds-field-shell input { width:100%; height:56px; min-width:0; padding:0 14px; border:0; outline:0; background:transparent; color:#10234a; font:400 17px/1.4 Roboto,system-ui,sans-serif; } .ds-field-shell input::placeholder { color:#526aa8; opacity:1; }"
+    },
+    {
+      "name": "Selected Navigation Item",
+      "kind": "nav",
+      "refersTo": "navigation-selected",
+      "description": "The active destination treatment shared by desktop, rail, and mobile navigation.",
+      "html": "<button class=\"ds-nav-selected\" aria-current=\"page\"><svg aria-hidden=\"true\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"m3 11 9-8 9 8\"/><path d=\"M5 10v10h14V10\"/><path d=\"M9 20v-6h6v6\"/></svg>Overview</button>",
+      "css": ".ds-nav-selected { display:flex; width:100%; min-height:48px; align-items:center; gap:13px; padding:12px 15px; border:0; border-radius:8px; background:#eaf1ff; color:var(--color-primary, #245ce5); font:500 14px/1.4 Roboto,system-ui,sans-serif; cursor:pointer; } .ds-nav-selected svg { width:20px; height:20px; } .ds-nav-selected:hover { background:#dfeaff; } .ds-nav-selected:focus-visible { outline:3px solid var(--color-primary, #245ce5); outline-offset:3px; } .ds-nav-selected:active { background:#d6e4ff; }"
+    },
+    {
+      "name": "Scope Chip",
+      "kind": "chip",
+      "refersTo": "status-chip",
+      "description": "An explicit text-labelled scope or status marker on a pale tonal ground.",
+      "html": "<span class=\"ds-scope-chip\"><svg aria-hidden=\"true\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M20 13c0 5-3.5 7.5-8 9-4.5-1.5-8-4-8-9V5l8-3 8 3v8Z\"/><path d=\"m9 12 2 2 4-4\"/></svg>Global platform view</span>",
+      "css": ".ds-scope-chip { display:inline-flex; min-height:40px; align-items:center; gap:8px; padding:0 12px; border:1px solid #bed4fa; border-radius:8px; background:#edf4ff; color:#245bd4; font:500 12px/1.4 Roboto,system-ui,sans-serif; letter-spacing:.3px; text-transform:uppercase; } .ds-scope-chip svg { width:17px; height:17px; } .ds-scope-chip:focus-visible { outline:3px solid var(--color-primary, #245ce5); outline-offset:3px; }"
+    },
+    {
+      "name": "Operational Card",
+      "kind": "card",
+      "refersTo": "card-operational",
+      "description": "A flat white working surface separated by a cool hairline rather than elevation.",
+      "html": "<article class=\"ds-card\"><span class=\"ds-card-icon\"><svg aria-hidden=\"true\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3\" y=\"8\" width=\"18\" height=\"13\" rx=\"2\"/><path d=\"M9 21V3h6v18\"/><path d=\"M7 12h2M7 16h2M15 12h2M15 16h2\"/></svg></span><span><small>Tenant directory</small><strong>Not connected</strong></span></article>",
+      "css": ".ds-card { display:flex; min-height:112px; align-items:center; gap:16px; padding:20px; border:1px solid var(--color-border, #e0e7f0); border-radius:12px; background:#fff; color:var(--color-foreground, #192943); font-family:Roboto,system-ui,sans-serif; } .ds-card > span:last-child { display:grid; gap:8px; } .ds-card small { color:#65738b; font-size:12px; } .ds-card strong { color:#253650; font-size:15px; font-weight:500; } .ds-card-icon { display:grid; width:46px; height:48px; flex:0 0 auto; place-items:center; border-radius:12px; background:#ebf3ff; color:#255bd5; } .ds-card-icon svg { width:23px; height:23px; } .ds-card:hover { border-color:#b8c9ec; } .ds-card:focus-within { outline:3px solid var(--color-primary, #245ce5); outline-offset:3px; }"
+    },
+    {
+      "name": "Scope Boundary Notice",
+      "kind": "custom",
+      "description": "A security or tenant-boundary statement placed before provider feature summaries.",
+      "html": "<aside class=\"ds-boundary\"><svg aria-hidden=\"true\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M20 13c0 5-3.5 7.5-8 9-4.5-1.5-8-4-8-9V5l8-3 8 3v8Z\"/><path d=\"m9 12 2 2 4-4\"/></svg><p><strong>Global view contains no patient records.</strong><span>Practice access requires an active managed-administration grant and a recorded support reason.</span></p></aside>",
+      "css": ".ds-boundary { display:flex; align-items:flex-start; gap:12px; padding:15px 17px; border:1px solid #bfd5fa; border-radius:10px; background:#edf5ff; color:#1d55b5; font-family:Roboto,system-ui,sans-serif; } .ds-boundary > svg { width:20px; height:20px; margin-top:1px; flex:0 0 auto; color:#245ce5; } .ds-boundary p { display:grid; gap:3px; margin:0; font-size:13px; line-height:1.45; } .ds-boundary span { color:#426493; } .ds-boundary:focus-within { outline:3px solid var(--color-primary, #245ce5); outline-offset:3px; }"
+    },
+    {
+      "name": "Folded-document EPR Mark",
+      "kind": "custom",
+      "description": "The signature EPR mark used across clinical and provider shells.",
+      "html": "<span class=\"ds-epr-mark\"><svg aria-hidden=\"true\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"round\"><path d=\"M12 5v14M5 12h14\"/></svg></span>",
+      "css": ".ds-epr-mark { position:relative; display:grid; width:39px; height:43px; place-items:center; overflow:hidden; border-radius:11px 11px 11px 3px; background:var(--color-primary, #245ce5); color:#fff; } .ds-epr-mark::after { position:absolute; top:0; right:0; border-width:0 0 10px 10px; border-style:solid; border-color:transparent transparent #cfe0ff transparent; content:''; } .ds-epr-mark svg { width:29px; height:29px; } .ds-epr-mark:hover { background:var(--color-primary-hover, #184bc9); } .ds-epr-mark:focus-visible { outline:3px solid var(--color-primary, #245ce5); outline-offset:3px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Secure Clinical Workbench",
+    "overview": "EPR presents a calm, deliberate operational environment: information is easy to scan, actions are unmistakable, and security or scope boundaries are stated in plain language. The visual system uses a pale clinical canvas, crisp white working surfaces, navy hierarchy, and royal-blue action cues. Brand expression comes from disciplined spacing, the folded-document mark, and precise Lucide line icons rather than decorative healthcare imagery.\n\nThe system is compact without feeling compressed. Fine borders and pale selection fills separate structure; colour is reserved for action, status, and bounded illustration. The provider sign-in surface may use a contained blue workflow field to mark the secure threshold, while authenticated clinical and provider workspaces return to flat, productive surfaces.",
+    "keyCharacteristics": [
+      "Calm, high-scanability application density",
+      "Navy hierarchy with royal-blue action and selection",
+      "White bordered surfaces on a pale neutral canvas",
+      "Modest radii and restrained depth",
+      "Text-labelled status and availability states",
+      "Responsive sidebar, rail, and bottom-navigation shells"
+    ],
+    "rules": [
+      { "name": "The Label Before Colour Rule", "body": "Colour reinforces a state; visible text or an icon-plus-label carries its meaning.", "section": "colors" },
+      { "name": "The Contained Gradient Rule", "body": "The blue gradient belongs to the illustrative unauthenticated threshold. Authenticated work surfaces remain flat and neutral.", "section": "colors" },
+      { "name": "The One-Family Rule", "body": "Use Roboto for headings, body text, form controls, and labels; hierarchy comes from scale and weight, not a second typeface.", "section": "typography" },
+      { "name": "The Operational Case Rule", "body": "Use sentence case by default. Reserve uppercase for compact, explicit scope or system-state labels.", "section": "typography" },
+      { "name": "The Context Persists Rule", "body": "Responsive changes may compress navigation and illustration, but must retain page identity, explicit scope, primary action, and labelled system state.", "section": "layout" },
+      { "name": "The Flat-by-Default Rule", "body": "Use borders and tonal layering for routine structure; reserve shadow for focused threshold or action emphasis.", "section": "elevation" },
+      { "name": "The Modest Radius Rule", "body": "Rounded corners soften dense clinical UI but never turn every surface into a pill.", "section": "shapes" }
+    ],
+    "dos": [
+      "Do reuse royal blue for action, focus, active navigation, and explicit scope while keeping most of the screen neutral.",
+      "Do place visible text beside status colour and Lucide icons, especially for security, connection, urgency, and availability.",
+      "Do preserve the sidebar → rail → bottom-navigation progression and keep top-level context sticky.",
+      "Do use fine borders and pale tonal fills to structure dense information before adding shadow.",
+      "Do keep unavailable functionality visible only when its “Not connected” or disabled state is explicit."
+    ],
+    "donts": [
+      "Don't place authenticated workspace content on decorative healthcare imagery, glass effects, or broad gradients.",
+      "Don't use colour, an icon, or hover alone to communicate clinical or system meaning.",
+      "Don't introduce a decorative typeface or mix icon families; use Roboto and Lucide consistently.",
+      "Don't inflate routine cards into floating, heavily shadowed objects or use pill shapes for general containers.",
+      "Don't let responsive compression hide scope, page identity, primary action, or labelled system state."
+    ]
+  }
+}

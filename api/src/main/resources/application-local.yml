@@ -12,3 +12,17 @@ server:
     session:
       cookie:
         secure: ${EPR_SECURE_COOKIES:false}
+
+epr:
+  local-auth:
+    superadmin:
+      username: ${EPR_LOCAL_SUPERADMIN_USERNAME:superadmin}
+      password: ${EPR_LOCAL_SUPERADMIN_PASSWORD:ChangeMe123!}
+      display-name: ${EPR_LOCAL_SUPERADMIN_DISPLAY_NAME:Local Superadmin}
+  tenant-provisioning:
+    enabled: ${EPR_TENANT_PROVISIONING_ENABLED:true}
+    admin-jdbc-url: ${EPR_TENANT_ADMIN_DB_URL:jdbc:postgresql://localhost:5432/epr}
+    admin-username: ${EPR_DB_OWNER_USERNAME:epr_owner}
+    admin-password: ${EPR_DB_OWNER_PASSWORD:epr-owner-local-only}
+    tenant-jdbc-url-template: ${EPR_TENANT_DB_URL_TEMPLATE:jdbc:postgresql://localhost:5432/{database}}
+    local-credential-encryption-key: ${EPR_TENANT_CREDENTIAL_ENCRYPTION_KEY:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}

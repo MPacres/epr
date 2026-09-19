@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { ArrowLeftRight, Bell, Building2, CalendarDays, ChevronDown, ChevronRight, FileText, House, Inbox, Keyboard, ListOrdered, Menu, Plus, Search, Settings, Users } from 'lucide-react'
+import { ArrowLeftRight, Bell, Building2, CalendarDays, ChevronDown, ChevronRight, FileText, House, Inbox, Keyboard, ListOrdered, LogOut, Menu, Search, Settings, Users } from 'lucide-react'
+import { EprMark } from '../brand/epr-mark'
 import { Button } from '../ui/button'
 
 export type Destination = 'dashboard' | 'queue' | 'patients' | 'schedule' | 'inbox' | 'practices' | 'more' | 'profile'
@@ -15,11 +16,13 @@ const navigation = [
   { id: 'settings', label: 'Settings', icon: Settings, disabled: true },
 ] as const
 export function Logo() {
-  return <div className="brand"><span className="brand-mark"><Plus aria-hidden="true" /></span><div><strong>EPR<span className="brand-period">.</span></strong><span className="brand-caption">Clinical workspace</span></div></div>
+  return <div className="brand"><EprMark /><div><strong>EPR</strong><span className="brand-caption">Clinical workspace</span></div></div>
 }
-export function WorkspaceShell({ children, readyCount, inboxCount, onNavigate, onSearchOpen, activeDestination = 'dashboard' }: {
+export function WorkspaceShell({ children, readyCount, inboxCount, onNavigate, onSearchOpen, onSignOut, activeDestination = 'dashboard', context, administration = false }: {
   children: ReactNode; readyCount: number; inboxCount: number; onNavigate: (destination: Destination) => void
-  onSearchOpen: () => void
+  onSearchOpen: () => void; onSignOut: () => void
+  administration?: boolean
+  context?: { practiceName: string; siteName: string; clinicianName: string }
   activeDestination?: Destination
 }) {
   function navButton(item: typeof navigation[number], mobile = false) {
@@ -35,7 +38,7 @@ export function WorkspaceShell({ children, readyCount, inboxCount, onNavigate, o
       {!mobile && count > 0 ? <span className="nav-count">{count}</span> : null}
     </button>
   }
-  return <div className="workspace">
+  return <div className={`workspace${administration ? ' administration-workspace' : ''}`}>
     <a href="#main-content" className="skip-link" onClick={event => {
       event.preventDefault()
       const main = document.getElementById('main-content')
@@ -45,22 +48,25 @@ export function WorkspaceShell({ children, readyCount, inboxCount, onNavigate, o
     <aside className="sidebar">
       <Logo />
       <nav aria-label="Main navigation" className="desktop-nav">{navigation.map(item => navButton(item))}</nav>
-      <div className="sidebar-footer"><span className="workspace-label"><span className="demo-dot" />Demo workspace</span>
-        <button className="profile" onClick={() => onNavigate('profile')}><span className="avatar blue">AS</span><span className="profile-copy"><strong>Dr. Ana Santos</strong><small>Internal Medicine</small></span><ChevronRight aria-hidden="true" /></button>
+      <div className="sidebar-footer"><span className="workspace-label"><span className="demo-dot" />{context ? 'Connected · synthetic data' : 'Demo workspace'}</span>
+        <button className="profile" onClick={() => onNavigate('profile')}><span className="avatar blue">{administration ? 'PA' : context ? 'MD' : 'AS'}</span><span className="profile-copy"><strong>{context?.clinicianName ?? 'Dr. Ana Santos'}</strong><small>{administration ? 'Practice administration' : context ? 'Clinical workspace' : 'Internal Medicine'}</small></span><ChevronRight aria-hidden="true" /></button>
       </div>
     </aside>
     <div className="workspace-main">
       <header className="topbar">
         <div className="mobile-brand"><Logo /></div>
-        <button className="practice-selector" onClick={() => onNavigate('practices')} aria-label="View practice sessions; Hospital A is active">
+        <button className="practice-selector" onClick={() => onNavigate('practices')} aria-label={context ? `View authorized sites; ${context.siteName}` : "View practice sessions; Hospital A is active"}>
           <span className="icon-tile blue"><Building2 aria-hidden="true" /></span>
-          <span><span className="practice-name">Hospital A <ChevronDown aria-hidden="true" /><span className="current-tag">Current session</span></span><span className="practice-subtitle">Outpatient Clinic <span>·</span> 8:00 AM–12:00 PM</span></span>
+          <span><span className="practice-name">{context?.siteName ?? 'Hospital A'} <ChevronDown aria-hidden="true" /><span className="current-tag">{administration ? 'Administration' : context ? 'Selected site' : 'Current session'}</span></span>{context ? <span className="connected-practice-mobile">{context.practiceName}</span> : null}<span className="practice-subtitle">{context?.practiceName ?? 'Outpatient Clinic'} {!context ? <><span>·</span> 8:00 AM–12:00 PM</> : null}</span></span>
         </button>
-        <button className="global-search search-trigger" onClick={onSearchOpen} aria-label="Search patients across your clinics" aria-haspopup="dialog" aria-keyshortcuts="Meta+K Control+K">
+        {!administration ? <button className="global-search search-trigger" onClick={onSearchOpen} aria-label="Search patients across your clinics" aria-haspopup="dialog" aria-keyshortcuts="Meta+K Control+K">
           <Search aria-hidden="true" /><span>Search patients…</span><span className="search-shortcut" aria-hidden="true"><Keyboard /></span>
-        </button>
-        <span className="header-demo"><span className="demo-dot" />Demo data</span>
-        <Button variant="ghost" size="icon" className="notification-button" aria-label={`Open clinical inbox, ${inboxCount} items need attention`} onClick={() => onNavigate('inbox')}><Bell aria-hidden="true" /><span className="notification-dot" /></Button>
+        </button> : null}
+        <div className="topbar-actions">
+          <span className="header-demo"><span className="demo-dot" />{context ? 'Synthetic data' : 'Demo data'}</span>
+          <Button variant="ghost" size="icon" className="notification-button" aria-label={`Open clinical inbox, ${inboxCount} items need attention`} onClick={() => onNavigate('inbox')}><Bell aria-hidden="true" />{inboxCount > 0 ? <span className="notification-dot" /> : null}</Button>
+          <Button variant="ghost" className="topbar-sign-out" onClick={onSignOut} aria-label="Sign out"><LogOut aria-hidden="true" /><span>Sign out</span></Button>
+        </div>
       </header>
       {children}
     </div>

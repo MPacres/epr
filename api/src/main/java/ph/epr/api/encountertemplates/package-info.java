@@ -3,6 +3,6 @@
  */
 @org.springframework.modulith.ApplicationModule(
     displayName = "Encounters and Templates",
-    allowedDependencies = {}
+    allowedDependencies = {"documentscommunication", "clinicalchart", "patientregistry", "platformoperations", "identitytenancy"}
 )
 package ph.epr.api.encountertemplates;

@@ -16,6 +16,11 @@ export function findChartPatient(records: readonly DirectoryPatient[], allowedPr
 }
 export function hasClinicalFixture(patient: Pick<DirectoryPatient, 'practiceId' | 'id'>) { return patient.practiceId === 'practice-a' && patient.id === 'patient-maria' }
 export function patientEncounters(patient: Pick<DirectoryPatient, 'practiceId' | 'id'>) { return hasClinicalFixture(patient) ? encounters : [] }
+export function filterPatientNotes(notes: readonly DemoEncounter[], query: string, status: 'All' | DemoEncounter['documentation']) {
+  const words = query.toLocaleLowerCase().trim().split(/\s+/).filter(Boolean)
+  return notes.filter(note => (status === 'All' || note.documentation === status)
+    && words.every(word => `${note.reason} ${note.id} ${note.template} ${note.date}`.toLocaleLowerCase().includes(word)))
+}
 export function findEncounter(patient: Pick<DirectoryPatient, 'practiceId' | 'id'>, id: string) { return patientEncounters(patient).find(item => item.id === id) }
 export function initialNote(encounter: DemoEncounter): EncounterNote { return { reason: encounter.reason, history: '', examination: '', assessment: '', plan: '', disposition: '', followup: '', precautions: '', diagnoses: [] } }
 export function noteChanged(note: EncounterNote, baseline: EncounterNote) { return JSON.stringify(note) !== JSON.stringify(baseline) }
@@ -31,5 +36,6 @@ export function filterEvents(events: readonly ChartEvent[], query: string, categ
   const words = query.toLocaleLowerCase().trim().split(/\s+/).filter(Boolean)
   return events.filter(event => (category === 'All' || event.category === category) && words.every(word => `${event.title} ${event.detail} ${event.date}`.toLocaleLowerCase().includes(word)))
 }
-export const chartPath = (patient: Pick<DirectoryPatient, 'practiceId' | 'id'>) => `/patients/${encodeURIComponent(patient.practiceId)}/${encodeURIComponent(patient.id)}/chart`
-export const encounterPath = (patient: Pick<DirectoryPatient, 'practiceId' | 'id'>, id: string) => `/patients/${encodeURIComponent(patient.practiceId)}/${encodeURIComponent(patient.id)}/encounters/${encodeURIComponent(id)}`
+export const chartPath = (patient: Pick<DirectoryPatient, 'practiceId' | 'id'>) => `/patients/preview/${encodeURIComponent(patient.practiceId)}/${encodeURIComponent(patient.id)}/chart`
+export const notesPath = (patient: Pick<DirectoryPatient, 'practiceId' | 'id'>) => `/patients/preview/${encodeURIComponent(patient.practiceId)}/${encodeURIComponent(patient.id)}/notes`
+export const encounterPath = (patient: Pick<DirectoryPatient, 'practiceId' | 'id'>, id: string) => `/patients/preview/${encodeURIComponent(patient.practiceId)}/${encodeURIComponent(patient.id)}/encounters/${encodeURIComponent(id)}`

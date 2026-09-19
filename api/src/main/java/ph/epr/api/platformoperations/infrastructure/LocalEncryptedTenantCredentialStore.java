@@ -113,6 +113,23 @@ class LocalEncryptedTenantCredentialStore implements TenantCredentialStore {
 			.optional();
 	}
 
+	@Override
+	@Transactional
+	public TenantDatabaseCredential resolveRuntime(UUID practiceId, String reference) {
+		jdbcClient.sql("SELECT set_config('epr.platform_operations', 'true', true)").query(String.class).single();
+		return find(practiceId, CredentialPurpose.RUNTIME)
+			.filter(value -> value.secretReference().equals(reference))
+			.orElseThrow(() -> new ph.epr.api.identitytenancy.ClinicalAccessException("TENANT_UNAVAILABLE", 503));
+	}
+
+    @Override
+    @Transactional
+    public TenantDatabaseCredential resolveMigration(UUID practiceId, String reference) {
+        jdbcClient.sql("SELECT set_config('epr.platform_operations', 'true', true)").query(String.class).single();
+        return find(practiceId, CredentialPurpose.MIGRATION).filter(value -> value.secretReference().equals(reference))
+            .orElseThrow(() -> new ph.epr.api.identitytenancy.ClinicalAccessException("TENANT_UNAVAILABLE", 503));
+    }
+
 	private byte[] encrypt(String reference, String password, byte[] nonce) {
 		try {
 			var cipher = Cipher.getInstance("AES/GCM/NoPadding");

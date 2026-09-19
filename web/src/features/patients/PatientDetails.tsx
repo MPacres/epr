@@ -13,7 +13,7 @@ export function PatientDetails({ patient, overview = false, onOpenOverview }: {
   const entry = queue.find(item => item.patient.id === patient.id && item.patient.practiceId === patient.practiceId && item.sessionId === activeSession.id)
   return <div className="patient-details">
     <div className="directory-identity"><span className="avatar blue" aria-hidden="true">{patient.initials}</span><div><h2>{patient.name}</h2><p>{patient.mrn} <span>·</span> {clinic?.site}</p></div></div>
-    <button className="edit-patient-link" onClick={() => navigate(`/patients/${encodeURIComponent(patient.practiceId)}/${encodeURIComponent(patient.id)}/edit`)}><PencilLine aria-hidden="true" />Edit patient details</button>
+    <button className="edit-patient-link" onClick={() => navigate(`/patients/preview/${encodeURIComponent(patient.practiceId)}/${encodeURIComponent(patient.id)}/edit`)}><PencilLine aria-hidden="true" />Edit patient details</button>
     {patient.identity === 'provisional' ? <div className="identity-notice"><TriangleAlert aria-hidden="true" /><p><strong>Provisional identity</strong><span>Verify identity details before clinical actions.</span></p></div> : null}
     <dl className="patient-facts">
       <div><dt>Date of birth</dt><dd>{patient.birthDateAccuracy === 'estimated' ? 'Estimated ' : ''}{formatPatientDate(patient.birthDate)}{age !== null ? <span> · {patient.birthDateAccuracy === 'estimated' ? 'about ' : ''}{age} years</span> : null}</dd></div>

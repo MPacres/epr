@@ -3,6 +3,6 @@
  */
 @org.springframework.modulith.ApplicationModule(
     displayName = "Prescribing",
-    allowedDependencies = {}
+    allowedDependencies = {"encountertemplates", "platformoperations", "identitytenancy", "documentscommunication", "clinicalchart"}
 )
 package ph.epr.api.prescribing;

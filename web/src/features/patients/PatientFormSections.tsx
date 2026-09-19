@@ -1,3 +1,5 @@
+import { useContext } from 'react'
+import { PatientIdentifierContext } from './patient-identifier-context'
 import { ChevronDown, CreditCard, FileText, MapPin, Paperclip, Phone, ShieldCheck, UserRound, Users, type LucideIcon } from 'lucide-react'
 import { useFormContext, useWatch } from 'react-hook-form'
 import { Button } from '../../components/ui/button'
@@ -14,13 +16,15 @@ const accuracy = [{value:'exact',label:'Exact'}, {value:'estimated',label:'Estim
 export function PatientFormSections({ openSections, onToggle, mrn, practice }: { openSections: FormSection[]; onToggle:(section:FormSection)=>void; mrn?: string; practice: string }) {
   const { control } = useFormContext<PatientDraft>()
   const draft = useWatch({ control }) as PatientDraft
+  const identifiers = useContext(PatientIdentifierContext)
+  const pinRecorded = !draft.pinUnavailable && (identifiers?.modes.pin === 'UNCHANGED' ? !!identifiers.masks.pin : identifiers?.modes.pin === 'REMOVE' ? false : !!draft.pin)
   const summaries: Record<FormSection, string> = {
     demographics: [fullPatientName(draft) || 'Name and identity details', draft.birthAccuracy === 'unknown' ? 'Birth date unknown' : draft.birthDate ? `${draft.birthAccuracy === 'estimated' ? 'Estimated ' : ''}${formatPatientDate(draft.birthDate)}` : 'Birth date not entered', draft.sex].join(' · '),
     contact: [draft.phone || 'No phone number', draft.language || 'Language not recorded', draft.communication].join(' · '),
     address: draft.city ? `${draft.city} · ${draft.street || 'Street not provided'}` : 'Street, barangay, city and province · Optional',
-    philhealth: `${draft.philhealthRole} · ${draft.pinUnavailable || !draft.pin ? 'PIN not provided' : 'PIN recorded'} · Not verified`,
+    philhealth: `${draft.philhealthRole} · ${pinRecorded ? 'PIN recorded' : 'PIN not provided'} · Not verified`,
     representatives: draft.representativeName || draft.emergencyName ? `${draft.representativeName || 'No representative'} · ${draft.emergencyName || 'No emergency contact'}` : 'Contact person, relationship and representative authority',
-    identifiers: mrn ? `${mrn} · ${practice} · Other IDs optional` : 'Demo patient ID assigned after saving · Other IDs optional',
+    identifiers: mrn ? `${mrn} · ${practice} · Other IDs optional` : 'Patient ID assigned after saving · Other IDs optional',
   }
   return <div className="patient-form-sections">{formSections.map(({id,title,icon:Icon}) => {
     const expanded = openSections.includes(id)
@@ -34,7 +38,7 @@ export function PatientFormSections({ openSections, onToggle, mrn, practice }: {
           {draft.philhealthRole === 'Dependent' ? <div className="dependent-fields"><h3>Principal member</h3><p className="form-help">Keep the principal member’s details separate from this patient’s own PIN. Leave unknown details blank.</p><div className="form-grid"><FormField name="principalName" label="Principal member name (optional)" /><SecretField name="principalPin" /><FormField name="principalRelationship" wide label="Relationship to principal member (optional)" placeholder="e.g. Child" /></div></div> : null}
           <div className="philhealth-status"><span className="badge amber"><ShieldCheck aria-hidden="true" />Not verified</span><span>Eligibility not checked</span></div><div className="attachment-unavailable"><Button variant="outline" disabled><Paperclip aria-hidden="true" />Attach supporting document</Button><span>Optional · Document upload is not connected.</span></div></> : null}
         {id === 'representatives' ? <><h3 className="form-subheading">Patient representative</h3><p className="form-help">Authority has not been reviewed. These details alone do not grant access to the patient’s chart.</p><div className="form-grid"><FormField name="representativeName" label="Representative name (optional)" /><FormField name="representativeRelationship" label="Relationship (optional)" /><FormField name="representativePhone" label="Representative phone (optional)" type="tel" /><FormField name="representativeAuthority" options={['Not recorded','Patient nominated','Parent / guardian','Other — requires review']} /></div><h3 className="form-subheading contact-subheading">Emergency contact</h3><div className="form-grid"><FormField name="emergencyName" label="Emergency contact name (optional)" /><FormField name="emergencyRelationship" label="Emergency relationship (optional)" /><FormField name="emergencyPhone" label="Emergency contact phone (optional)" type="tel" /></div></> : null}
-        {id === 'identifiers' ? <><dl className="form-record-identifiers"><div><dt>Practice patient ID</dt><dd>{mrn ?? 'Assigned after adding the demo patient'}</dd></div><div><dt>Practice</dt><dd>{practice}</dd></div></dl><p className="form-help">The practice ID is read-only and separate from PhilHealth and other identifiers.</p><div className="form-grid"><FormField name="otherIdType" label="Other identifier type (optional)" placeholder="e.g. External hospital MRN" /><FormField name="otherIdIssuer" label="Identifier issuer (optional)" /><SecretField name="otherIdValue" /></div></> : null}
+        {id === 'identifiers' ? <><dl className="form-record-identifiers"><div><dt>Practice patient ID</dt><dd>{mrn ?? 'Assigned after saving the patient'}</dd></div><div><dt>Practice</dt><dd>{practice}</dd></div></dl><p className="form-help">The practice ID is read-only and separate from PhilHealth and other identifiers.</p><div className="form-grid"><FormField name="otherIdType" label="Other identifier type (optional)" placeholder="e.g. External hospital MRN" /><FormField name="otherIdIssuer" label="Identifier issuer (optional)" /><SecretField name="otherIdValue" /></div></> : null}
       </div>
     </section>
   })}</div>

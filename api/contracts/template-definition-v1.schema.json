@@ -1,0 +1,274 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Synthetic EPR template definition v1",
+  "$ref": "#/$defs/TemplateDefinition",
+  "$defs": {
+    "TemplateDefinition": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0"
+        },
+        "ruleVersion": {
+          "const": "1"
+        },
+        "rendererVersion": {
+          "const": "1"
+        },
+        "extractionVersion": {
+          "const": "none"
+        },
+        "terminologyVersion": {
+          "const": "uncoded-1"
+        },
+        "templateKey": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "specialty": {
+          "type": "string"
+        },
+        "encounterType": {
+          "type": "string"
+        },
+        "businessVersion": {
+          "type": "string"
+        },
+        "requiresPregnancyEpisode": {
+          "type": "boolean"
+        },
+        "syntheticOnly": {
+          "const": true
+        },
+        "sections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Section"
+          },
+          "maxItems": 30
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "ruleVersion",
+        "rendererVersion",
+        "extractionVersion",
+        "terminologyVersion",
+        "templateKey",
+        "title",
+        "specialty",
+        "encounterType",
+        "businessVersion",
+        "requiresPregnancyEpisode",
+        "syntheticOnly",
+        "sections"
+      ],
+      "additionalProperties": false
+    },
+    "Section": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "key": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Field"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "key",
+        "label",
+        "fields"
+      ],
+      "additionalProperties": false
+    },
+    "Field": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "key": {
+          "type": "string"
+        },
+        "concept": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "TEXT",
+            "MULTILINE_TEXT",
+            "INTEGER",
+            "DECIMAL",
+            "QUANTITY",
+            "DATE",
+            "DATETIME",
+            "SINGLE_CHOICE",
+            "MULTIPLE_CHOICE",
+            "ASSESSMENT_STATE",
+            "REFERENCE",
+            "GROUP"
+          ]
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "units": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "allowedMissingStates": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "NOT_ASSESSED",
+              "UNKNOWN",
+              "DECLINED",
+              "NOT_APPLICABLE"
+            ]
+          }
+        },
+        "maxLength": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "maxItems": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 30
+        },
+        "precision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 6
+        },
+        "requiredAtSign": {
+          "type": "boolean"
+        },
+        "sensitivity": {
+          "type": "string",
+          "enum": [
+            "CLINICAL",
+            "RESTRICTED_REPRODUCTIVE"
+          ]
+        },
+        "visibleWhen": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Rule"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "requiredWhen": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Rule"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Field"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "key",
+        "concept",
+        "label",
+        "type",
+        "options",
+        "units",
+        "allowedMissingStates",
+        "maxLength",
+        "maxItems",
+        "precision",
+        "requiredAtSign",
+        "sensitivity",
+        "visibleWhen",
+        "requiredWhen",
+        "fields"
+      ],
+      "additionalProperties": false
+    },
+    "Rule": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "type": "string",
+          "enum": [
+            "EQ",
+            "IN",
+            "PRESENT",
+            "ALL",
+            "ANY",
+            "NOT"
+          ]
+        },
+        "fieldId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Rule"
+          }
+        }
+      },
+      "required": [
+        "op",
+        "fieldId",
+        "values",
+        "rules"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

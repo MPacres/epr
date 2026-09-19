@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { changeRequiredPassword, createSession, deleteSession, fetchSession, type LoginCommand, type PasswordChangeCommand } from './auth-client'
 import { AuthContext, type AuthState } from './auth-context'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient()
   const [state, setState] = useState<AuthState>({ status: 'loading', user: null, message: null })
 
   const retry = useCallback(async () => {
@@ -34,9 +36,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const signOut = useCallback(async () => {
-    await deleteSession()
-    setState({ status: 'unauthenticated', user: null, message: null })
-  }, [])
+    setState({ status: 'loading', user: null, message: null })
+    await queryClient.cancelQueries().catch(() => undefined)
+    queryClient.clear()
+    try {
+      await deleteSession()
+      setState({ status: 'unauthenticated', user: null, message: null })
+    } catch (error) {
+      setState({ status: 'unavailable', user: null, message: 'Sign-out could not be confirmed. Try again.' })
+      throw error
+    }
+  }, [queryClient])
 
   const changePassword = useCallback(async (command: PasswordChangeCommand) => {
     const user = await changeRequiredPassword(command)

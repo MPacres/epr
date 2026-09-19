@@ -1,0 +1,261 @@
+[
+  {
+    "name": "no-answer",
+    "rule": {
+      "op": "EQ",
+      "fieldId": "18f57041-8ad9-4c2c-adcf-332a5f047e92",
+      "values": [
+        "PRESENT"
+      ],
+      "rules": []
+    },
+    "answers": [],
+    "expected": "UNKNOWN"
+  },
+  {
+    "name": "explicit-unknown",
+    "rule": {
+      "op": "EQ",
+      "fieldId": "18f57041-8ad9-4c2c-adcf-332a5f047e92",
+      "values": [
+        "PRESENT"
+      ],
+      "rules": []
+    },
+    "answers": [
+      {
+        "fieldId": "18f57041-8ad9-4c2c-adcf-332a5f047e92",
+        "groupItemId": null,
+        "value": null,
+        "missingState": "UNKNOWN",
+        "source": {
+          "kind": "CLINICIAN_ENTERED",
+          "recordId": null,
+          "version": null,
+          "clinicalTime": null,
+          "description": "Synthetic rule test"
+        },
+        "review": "REVIEWED",
+        "hiddenResolution": null,
+        "resolutionReason": null
+      }
+    ],
+    "expected": "UNKNOWN"
+  },
+  {
+    "name": "negation-of-unassessed",
+    "rule": {
+      "op": "NOT",
+      "fieldId": null,
+      "values": [],
+      "rules": [
+        {
+          "op": "EQ",
+          "fieldId": "18f57041-8ad9-4c2c-adcf-332a5f047e92",
+          "values": [
+            "PRESENT"
+          ],
+          "rules": []
+        }
+      ]
+    },
+    "answers": [
+      {
+        "fieldId": "18f57041-8ad9-4c2c-adcf-332a5f047e92",
+        "groupItemId": null,
+        "value": null,
+        "missingState": "NOT_ASSESSED",
+        "source": {
+          "kind": "CLINICIAN_ENTERED",
+          "recordId": null,
+          "version": null,
+          "clinicalTime": null,
+          "description": "Synthetic rule test"
+        },
+        "review": "REVIEWED",
+        "hiddenResolution": null,
+        "resolutionReason": null
+      }
+    ],
+    "expected": "UNKNOWN"
+  },
+  {
+    "name": "positive",
+    "rule": {
+      "op": "EQ",
+      "fieldId": "18f57041-8ad9-4c2c-adcf-332a5f047e92",
+      "values": [
+        "PRESENT"
+      ],
+      "rules": []
+    },
+    "answers": [
+      {
+        "fieldId": "18f57041-8ad9-4c2c-adcf-332a5f047e92",
+        "groupItemId": null,
+        "value": {
+          "text": null,
+          "number": null,
+          "unit": null,
+          "choices": [
+            "PRESENT"
+          ],
+          "referenceId": null,
+          "referenceVersion": null,
+          "items": []
+        },
+        "missingState": null,
+        "source": {
+          "kind": "CLINICIAN_ENTERED",
+          "recordId": null,
+          "version": null,
+          "clinicalTime": null,
+          "description": "Synthetic rule test"
+        },
+        "review": "REVIEWED",
+        "hiddenResolution": null,
+        "resolutionReason": null
+      }
+    ],
+    "expected": "TRUE"
+  },
+  {
+    "name": "negative",
+    "rule": {
+      "op": "EQ",
+      "fieldId": "18f57041-8ad9-4c2c-adcf-332a5f047e92",
+      "values": [
+        "PRESENT"
+      ],
+      "rules": []
+    },
+    "answers": [
+      {
+        "fieldId": "18f57041-8ad9-4c2c-adcf-332a5f047e92",
+        "groupItemId": null,
+        "value": {
+          "text": null,
+          "number": null,
+          "unit": null,
+          "choices": [
+            "ABSENT"
+          ],
+          "referenceId": null,
+          "referenceVersion": null,
+          "items": []
+        },
+        "missingState": null,
+        "source": {
+          "kind": "CLINICIAN_ENTERED",
+          "recordId": null,
+          "version": null,
+          "clinicalTime": null,
+          "description": "Synthetic rule test"
+        },
+        "review": "REVIEWED",
+        "hiddenResolution": null,
+        "resolutionReason": null
+      }
+    ],
+    "expected": "FALSE"
+  },
+  {
+    "name": "negation",
+    "rule": {
+      "op": "NOT",
+      "fieldId": null,
+      "values": [],
+      "rules": [
+        {
+          "op": "EQ",
+          "fieldId": "18f57041-8ad9-4c2c-adcf-332a5f047e92",
+          "values": [
+            "PRESENT"
+          ],
+          "rules": []
+        }
+      ]
+    },
+    "answers": [
+      {
+        "fieldId": "18f57041-8ad9-4c2c-adcf-332a5f047e92",
+        "groupItemId": null,
+        "value": {
+          "text": null,
+          "number": null,
+          "unit": null,
+          "choices": [
+            "ABSENT"
+          ],
+          "referenceId": null,
+          "referenceVersion": null,
+          "items": []
+        },
+        "missingState": null,
+        "source": {
+          "kind": "CLINICIAN_ENTERED",
+          "recordId": null,
+          "version": null,
+          "clinicalTime": null,
+          "description": "Synthetic rule test"
+        },
+        "review": "REVIEWED",
+        "hiddenResolution": null,
+        "resolutionReason": null
+      }
+    ],
+    "expected": "TRUE"
+  },
+  {
+    "name": "all-unknown",
+    "rule": {
+      "op": "ALL",
+      "fieldId": null,
+      "values": [],
+      "rules": [
+        {
+          "op": "EQ",
+          "fieldId": "18f57041-8ad9-4c2c-adcf-332a5f047e92",
+          "values": [
+            "PRESENT"
+          ],
+          "rules": []
+        },
+        {
+          "op": "NOT",
+          "fieldId": null,
+          "values": [],
+          "rules": [
+            {
+              "op": "EQ",
+              "fieldId": "18f57041-8ad9-4c2c-adcf-332a5f047e92",
+              "values": [
+                "PRESENT"
+              ],
+              "rules": []
+            }
+          ]
+        }
+      ]
+    },
+    "answers": [
+      {
+        "fieldId": "18f57041-8ad9-4c2c-adcf-332a5f047e92",
+        "groupItemId": null,
+        "value": null,
+        "missingState": "DECLINED",
+        "source": {
+          "kind": "CLINICIAN_ENTERED",
+          "recordId": null,
+          "version": null,
+          "clinicalTime": null,
+          "description": "Synthetic rule test"
+        },
+        "review": "REVIEWED",
+        "hiddenResolution": null,
+        "resolutionReason": null
+      }
+    ],
+    "expected": "UNKNOWN"
+  }
+]

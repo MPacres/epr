@@ -3,6 +3,6 @@
  */
 @org.springframework.modulith.ApplicationModule(
     displayName = "Documents and Communication",
-    allowedDependencies = {}
+    allowedDependencies = {"platformoperations", "identitytenancy"}
 )
 package ph.epr.api.documentscommunication;

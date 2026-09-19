@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { Building2, CircleCheck, FileKey2, Headphones, House, LockKeyhole, LogOut, Menu, Plus, Search, ShieldCheck, Stethoscope } from 'lucide-react'
 import { matchPath, useLocation, useNavigate } from 'react-router-dom'
 import { Button } from '../../components/ui/button'
@@ -19,8 +19,6 @@ export function ProviderPortal() {
   const auth = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const [signOutError, setSignOutError] = useState<string | null>(null)
-  const [signingOut, setSigningOut] = useState(false)
   const user = auth.status === 'authenticated' ? auth.user : null
   const initials = user?.displayName.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase() ?? 'SA'
   const creatingTenant = location.pathname === '/provider/tenants/new'
@@ -39,18 +37,6 @@ export function ProviderPortal() {
     requestAnimationFrame(() => document.getElementById('practice-directory-search')?.focus())
   }
 
-  async function signOut() {
-    setSignOutError(null)
-    setSigningOut(true)
-    try {
-      await auth.signOut()
-      navigate('/login', { replace: true })
-    } catch (error) {
-      setSignOutError(error instanceof Error ? error.message : 'Sign-out could not be completed.')
-      setSigningOut(false)
-    }
-  }
-
   return <div className="provider-workspace">
     <aside className="provider-sidebar">
       <div className="provider-brand"><EprMark className="provider-brand-mark" /><span><strong>EPR</strong><small>Provider support</small></span></div>
@@ -67,10 +53,9 @@ export function ProviderPortal() {
         <span className="provider-scope"><ShieldCheck aria-hidden="true" />Global platform view</span>
         <button className="provider-search" type="button" onClick={openPracticeSearch}><Search aria-hidden="true" /><span>Search practices</span><strong>Open directory</strong></button>
         <span className="provider-health"><CircleCheck aria-hidden="true" />Local session API connected</span>
-        <Button variant="ghost" onClick={() => void signOut()} disabled={signingOut}><LogOut aria-hidden="true" />{signingOut ? 'Signing out…' : 'Sign out'}</Button>
+        <Button variant="ghost" onClick={() => navigate('/logout')}><LogOut aria-hidden="true" />Sign out</Button>
       </header>
       <main id="main-content" className="provider-content" tabIndex={-1}>
-        {signOutError ? <p className="provider-error" role="alert">{signOutError}</p> : null}
         {creatingTenant ? <TenantCreation onBack={() => navigate('/provider/practices')} onCreated={practiceId => navigate(`/provider/practices/${practiceId}`)} />
           : practiceDetail?.params.practiceId ? <PracticeDetail practiceId={practiceDetail.params.practiceId} />
             : viewingPractices ? <PracticeDirectory onCreate={() => navigate('/provider/tenants/new')} /> : <>

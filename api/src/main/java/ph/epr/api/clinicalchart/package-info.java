@@ -3,6 +3,6 @@
  */
 @org.springframework.modulith.ApplicationModule(
     displayName = "Clinical Chart",
-    allowedDependencies = {}
+    allowedDependencies = {"patientregistry", "platformoperations", "identitytenancy"}
 )
 package ph.epr.api.clinicalchart;

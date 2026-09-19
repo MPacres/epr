@@ -1,0 +1,2 @@
+import { z } from 'zod'
+export const reportSchema = z.object({ id: z.uuid(), version: z.number(), kind: z.enum(['LAB_ORDER', 'IMAGING_ORDER']), source: z.string(), externalReference: z.string(), content: z.string(), occurredAt: z.string(), receivedAt: z.string(), correctsId: z.uuid().nullable(), patientId: z.uuid().nullable(), requestId: z.uuid().nullable(), state: z.enum(['MATCHED', 'UNMATCHED']) })

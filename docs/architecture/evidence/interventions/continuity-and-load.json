@@ -1,0 +1,12 @@
+{
+  "taskLayouts": 3,
+  "imagingLayouts": 3,
+  "load": {
+    "requests": 50,
+    "successes": 50,
+    "p50Ms": 211,
+    "p95Ms": 385,
+    "maxMs": 401
+  },
+  "errors": []
+}

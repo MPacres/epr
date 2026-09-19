@@ -91,6 +91,16 @@ class JdbcTenantDatabaseManager implements TenantDatabaseManager {
 		}
 	}
 
+    @Override
+    public String upgrade(PracticeTenant tenant) {
+        var migration = credentialStore.resolveMigration(tenant.practiceId(), tenant.migrationSecretReference());
+        try (var connection = DriverManager.getConnection(tenant.jdbcUrl(), migration.username(), migration.password())) {
+            var identity = readTenantIdentity(connection);
+            if (identity == null || !identity.practiceId().equals(tenant.practiceId())) throw new TenantProvisioningException("TENANT_DATABASE_IDENTITY_MISMATCH", "Tenant migration identity check failed.");
+        } catch (SQLException e) { throw new TenantProvisioningException("TENANT_DATABASE_OPERATION_FAILED", "Tenant migration connection failed.", e); }
+        return migrate(tenant.jdbcUrl(), migration);
+    }
+
 	private void hardenAdministrativeDatabaseBoundary() throws SQLException {
 		try (var connection = adminConnection(); var statement = connection.createStatement()) {
 			try (var resultSet = statement.executeQuery("SELECT current_database()")) {

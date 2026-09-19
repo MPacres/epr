@@ -3,6 +3,6 @@
  */
 @org.springframework.modulith.ApplicationModule(
     displayName = "Care Coordination",
-    allowedDependencies = {}
+    allowedDependencies = {"encountertemplates", "platformoperations", "identitytenancy", "documentscommunication"}
 )
 package ph.epr.api.carecoordination;

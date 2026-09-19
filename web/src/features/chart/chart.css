@@ -74,6 +74,25 @@
 .chart-statuses { display: flex; flex-wrap: wrap; gap: 8px; }
 .chart-disabled-action { margin-top: 15px; }
 .chart-outline-link { border: 1px solid var(--border); border-radius: 7px; background: white; padding: 11px 14px; font-size: 12px; }
+.chart-heading-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
+.notes-panel { padding: 20px; }
+.notes-panel-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.notes-panel-heading h2 { font-size: 17px; }
+.notes-panel-heading p { color: var(--secondary); font-size: 12px; line-height: 1.5; margin-top: 4px; }
+.notes-count { flex-shrink: 0; color: var(--secondary); font-size: 12px; font-variant-numeric: tabular-nums; }
+.notes-tools { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin: 20px 0 4px; }
+.notes-search { flex: 1 1 290px; max-width: 460px; }
+.notes-filters { margin: 0; }
+.notes-list { list-style: none; margin: 0; padding: 0; }
+.notes-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; border-top: 1px solid var(--border); padding: 18px 0; }
+.notes-row-main { min-width: 0; }
+.notes-row-title { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.notes-row-title h3 { font-size: 14px; line-height: 1.4; }
+.notes-row p { color: var(--secondary); font-size: 12px; line-height: 1.5; margin-top: 6px; }
+.notes-row small { display: block; color: #52627b; font-size: 11px; line-height: 1.5; margin-top: 10px; }
+.notes-open { display: inline-flex; align-items: center; gap: 7px; flex-shrink: 0; min-height: 40px; font-size: 12px; font-weight: 500; }
+.notes-open svg { width: 15px; }
+.notes-panel .chart-empty { border-top: 1px solid var(--border); margin-top: 14px; }
 .encounter-context { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin: 12px 0 8px; }
 .encounter-context > span { display: flex; align-items: center; gap: 6px; color: var(--secondary); font-size: 11px; }
 .encounter-context svg { width: 13px; }
@@ -132,6 +151,12 @@
 }
 @media (max-width: 600px) {
   .chart-workspace .page-heading { align-items: flex-start; gap: 14px; flex-direction: column; }
+  .chart-heading-actions { justify-content: flex-start; width: 100%; }
+  .notes-panel { padding: 15px; }
+  .notes-tools { align-items: stretch; }
+  .notes-search { flex-basis: 100%; }
+  .notes-filters { width: 100%; }
+  .notes-row { align-items: flex-start; flex-direction: column; gap: 8px; }
   .chart-workspace h1 { font-size: 25px; }
   .chart-patient-banner { top: 69px; padding: 12px; }
   .chart-patient-row { flex-wrap: wrap; gap: 9px; }

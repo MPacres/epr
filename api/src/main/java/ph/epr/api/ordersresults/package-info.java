@@ -3,6 +3,6 @@
  */
 @org.springframework.modulith.ApplicationModule(
     displayName = "Orders and Results",
-    allowedDependencies = {}
+    allowedDependencies = {"encountertemplates", "platformoperations", "identitytenancy", "documentscommunication", "carecoordination"}
 )
 package ph.epr.api.ordersresults;

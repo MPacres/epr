@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes } from 'react'
+import type { ComponentPropsWithRef } from 'react'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
@@ -14,6 +14,6 @@ const buttonVariants = cva('inline-flex items-center justify-center gap-2 whites
   },
   defaultVariants: { variant: 'default', size: 'default' },
 })
-export function Button({ className, variant, size, type = 'button', ...props }: ButtonHTMLAttributes<HTMLButtonElement> & VariantProps<typeof buttonVariants>) {
+export function Button({ className, variant, size, type = 'button', ...props }: ComponentPropsWithRef<'button'> & VariantProps<typeof buttonVariants>) {
   return <button type={type} className={twMerge(clsx(buttonVariants({ variant, size }), className))} {...props} />
 }

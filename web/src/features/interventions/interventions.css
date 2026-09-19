@@ -1,0 +1,61 @@
+.encounter-interventions { margin-top: 24px; padding: 24px; min-width: 0; }
+.intervention-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.intervention-section-heading h2, .intervention-section-heading h3 { margin: 0; }
+.intervention-section-heading p { margin: 4px 0 0; color: var(--color-muted-foreground, #65738b); }
+.intervention-filters { display: flex; gap: 4px; flex-wrap: wrap; padding-bottom: 12px; border-bottom: 1px solid #e0e7f0; }
+.intervention-filters button { font-size: 13px; }
+.intervention-list { list-style: none; padding: 0; margin: 0; }
+.intervention-list li { display: flex; align-items: flex-start; gap: 14px; padding: 20px 0; border-bottom: 1px solid #e0e7f0; }
+.intervention-list li:last-child { border-bottom: 0; }
+.intervention-type-icon { background: #edf4ff; color: #245ce5; padding: 10px; border-radius: 8px; flex: 0 0 auto; }
+.intervention-type-icon svg { width: 20px; height: 20px; }
+.intervention-row-content { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.intervention-row-content h3 { margin: 0; font-size: 16px; }
+.intervention-row-content p { margin: 6px 0; line-height: 1.6; }
+.intervention-row-status { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; font-size: 13px; margin: 8px 0; }
+.intervention-row-content small, .intervention-help { color: #65738b; }
+.intervention-empty { padding: 24px 0; color: #65738b; }
+.intervention-confirmed { color: #087953; }
+.sheet-content:has(.intervention-dialog) { width: min(760px, 100vw); max-width: 100vw; }
+.intervention-dialog { min-width: 0; overflow-wrap: anywhere; }
+.intervention-dialog p { line-height: 1.6; }
+.intervention-context { background: #edf4ff; border: 1px solid #d8e4fc; border-radius: 8px; padding: 12px; margin: 0 0 20px; }
+.intervention-search { display: flex; gap: 10px; align-items: center; border: 1px solid #b8c9ec; border-radius: 8px; padding: 10px 12px; }
+.intervention-search svg { width: 20px; color: #65738b; flex-shrink: 0; }
+.intervention-search input { border: 0; background: transparent; width: 100%; min-width: 0; font: inherit; padding: 4px; }
+.intervention-picker { display: grid; margin-top: 16px; }
+.intervention-picker button { display: flex; align-items: center; gap: 16px; width: 100%; padding: 20px 12px; border: 0; border-bottom: 1px solid #e0e7f0; background: white; text-align: left; font: inherit; color: #192943; cursor: pointer; }
+.intervention-picker button:hover { background: #edf4ff; }
+.intervention-picker svg { width: 22px; height: 22px; color: #245ce5; }
+.intervention-composer fieldset { min-width: 0; border: 0; padding: 0; margin: 0; display: grid; gap: 16px; }
+.intervention-composer .clinical-field { display: grid; gap: 6px; }
+.intervention-composer input, .intervention-composer select, .intervention-composer textarea, .intervention-dialog > .clinical-field textarea, .intervention-document-review textarea { box-sizing: border-box; width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid #b8c9ec; border-radius: 8px; font: inherit; color: #192943; background: white; }
+.intervention-composer textarea { min-height: 88px; resize: vertical; }
+.intervention-composer input[type=checkbox] { width: 18px; height: 18px; padding: 0; flex-shrink: 0; }
+.intervention-field-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
+.intervention-composer-actions { display: flex; justify-content: flex-end; gap: 12px; padding: 20px 0 8px; background: white; }
+.prescription-item { padding: 20px 0; border-block: 1px solid #e0e7f0; display: grid; gap: 16px; }
+.medication-safety-review { margin-top: 20px; display: grid; gap: 14px; }
+.medication-safety-review h3 { margin: 8px 0 0; }
+.medication-safety-review p { margin: 0; }
+.intervention-document-review iframe { width: 100%; height: 52vh; border: 1px solid #e0e7f0; background: white; }
+.intervention-document-review .clinical-field { display: grid; gap: 8px; margin-block: 16px; }
+.intervention-document-review .clinical-checkbox { display: flex; align-items: flex-start; gap: 10px; margin-block: 16px; }
+.intervention-document-review .clinical-checkbox input { margin-top: 4px; }
+.intervention-discard { padding: 16px; border: 1px solid #e8c58e; background: #fff5e4; border-radius: 8px; margin-bottom: 20px; }
+.intervention-field-error { color: #a52c3d; font-size: 13px; }
+@media (max-width: 600px) {
+ .encounter-interventions { padding: 16px; }
+ .intervention-section-heading { align-items: stretch; flex-direction: column; gap: 12px; }
+ .intervention-list li { flex-wrap: wrap; gap: 12px; }
+ .intervention-list li > button { margin-left: 52px; min-height: 44px; }
+ .intervention-row-content { flex-basis: calc(100% - 60px); }
+ .intervention-field-grid { grid-template-columns: minmax(0,1fr); }
+ .intervention-composer input,.intervention-composer select,.intervention-composer textarea { font-size: 16px; min-height: 44px; }
+ .intervention-composer input[type=checkbox] { min-height: 18px; }
+ .intervention-composer-actions { padding-bottom: max(16px,env(safe-area-inset-bottom)); }
+ .sheet-content:has(.intervention-dialog) { height: 100dvh; max-height: 100dvh; }
+}
+.intervention-composer .clinical-checkbox { display: flex; align-items: flex-start; gap: 10px; margin-block: 12px; }
+.intervention-composer .clinical-checkbox input { width: 18px; height: 18px; min-height: 18px; flex: 0 0 auto; margin-top: 3px; }
+@media (max-width: 600px) { .intervention-composer-actions { flex-wrap: wrap; } .intervention-composer-actions button { flex: 1 1 auto; min-height: 44px; } }

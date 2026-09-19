@@ -26,8 +26,9 @@ The packages directly below `ph.epr.api` define the initial module boundaries:
 | `carecoordination` | Clinical inbox, referrals, follow-up, and escalation |
 | `documentscommunication` | Attachments, certificates, exports, releases, and communication history |
 | `platformoperations` | Audit, durable jobs/events, tenant database provisioning, and operational controls |
+| `practiceadministration` | Practice team orchestration through identity commands and authorized site metadata |
 
-All modules are explicitly annotated and closed. They initially declare no allowed cross-module dependencies. When a feature needs collaboration, expose a narrow module API or named interface and declare that exact dependency; Spring Modulith verification fails the build for cycles, internal-package access, or undeclared dependencies.
+All modules are explicitly annotated and closed. Implemented dependencies are explicitly allowlisted and checked by `ModularityTests`. When a feature needs collaboration, expose a narrow module API or named interface and declare that exact dependency; Spring Modulith verification fails the build for cycles, internal-package access, or undeclared dependencies.
 
 ## Build
 
@@ -142,3 +143,19 @@ Use `/reactivation` with the same reason/version contract to restore access. Pro
 ## Database migrations
 
 Flyway connects as `epr_migrator` and owns control-plane schema changes. The main datasource connects as `epr_app`; Hibernate runs with `ddl-auto: validate`. Control-plane migrations create framework tables, global platform users, administrator credential setup state, the tenant registry, Practice memberships with separate multi-role assignments, independent service-access state, append-only provisioning and administration events, and the encrypted local credential adapter. Tenant migrations are kept separately under `db/tenant-migration` and currently create the verified tenant identity, initial administrator reference, and first Practice site. Runtime tenant datasource lifecycle, AWS Secrets Manager, RDS/IAM administration, controlled fleet migrations, and permanent decommission remain to be implemented before production use.
+
+## Opt-in connected synthetic encounters
+
+The local clinical slice now adds explicit grants, bounded runtime tenant routing, immutable encounter templates and drafts, pregnancy sources, queue handoff, local synthetic signature/amendment mechanics and owned-work reconciliation. It is disabled by default. See [implementation, startup commands, contract generation and remaining gates](../docs/architecture/encounter-templates-obgyn-implementation.md). These capabilities do not enable real-patient use or replace the production identity, signing, storage, restore and pilot gates.
+
+Saved synthetic patient registration, capability rollout, tenant schema 7, development commands and limitations are documented in [the patient-registration implementation](../docs/architecture/patient-registration-implementation.md).
+
+## Tenant team management (local synthetic)
+
+Enable `EPR_TEAM_ENABLED=true` (or `--epr.team.enabled=true`) on the local API, then open `/#/practices` as a Practice administrator. Team management includes new/existing accounts, roles, verified clinical sites, password setup/reissue, versioned access changes and audit history. Non-clinical members can be suspended/reactivated. Clinical offboarding and delegated provider management remain unavailable. See [implementation and verification](../docs/architecture/practice-team-access-implementation.md).
+
+The connected **My Patients** page also requires `EPR_CLINICAL_ENABLED=true`. New Practices retain separate synthetic clinical capability and schema gates after a doctor receives a role and site grant. A local `SUPERADMIN` can run the versioned schema-11 upgrade followed by the audited `POST /api/v1/admin/practices/{practiceId}/synthetic-clinical-capability` command; see the team implementation for its prerequisites and retry contract. This does not activate real-patient use or publish encounter templates.
+
+### Synthetic encounter interventions
+
+With the local clinical slice enabled, set `EPR_INTERVENTIONS_ENABLED=true` for new synthetic intervention preparation and authorization. Tenant schema 11 and explicit per-Practice/kind/site grants are required; the demo seeder provisions only its synthetic Practice. `EPR_INTERVENTIONS_WORKER_ENABLED` defaults to true and independently controls the retryable continuity worker. Disabling new intervention commands retains history, original documents and authorized existing-work disposition. See [implementation, migration and verification](../docs/architecture/encounter-interventions-implementation.md). Real-patient issuance, external transmission and procedures remain disabled.

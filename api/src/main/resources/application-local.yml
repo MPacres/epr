@@ -14,6 +14,16 @@ server:
         secure: ${EPR_SECURE_COOKIES:false}
 
 epr:
+  interventions:
+    enabled: ${EPR_INTERVENTIONS_ENABLED:false}
+    worker-enabled: ${EPR_INTERVENTIONS_WORKER_ENABLED:true}
+  team:
+    enabled: ${EPR_TEAM_ENABLED:false}
+  clinical:
+    enabled: ${EPR_CLINICAL_ENABLED:false}
+    patient-encryption-key: ${EPR_PATIENT_ENCRYPTION_KEY:BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBA=}
+    demo-seed: ${EPR_CLINICAL_DEMO_SEED:false}
+    demo-password: ${EPR_CLINICAL_DEMO_PASSWORD:ClinicalDemo123!}
   portal:
     clinical-hostname: ${EPR_CLINICAL_HOSTNAME:epr.test}
     support-hostname: ${EPR_SUPPORT_HOSTNAME:support.epr.test}

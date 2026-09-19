@@ -42,3 +42,19 @@ These instructions apply under `api/` in addition to the repository-level `AGENT
 - Keep `ModularityTests` passing; it is the CI guard for cycles, access to module internals, and undeclared module dependencies.
 - Add module-sliced tests for new application behavior and PostgreSQL Testcontainers tests for persistence, RLS, transaction, retry, concurrency, and pooled-connection isolation behavior as applicable.
 - A passing context or build test is not clinical validation or authorization proof.
+
+## Connected synthetic clinical slice
+
+The local clinical capability is opt-in (`epr.clinical.enabled`, `epr.clinical.demo-seed`). See `../docs/architecture/encounter-templates-obgyn-implementation.md` for the base rollout (current tenant schema 11), exact-byte local artifacts, active-care reconciliation and contract generation. The synthetic confirmation adapter is not clinical signing authority. Runtime routing and command/audit/outbox helpers expose explicit tenant transaction contexts; their presence does not authorize cross-module table access. The base worklist supports explicit reconciliation; the intervention extension adds a retryable worker and accepted operational handoffs, with authoritative obligations retained before delivery. Keep real-patient, extraction, production offboarding/coverage, storage/signing and pilot gates explicit.
+
+Patient registration extends the local slice with explicit patient capabilities (control-plane V13–V14) and tenant schema 7 (V6–V7). The patient registry owns demographics, identifiers, duplicate reviews, correction evidence, recent opens and visit projections. Encounter-owned reconciliation publishes summaries through the registry API; never add cross-module table reads. See `../docs/architecture/patient-registration-implementation.md`.
+
+## Practice team administration
+
+The closed `practiceadministration` module depends only on identity/tenancy and platform operations. It coordinates identity-owned team commands with an authorized site-metadata directory; administrative contexts never enter clinical commands. Control-plane V15 supplies aggregate versions, generic team onboarding, append-only evidence/receipts and lookup throttling. Team endpoints require `local` plus `epr.team.enabled=true`. Clinical access reduction remains blocked pending fenced offboarding; non-clinical suspension/reactivation is supported. See `../docs/architecture/practice-team-access-implementation.md`.
+
+Local synthetic clinical capability for a newly provisioned Practice is a separate `SUPERADMIN` command after schema-11 rollout and an explicit clinician directory grant. Control-plane V17 permits its append-only administration event. Doctor/team roles alone do not activate clinical routing, and this command does not publish templates or authorize real-patient use.
+
+## Synthetic encounter interventions
+
+The intervention extension uses tenant schema 11 and control-plane V16. `EncounterInterventionLinks` owns encounter associations/manifests; prescribing, orders/results and care coordination retain typed source ownership. Acquire the encounter boundary before source locks. Capture content, stage private bytes outside the transaction, then finalize against versions and hashes. `epr.interventions.enabled` gates new preparation/issuance, while current explicit clinical grants authorize history and existing-work disposition. The tenant-aware local worker reconciles owned obligations and cleans old unattached files; disabling new commands must not disable continuity. See [implementation and evidence](../docs/architecture/encounter-interventions-implementation.md). Production signing/storage, offboarding/fallback coverage and clinical approval remain gated.

@@ -78,10 +78,10 @@ export function MyPatients() {
     const patient = dialogPatient ?? selected
     if (!patient) return
     setSelectedKey(patientKey(patient))
-    remember(patient); navigate(`/patients/${encodeURIComponent(patient.practiceId)}/${encodeURIComponent(patient.id)}/chart`)
+    remember(patient); navigate(`/patients/preview/${encodeURIComponent(patient.practiceId)}/${encodeURIComponent(patient.id)}/chart`)
   }
   return <main id="main-content" className="dashboard patients-workspace" tabIndex={-1}>
-    <div className="page-heading patients-heading"><div><h1>My Patients</h1><p>Find a patient and continue their care.</p></div><div className="registration-action"><Button onClick={() => navigate(`/patients/new?practice=${encodeURIComponent(practiceId)}`)}><Plus aria-hidden="true" />New patient</Button></div></div>
+    <div className="page-heading patients-heading"><div><h1>My Patients</h1><p>Find a patient and continue their care.</p></div><div className="registration-action"><Button onClick={() => navigate(`/patients/preview/new?practice=${encodeURIComponent(practiceId)}`)}><Plus aria-hidden="true" />New patient</Button></div></div>
     {location.state?.patientSave ? <p className="form-success" role="status">{location.state.patientSave}</p> : null}
     <div className="dashboard-tabs patient-tabs" role="tablist" aria-label="Patient views">
       <button id="patients-tab-directory" role="tab" aria-selected={tab === 'directory'} aria-controls="patient-directory-panel" tabIndex={tab === 'directory' ? 0 : -1} onClick={() => switchTab('directory')} onKeyDown={tabKey}>Patient directory</button>

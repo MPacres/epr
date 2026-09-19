@@ -18,6 +18,7 @@ class ModularityTests {
 		"ordersresults",
 		"patientregistry",
 		"platformoperations",
+        "practiceadministration",
 		"prescribing",
 		"schedulingqueue"
 	);
@@ -44,14 +45,24 @@ class ModularityTests {
 	}
 
 	@Test
-	void allowsOnlyTheExplicitTenantProvisioningDependency() {
-		assertThat(modules.stream()
-			.filter(module -> !module.getIdentifier().toString().equals("platformoperations")))
-			.allMatch(module -> module.getAllowedDependencies(modules).isEmpty());
-
-		var platformOperations = modules.getModuleByName("platformoperations").orElseThrow();
-		assertThat(platformOperations.getAllowedDependencies(modules).stream()
-			.map(dependency -> dependency.getTargetModule().getIdentifier().toString()))
-			.containsExactly("identitytenancy");
+	void allowsOnlyDeclaredClinicalDependencyDirections() {
+        var expected = java.util.Map.of(
+            "platformoperations", Set.of("identitytenancy"),
+            "prescribing", Set.of("encountertemplates", "platformoperations", "identitytenancy", "documentscommunication", "clinicalchart"),
+            "ordersresults", Set.of("encountertemplates", "platformoperations", "identitytenancy", "documentscommunication", "carecoordination"),
+            "practiceadministration", Set.of("identitytenancy", "platformoperations"),
+            "carecoordination", Set.of("encountertemplates", "platformoperations", "identitytenancy", "documentscommunication"),
+            "documentscommunication", Set.of("identitytenancy", "platformoperations"),
+            "schedulingqueue", Set.of("identitytenancy", "platformoperations", "patientregistry", "encountertemplates"),
+            "patientregistry", Set.of("platformoperations", "identitytenancy"),
+            "clinicalchart", Set.of("patientregistry", "platformoperations", "identitytenancy"),
+            "encountertemplates", Set.of("documentscommunication", "clinicalchart", "patientregistry", "platformoperations", "identitytenancy")
+        );
+        for (var module : modules) {
+            var actual = module.getAllowedDependencies(modules).stream()
+                .map(dependency -> dependency.getTargetModule().getIdentifier().toString())
+                .collect(java.util.stream.Collectors.toSet());
+            assertThat(actual).containsExactlyInAnyOrderElementsOf(expected.getOrDefault(module.getIdentifier().toString(), Set.of()));
+        }
 	}
 }

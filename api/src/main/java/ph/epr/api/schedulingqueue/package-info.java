@@ -3,6 +3,6 @@
  */
 @org.springframework.modulith.ApplicationModule(
     displayName = "Scheduling and Queue",
-    allowedDependencies = {}
+    allowedDependencies = {"identitytenancy", "platformoperations", "patientregistry", "encountertemplates"}
 )
 package ph.epr.api.schedulingqueue;

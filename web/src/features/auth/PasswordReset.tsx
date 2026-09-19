@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { CheckCircle2, Circle, Eye, EyeOff, KeyRound, LockKeyhole, LogOut, ShieldCheck, TriangleAlert } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { EprMark } from '../../components/brand/epr-mark'
 import { Button } from '../../components/ui/button'
 import { AuthRequestError, homePathFor } from './auth-client'
@@ -29,10 +29,10 @@ function createIdempotencyKey(): string {
 
 export function PasswordReset({ surface = 'combined' }: { surface?: PortalSurface }) {
   const auth = useAuth()
+  const navigate = useNavigate()
+  const workspaceLabel = auth.user?.roles.some(role => role === 'PRACTICE_STAFF' || role === 'CLINICIAN') ? 'Clinical workspace' : portalLabel(surface)
   const [showPasswords, setShowPasswords] = useState(false)
   const [completed, setCompleted] = useState(false)
-  const [signOutPending, setSignOutPending] = useState(false)
-  const [signOutError, setSignOutError] = useState<string | null>(null)
   const [idempotencyKey] = useState(createIdempotencyKey)
   const form = useForm<PasswordResetValues>({
     resolver: zodResolver(passwordResetSchema),
@@ -41,8 +41,8 @@ export function PasswordReset({ surface = 'combined' }: { surface?: PortalSurfac
   const newPassword = useWatch({ control: form.control, name: 'newPassword' })
 
   useEffect(() => {
-    document.title = `Create a private password · EPR ${portalLabel(surface)}`
-  }, [surface])
+    document.title = `Create a private password · EPR ${workspaceLabel}`
+  }, [workspaceLabel])
 
   async function submit(values: PasswordResetValues) {
     try {
@@ -50,17 +50,6 @@ export function PasswordReset({ surface = 'combined' }: { surface?: PortalSurfac
       setCompleted(true)
     } catch (error) {
       form.setError('root', { message: error instanceof AuthRequestError ? error.message : 'Your password could not be changed. Try again.' })
-    }
-  }
-
-  async function signOutSecurely() {
-    setSignOutPending(true)
-    setSignOutError(null)
-    try {
-      await auth.signOut()
-    } catch {
-      setSignOutError('Sign out could not be completed. Check the connection and try again.')
-      setSignOutPending(false)
     }
   }
 
@@ -72,19 +61,20 @@ export function PasswordReset({ surface = 'combined' }: { surface?: PortalSurfac
 
   if (completed) return <main className="password-reset-page">
     <section className="password-reset-sheet password-reset-complete" aria-labelledby="password-complete-title">
-      <div className="password-reset-brand"><EprMark /><span><strong>EPR</strong><small>{portalLabel(surface)}</small></span></div>
+      <div className="password-reset-brand"><EprMark /><span><strong>EPR</strong><small>{workspaceLabel}</small></span></div>
       <span className="password-complete-mark"><CheckCircle2 aria-hidden="true" /></span>
       <h1 id="password-complete-title">Your private password is set</h1>
-      <p>The temporary password no longer works. Your administrator account is ready, but the Practice administration workspace is not connected yet.</p>
-      <div className="password-reset-next"><ShieldCheck aria-hidden="true" /><span><strong>Setup continues with support</strong><small>Your support representative can complete the remaining Practice configuration with you.</small></span></div>
-      {signOutError ? <p className="password-reset-alert" role="alert"><TriangleAlert aria-hidden="true" />{signOutError}</p> : null}
-      <Button onClick={() => void signOutSecurely()} disabled={signOutPending}><LogOut aria-hidden="true" />{signOutPending ? 'Signing out…' : 'Sign out securely'}</Button>
+      <p>The temporary password no longer works. Your account is ready to use its assigned Practice access.</p>
+      <div className="password-reset-next"><ShieldCheck aria-hidden="true" /><span><strong>Your access stays Practice-specific</strong><small>Manage your team if you are an administrator, or open your authorized clinical workspace.</small></span></div>
+      <Button onClick={() => navigate('/practices')}>Open Practices</Button>
+      <Button variant="outline" onClick={() => navigate('/patients')}>Open clinical workspace</Button>
+      <Button variant="ghost" onClick={() => navigate('/logout')}><LogOut aria-hidden="true" />Sign out securely</Button>
     </section>
   </main>
 
   return <main className="password-reset-page">
     <section className="password-reset-sheet" aria-labelledby="password-reset-title">
-      <div className="password-reset-brand"><EprMark /><span><strong>EPR</strong><small>{portalLabel(surface)}</small></span></div>
+      <div className="password-reset-brand"><EprMark /><span><strong>EPR</strong><small>{workspaceLabel}</small></span></div>
       <div className="password-reset-heading">
         <span><KeyRound aria-hidden="true" /></span>
         <div><h1 id="password-reset-title">Create your private password</h1><p>Welcome, {auth.user.displayName}. Replace the temporary password before continuing.</p></div>

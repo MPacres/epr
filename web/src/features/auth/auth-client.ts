@@ -113,8 +113,9 @@ export async function changeRequiredPassword(command: PasswordChangeCommand): Pr
 export function homePathFor(user: AuthUser, surface: PortalSurface = 'combined'): string | null {
   const isProvider = user.roles.some(role => role === 'SUPERADMIN' || role === 'PROVIDER_SUPPORT')
   const isTenant = user.roles.some(role => role === 'PRACTICE_STAFF' || role === 'CLINICIAN')
+  const tenantHome = user.roles.includes('PRACTICE_STAFF') ? '/practices' : '/dashboard'
   if (surface === 'support') return isProvider ? '/provider' : null
-  if (surface === 'clinical') return isTenant ? '/dashboard' : null
+  if (surface === 'clinical') return isTenant ? tenantHome : null
   if (isProvider) return '/provider'
-  return isTenant ? '/dashboard' : null
+  return isTenant ? tenantHome : null
 }

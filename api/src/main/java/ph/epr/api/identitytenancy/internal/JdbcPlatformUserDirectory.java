@@ -225,6 +225,13 @@ class JdbcPlatformUserDirectory implements PlatformUserDirectory {
 
 		var account = findByIdForUpdate(userId)
 			.orElseThrow(() -> new PracticeAdministrationConflictException("Account not found."));
+        var claimed = jdbcClient.sql("SELECT user_id FROM practice_member_onboarding WHERE claim_key=:key")
+            .param("key",idempotencyKey).query(UUID.class).optional();
+        if(claimed.isPresent()) {
+            if(!claimed.get().equals(userId) || !account.enabled() || !passwordEncoder.matches(newPassword,account.passwordHash()))
+                throw new PracticeAdministrationConflictException("Password change retry does not match the completed request.");
+            return account;
+        }
 		if (!account.enabled() || !account.passwordResetRequired()) {
 			throw new PracticeAdministrationConflictException(
 				"This account does not have a required temporary-password change."
@@ -233,6 +240,17 @@ class JdbcPlatformUserDirectory implements PlatformUserDirectory {
 		if (passwordEncoder.matches(newPassword, account.passwordHash())) {
 			throw new IllegalArgumentException("Choose a new password that is different from the temporary password.");
 		}
+        var onboarding = jdbcClient.sql("SELECT practice_id FROM practice_member_onboarding WHERE user_id=:user AND claimed_at IS NULL FOR UPDATE")
+            .param("user",userId).query(UUID.class).optional();
+        if(onboarding.isPresent()) {
+            jdbcClient.sql("UPDATE platform_user_account SET password_hash=:hash,password_reset_required=false,updated_at=:now WHERE id=:user")
+                .param("hash",passwordEncoder.encode(newPassword)).param("now",now).param("user",userId).update();
+            jdbcClient.sql("UPDATE practice_member_onboarding SET claimed_at=:now,claim_key=:key WHERE user_id=:user")
+                .param("now",now).param("key",idempotencyKey).param("user",userId).update();
+            jdbcClient.sql("INSERT INTO practice_member_event(id,practice_id,user_id,actor_id,action,reason,before_access,after_access) VALUES(:id,:practice,:user,:user,'PASSWORD_SET','Account owner completed private password setup','{}','{}')")
+                .param("id",UUID.randomUUID()).param("practice",onboarding.get()).param("user",userId).update();
+            return findById(userId).orElseThrow();
+        }
 		var setup = jdbcClient.sql("""
 			SELECT practice_id, user_id, display_name, email, setup_status
 			FROM practice_administrator_setup

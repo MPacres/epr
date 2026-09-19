@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { directoryPatients } from '../patients/demo-data'
-import { chartEvents, filterEvents, findChartPatient, findEncounter, hasClinicalFixture, initialNote, noteChanged, patientEncounters } from './model'
+import { chartEvents, filterEvents, filterPatientNotes, findChartPatient, findEncounter, hasClinicalFixture, initialNote, noteChanged, notesPath, patientEncounters } from './model'
 const maria = directoryPatients.find(patient => patient.id === 'patient-maria')!
 describe('Practice-scoped clinical demo records', () => {
   it('requires both a permitted practice and a matching patient identity', () => {
@@ -20,6 +20,14 @@ describe('Practice-scoped clinical demo records', () => {
     expect(findEncounter(maria, 'missing')).toBeUndefined()
     expect(findEncounter(maria, 'EN-DEMO-006')).toMatchObject({care: 'Finished', documentation: 'Draft'})
     expect(findEncounter(maria, 'EN-DEMO-005')).toMatchObject({care: 'Finished', documentation: 'Signed', template: 'General outpatient · v1.1'})
+  })
+  it('filters only this patient’s notes by status and search text', () => {
+    const notes = patientEncounters(maria)
+    expect(filterPatientNotes(notes, '', 'All').map(note => note.id)).toEqual(['EN-DEMO-006', 'EN-DEMO-005'])
+    expect(filterPatientNotes(notes, '2026-08-15', 'Signed').map(note => note.id)).toEqual(['EN-DEMO-005'])
+    expect(filterPatientNotes(notes, 'v1.1', 'Draft')).toEqual([])
+    expect(filterPatientNotes(patientEncounters(directoryPatients.find(patient => patient.id === 'demo-maria-b')!), '', 'All')).toEqual([])
+    expect(notesPath(maria)).toContain('/practice-a/patient-maria/notes')
   })
   it('leaves unassessed fields and visit diagnoses empty without copying ongoing problems', () => {
     const note = initialNote(findEncounter(maria, 'EN-DEMO-006')!)

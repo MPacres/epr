@@ -9,7 +9,7 @@ import { usePatientPreview } from '../patients/patient-preview-context'
 import { formatPatientDate, type DirectoryPatient } from '../patients/model'
 import { ChartSection, ChartUnavailable } from './PatientChart'
 import { ClinicalPanel, LocalSections, Observations, PatientBanner, SourceSheet } from './ChartShared'
-import { chartPath, encounterPath, findChartPatient, findEncounter, initialNote, noteChanged, type DemoEncounter, type EncounterNote } from './model'
+import { chartPath, encounterPath, findChartPatient, findEncounter, initialNote, noteChanged, notesPath, type DemoEncounter, type EncounterNote } from './model'
 import './chart.css'
 
 const sections = ['Consultation note', 'Medications', 'Orders & Results', 'Documents', 'Activity'] as const
@@ -47,8 +47,8 @@ function EncounterContent({ patient, encounter }: { patient: DirectoryPatient; e
     setNote(previous => ({ ...previous, diagnoses: [...previous.diagnoses, value] })); setDiagnosis(''); setDiagnosisError('')
   }
   return <main id="main-content" className="dashboard chart-workspace encounter-workspace" tabIndex={-1}>
-    <nav className="chart-breadcrumb" aria-label="Breadcrumb"><Link to={chartPath(patient)}>Patient chart</Link><span>/</span><span>{patient.name}</span></nav>
-    <div className="page-heading"><div><h1>Follow-up encounter</h1><p>{formatPatientDate(encounter.date)} · {encounter.id} · Earlier encounter</p></div><Link className="text-link chart-outline-link" to={chartPath(patient)}>View patient chart</Link></div>
+    <nav className="chart-breadcrumb" aria-label="Breadcrumb"><Link to={chartPath(patient)}>Patient chart</Link><span>/</span><Link to={notesPath(patient)}>Clinical notes</Link><span>/</span><span>{encounter.id}</span></nav>
+    <div className="page-heading"><div><h1>Follow-up encounter</h1><p>{formatPatientDate(encounter.date)} · {encounter.id} · Earlier encounter</p></div><Link className="text-link chart-outline-link" to={notesPath(patient)}>View all notes</Link></div>
     <PatientBanner patient={patient} />
     <div className="encounter-context"><div className="chart-statuses"><span className="badge neutral">Care: Finished</span><span className={`badge ${signed ? 'green' : 'amber'}`}>Note: {encounter.documentation}</span></div><span><LockKeyhole aria-hidden="true" />Hospital A · Outpatient Clinic · {formatPatientDate(encounter.date)} · {doctor}</span></div>
     <p className="chart-caption encounter-boundary">Synthetic historical encounter. Today’s queue remains unchanged. {signed ? 'Signed document bytes and signature evidence are unavailable in this demo.' : 'Demo edits stay in this open screen and are discarded on leaving or reload.'}</p>

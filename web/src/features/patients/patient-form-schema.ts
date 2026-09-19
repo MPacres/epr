@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 const text = z.string().max(200, 'Use 200 characters or fewer.')
-export const patientDraftSchema = z.object({
+export const createPatientDraftSchema = (originalName?:string) => z.object({
   firstName: text, middleName: text, lastName: text, suffix: text,
   birthDate: z.string(), birthAccuracy: z.enum(['exact', 'estimated', 'unknown']),
   sex: z.enum(['Female', 'Male', 'Not recorded']), provisional: z.boolean(),
@@ -18,7 +18,7 @@ export const patientDraftSchema = z.object({
   changeNote: z.string().max(1000, 'Use 1,000 characters or fewer.'),
 }).superRefine((draft, ctx) => {
   const issue = (path: string, message: string) => ctx.addIssue({ code: 'custom', path: [path], message })
-  if (!draft.firstName.trim() && !draft.lastName.trim()) issue('firstName', 'Enter at least one patient name. A provisional name is supported.')
+  if (!originalName && !draft.firstName.trim() && !draft.middleName.trim() && !draft.lastName.trim()) issue('firstName', 'Enter at least one patient name. A provisional name is supported.')
   if (draft.birthAccuracy !== 'unknown') {
     const date = new Date(`${draft.birthDate}T00:00:00Z`)
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
@@ -35,4 +35,5 @@ export const patientDraftSchema = z.object({
   if (draft.otherIdValue.trim() && !draft.otherIdType.trim()) issue('otherIdType', 'Name the type of identifier.')
   if (draft.otherIdValue.trim() && !draft.otherIdIssuer.trim()) issue('otherIdIssuer', 'Record who issued this identifier.')
 })
+export const patientDraftSchema = createPatientDraftSchema()
 export type PatientDraft = z.infer<typeof patientDraftSchema>

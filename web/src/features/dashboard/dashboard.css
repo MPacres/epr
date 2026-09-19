@@ -1,12 +1,9 @@
 /* Clinical workspace: shared layout, surfaces, and responsive dashboard. */
 .workspace { min-height: 100svh; }
-.sidebar { position: fixed; inset: 0 auto 0 0; width: 228px; background: #fff; border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 20; }
+.sidebar { position: fixed; inset: 0 auto 0 0; width: 236px; overflow-y: auto; background: #fff; border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 20; }
 .brand { display: flex; gap: 11px; align-items: center; }
-.sidebar > .brand { padding: 29px 25px 32px; }
-.brand-mark { width: 39px; height: 43px; border-radius: 11px 11px 11px 3px; background: var(--blue); color: white; display: grid; place-items: center; }
-.brand-mark svg { width: 29px; height: 29px; stroke-width: 3; }
+.sidebar > .brand { padding: 27px 24px 33px; }
 .brand strong { font-size: 29px; line-height: 1.12; font-weight: 700; letter-spacing: -.9px; }
-.brand-period { color: var(--blue); }
 .brand-caption { display: block; color: var(--secondary); font-size: 11px; margin-top: 3px; }
 .desktop-nav { padding: 0 14px; display: flex; flex-direction: column; gap: 5px; }
 .nav-item { position: relative; display: flex; align-items: center; gap: 13px; width: 100%; padding: 13px 15px; min-height: 47px; border-radius: 8px; color: #4e5e77; font-size: 14px; font-weight: 500; }
@@ -34,8 +31,8 @@
 .red { background: #fff0f0; color: #bd3646; }
 .amber { background: #fff5e4; color: #986014; }
 .neutral { background: #f2f5f9; color: #71809a; }
-.workspace-main { margin-left: 228px; }
-.topbar { min-height: 84px; display: flex; align-items: center; gap: 24px; padding: 16px 30px; background: #fff; border-bottom: 1px solid var(--border); }
+.workspace-main { margin-left: 236px; }
+.topbar { min-height: 76px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 520px) minmax(0, 1fr); align-items: center; gap: 20px; padding: 14px 28px; background: #fff; border-bottom: 1px solid var(--border); }
 .practice-selector { display: flex; gap: 12px; align-items: center; text-align: left; flex-shrink: 0; border-radius: 8px; }
 .icon-tile { display: grid; place-items: center; width: 44px; height: 44px; flex-shrink: 0; border-radius: 12px; }
 .icon-tile svg { width: 23px; height: 23px; }
@@ -45,14 +42,17 @@
 .current-tag { color: #087953; background: #eaf8f2; font-size: 10px; padding: 3px 7px; border-radius: 5px; font-weight: 500; }
 .practice-subtitle { display: block; font-size: 11px; color: var(--secondary); margin-top: 4px; }
 .practice-subtitle > span { margin: 0 4px; }
-.global-search { margin-left: auto; width: min(360px, 100%); display: flex; gap: 10px; align-items: center; background: #f9fafd; border: 1px solid var(--border); padding: 0 10px 0 13px; border-radius: 8px; min-height: 40px; }
+.global-search { width: 100%; display: flex; gap: 10px; align-items: center; background: #fafbfe; border: 1px solid var(--border); padding: 0 10px 0 13px; border-radius: 8px; min-height: 42px; }
 .global-search > svg { color: #73819a; width: 17px; height: 17px; }
 .global-search input { width: 100%; background: transparent; outline-offset: 5px; font-size: 12px; height: 38px; }
 .global-search input::placeholder { color: #6d7c94; }
 .search-submit { width: 24px; height: 30px; display: grid; place-items: center; color: #8290a6; }
 .search-submit svg { width: 16px; }
 .header-demo { white-space: nowrap; color: var(--secondary); display: flex; gap: 7px; align-items: center; font-size: 11px; }
-.notification-button { position: relative; color: #4f607a; margin-left: -10px; }
+.topbar-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; min-width: 0; }
+.topbar-sign-out { min-height: 40px; padding-inline: 10px; }
+.topbar-sign-out svg { width: 17px; height: 17px; }
+.notification-button { position: relative; color: #4f607a; }
 .notification-dot { position: absolute; top: 10px; right: 12px; width: 6px; height: 6px; background: var(--blue); border-radius: 50%; border: 1px solid white; }
 .mobile-brand, .mobile-nav { display: none; }
 .dashboard { padding: 29px 30px 18px; max-width: 1660px; margin: 0 auto; }
@@ -242,6 +242,11 @@ h3 { font-size: 13px; }
 @keyframes overlay-in { from { opacity: 0; } to { opacity: 1; } }
 @media (min-width: 1600px) { .dashboard { padding-top: 36px; } .metrics { margin-bottom: 24px; } .metric { padding: 24px; } .current-session, .inbox-card { padding: 24px; } .next-patient { padding: 19px; } .queue-row { padding-top: 15px; padding-bottom: 15px; } .inbox-row { padding-top: 20px; padding-bottom: 20px; } }
 @media (max-width: 1250px) and (min-width: 1101px) { .sidebar { width: 204px; } .workspace-main { margin-left: 204px; } .topbar { gap: 14px; padding-inline: 22px; } .header-demo { display: none; } .dashboard { padding-inline: 22px; } .metric { gap: 9px; padding-inline: 13px; } .metric .icon-tile { width: 33px; height: 36px; } .metric-copy > span:first-child { font-size: 11px; } .metric-value { gap: 5px; } .current-session, .inbox-card { padding: 16px; } .clinical-grid { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; } .session-action { font-size: 0; } .inbox-row { gap: 7px; } .inbox-icon { width: 28px; } .row-chevron { display: none; } .section-header { gap: 8px; } .section-header h2 { font-size: 15px; } .current-session .section-header > .icon-tile { display: none; } .queue-row .avatar { display: none; } }
+@media (max-width: 1250px) and (min-width: 701px) {
+  .topbar { grid-template-columns: minmax(0, 1fr) auto; }
+  .global-search { grid-column: 1 / -1; grid-row: 2; }
+  .topbar-actions { grid-column: 2; grid-row: 1; }
+}
 @media (max-width: 1100px) and (min-width: 701px) {
   .sidebar { width: 88px; }
   .sidebar > .brand { padding: 22px 0 26px; justify-content: center; }
@@ -255,10 +260,7 @@ h3 { font-size: 13px; }
   .sidebar-footer { padding: 20px; }
   .profile { padding-top: 16px; justify-content: center; }
   .workspace-main { margin-left: 88px; }
-  .topbar { flex-wrap: wrap; gap: 15px; padding: 20px 26px 16px; }
-  .global-search { order: 4; width: 100%; margin: 0; }
-  .header-demo { margin-left: auto; }
-  .notification-button { margin-left: 0; }
+  .topbar { gap: 15px; padding: 20px 26px 16px; }
   .dashboard { padding: 25px 26px 20px; }
   .metrics { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 14px; }
   .metric { min-height: 120px; padding: 20px; }
@@ -289,17 +291,19 @@ h3 { font-size: 13px; }
   :root { font-size: 16px; }
   .sidebar { display: none; }
   .workspace-main { margin: 0; }
-  .topbar { display: grid; grid-template-columns: auto 1fr auto; gap: 14px 10px; padding: 16px 18px; min-height: 0; }
+  .topbar { grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px 10px; padding: 16px 18px; min-height: 0; }
   .mobile-brand { display: block; }
   .mobile-brand .brand { gap: 7px; }
-  .brand-mark { width: 29px; height: 32px; border-radius: 8px 8px 8px 3px; }
-  .brand-mark svg { width: 24px; height: 24px; }
+  .mobile-brand .epr-mark { width: 29px; height: 32px; border-radius: 8px 8px 8px 3px; }
+  .mobile-brand .epr-mark svg { width: 24px; height: 24px; }
   .brand strong { font-size: 22px; }
   .brand-caption { display: none; }
   .practice-selector { justify-self: end; border: 1px solid var(--border); padding: 10px; min-height: 42px; }
   .practice-selector > .icon-tile, .practice-subtitle, .current-tag, .header-demo { display: none; }
   .practice-name { font-size: 12px; gap: 7px; }
-  .notification-button { margin: 0 -6px 0 0; }
+  .topbar-actions { grid-column: 3; grid-row: 1; }
+  .notification-button { display: none; }
+  .topbar-sign-out { font-size: 12px; }
   .global-search { grid-column: 1 / -1; grid-row: 2; width: 100%; min-height: 43px; gap: 9px; }
   .global-search input { font-size: 14px; height: 41px; }
   .search-submit { width: 30px; min-height: 40px; }

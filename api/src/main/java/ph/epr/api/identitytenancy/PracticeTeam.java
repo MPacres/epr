@@ -6,17 +6,32 @@ import java.util.*;
 /** Identity-owned administration. Administrative authority never supplies a clinical context. */
 public interface PracticeTeam {
     enum TeamRole { PRACTICE_ADMINISTRATOR, CLINICIAN, NURSE, SECRETARY }
-    record TeamScope(UUID practiceId, String practiceName, boolean clinicalEnabled, String schemaVersion) {}
+    enum ClinicalListSource { ALLERGY, MEDICATION_USE, PROBLEM }
+    record TeamScope(UUID practiceId, String practiceName, boolean clinicalEnabled, String schemaVersion,
+        ClinicalReadiness clinicalReadiness) {}
     record TeamSiteGrant(UUID siteId, boolean reproductiveAccess) {}
+    record ClinicalListGrant(UUID siteId, ClinicalListSource sourceKind, boolean read,
+        boolean propose, boolean write, boolean review) {}
     record TeamMember(UUID userId, String displayName, String username, boolean accountEnabled,
         boolean setupRequired, boolean enabled, long version, List<TeamRole> roles,
-        List<TeamSiteGrant> siteGrants, boolean canReissue, boolean clinicalRemovalBlocked) {}
+        List<TeamSiteGrant> siteGrants, List<ClinicalListGrant> clinicalListGrants,
+        boolean canReissue, boolean clinicalRemovalBlocked) {}
     record TeamPage(List<TeamMember> items, long total, int page, int size) {}
     record TeamResolution(UUID userId, String displayName, String username, boolean existing) {}
     record TeamCreate(String email, String displayName, UUID confirmedUserId, List<TeamRole> roles,
-        List<TeamSiteGrant> siteGrants, String reason) {}
+        List<TeamSiteGrant> siteGrants, List<ClinicalListGrant> clinicalListGrants, String reason) {
+        public TeamCreate(String email, String displayName, UUID confirmedUserId, List<TeamRole> roles,
+            List<TeamSiteGrant> siteGrants, String reason) {
+            this(email, displayName, confirmedUserId, roles, siteGrants, List.of(), reason);
+        }
+    }
     record TeamAccess(long expectedVersion, boolean enabled, List<TeamRole> roles,
-        List<TeamSiteGrant> siteGrants, String reason) {}
+        List<TeamSiteGrant> siteGrants, List<ClinicalListGrant> clinicalListGrants, String reason) {
+        public TeamAccess(long expectedVersion, boolean enabled, List<TeamRole> roles,
+            List<TeamSiteGrant> siteGrants, String reason) {
+            this(expectedVersion, enabled, roles, siteGrants, List.of(), reason);
+        }
+    }
     record TeamPassword(long expectedVersion, String reason) {}
     record TeamResult(TeamMember member, String temporaryPassword, boolean replayed) {}
     record TeamEvent(UUID id, String actorName, String action, String reason, String beforeAccess,

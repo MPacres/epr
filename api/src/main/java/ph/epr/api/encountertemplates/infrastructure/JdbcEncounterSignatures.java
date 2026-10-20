@@ -19,11 +19,12 @@ public class JdbcEncounterSignatures {
     private final PrivateClinicalArtifacts artifacts;
     private final TenantCommandJournal journal;
     private final ph.epr.api.encountertemplates.EncounterInterventionLinks links;
-    public JdbcEncounterSignatures(JdbcEncounterService encounters, PrivateClinicalArtifacts artifacts, TenantCommandJournal journal, ph.epr.api.encountertemplates.EncounterInterventionLinks links) {
-        this.encounters = encounters; this.artifacts = artifacts; this.journal = journal; this.links=links;
+    private final ph.epr.api.clinicalchart.ClinicalLists clinicalLists;
+    public JdbcEncounterSignatures(JdbcEncounterService encounters, PrivateClinicalArtifacts artifacts, TenantCommandJournal journal, ph.epr.api.encountertemplates.EncounterInterventionLinks links,ph.epr.api.clinicalchart.ClinicalLists clinicalLists) {
+        this.encounters = encounters; this.artifacts = artifacts; this.journal = journal; this.links=links;this.clinicalLists=clinicalLists;
     }
     public record Prepare(UUID preparationId, long expectedVersion) {}
-    public record Preparation(UUID preparationId, long responseRevision, long encounterVersion, UUID artifactId, String artifactHash, String releaseChecksum, Long interventionSetVersion, UUID interventionManifestId) {}
+    public record Preparation(UUID preparationId, long responseRevision, long encounterVersion, UUID artifactId, String artifactHash, String releaseChecksum, Long interventionSetVersion, UUID interventionManifestId,UUID clinicalReviewId,String clinicalReviewHash) {}
     public record Sign(UUID preparationId, long expectedVersion, String reviewedArtifactHash, boolean confirmSyntheticReview) {}
     public record Signature(UUID signatureId, UUID preparationId, long responseRevision, UUID artifactId, String artifactHash,
                             UUID signerId, OffsetDateTime signedAt, String assuranceMethod, UUID amendmentOf, String amendmentReason, boolean interventionSnapshotCaptured) {}
@@ -38,7 +39,8 @@ public class JdbcEncounterSignatures {
             var errors=new AnswerValidator().validate(current.release().definition(),current.answers(),AnswerValidator.Stage.SIGN);
             if(!errors.isEmpty())throw new ClinicalAccessException("SIGN_REVIEW_REQUIRED:"+String.join(",",errors),422);
             var manifest=links.capture(c,patient,encounter,request.preparationId());
-            return new NoteCandidate(request.preparationId(),current.version(),render(c,current,manifest));
+            var clinicalReview=clinicalReview(c,patient,encounter);
+            return new NoteCandidate(request.preparationId(),current.version(),render(c,current,manifest,clinicalReview));
         });
         links.manifest(c,patient,encounter,candidate.preparationId());return candidate;
     }
@@ -58,16 +60,18 @@ public class JdbcEncounterSignatures {
             if (!errors.isEmpty()) throw new ClinicalAccessException("SIGN_REVIEW_REQUIRED:" + String.join(",", errors), 422);
             var manifest=staged==null?links.capture(c,patient,encounter,request.preparationId()):links.manifest(c,patient,encounter,request.preparationId());
             if(manifest.interventionSetVersion()!=links.version(c,patient,encounter))throw new ClinicalAccessException("SIGN_CANDIDATE_STALE",409);
-            var artifact = staged==null?artifacts.stage(c, request.preparationId(), render(c, current, manifest)):staged;
-            if(staged!=null){if(!PrivateClinicalArtifacts.sha256(render(c,current,manifest)).equals(staged.sha256()))throw new ClinicalAccessException("SIGN_CANDIDATE_STALE",409);artifacts.attach(c,staged);}
-            var result = new Preparation(request.preparationId(), current.responseRevision(), current.version() + 1, artifact.artifactId(), artifact.sha256(), current.release().checksum(), manifest.interventionSetVersion(), manifest.manifestId());
+            var clinicalReview=clinicalReview(c,patient,encounter);
+            var artifact = staged==null?artifacts.stage(c, request.preparationId(), render(c, current, manifest,clinicalReview)):staged;
+            if(staged!=null){if(!PrivateClinicalArtifacts.sha256(render(c,current,manifest,clinicalReview)).equals(staged.sha256()))throw new ClinicalAccessException("SIGN_CANDIDATE_STALE",409);artifacts.attach(c,staged);}
+            var result = new Preparation(request.preparationId(), current.responseRevision(), current.version() + 1, artifact.artifactId(), artifact.sha256(), current.release().checksum(), manifest.interventionSetVersion(), manifest.manifestId(),clinicalReview==null?null:clinicalReview.reviewId(),clinicalReview==null?null:clinicalReview.manifestHash());
             c.jdbc().sql("""
                 INSERT INTO encounter_sign_preparation(practice_id, patient_id, encounter_id, preparation_id, response_revision,
-                    encounter_version, release_checksum, artifact_id, artifact_hash, created_by, intervention_set_version, intervention_manifest_id)
-                VALUES (:practice, :patient, :encounter, :id, :revision, :version, :checksum, :artifact, :hash, :actor, :setVersion, :manifest)
+                    encounter_version, release_checksum, artifact_id, artifact_hash, created_by, intervention_set_version, intervention_manifest_id,clinical_review_id,clinical_review_hash)
+                VALUES (:practice, :patient, :encounter, :id, :revision, :version, :checksum, :artifact, :hash, :actor, :setVersion, :manifest,:clinicalReview,:clinicalReviewHash)
                 """).param("practice", c.practiceId()).param("patient", patient).param("encounter", encounter).param("id", result.preparationId())
                 .param("revision", result.responseRevision()).param("version", result.encounterVersion()).param("checksum", result.releaseChecksum())
-                .param("artifact", result.artifactId()).param("hash", result.artifactHash()).param("actor", c.actorId()).param("setVersion",result.interventionSetVersion()).param("manifest",result.interventionManifestId()).update();
+                .param("artifact", result.artifactId()).param("hash", result.artifactHash()).param("actor", c.actorId()).param("setVersion",result.interventionSetVersion()).param("manifest",result.interventionManifestId())
+                .param("clinicalReview",result.clinicalReviewId(),Types.OTHER).param("clinicalReviewHash",result.clinicalReviewHash(),Types.CHAR).update();
             c.jdbc().sql("UPDATE clinical_encounter SET note_state = 'READY_TO_SIGN', version = version + 1 WHERE practice_id = :practice AND patient_id = :patient AND encounter_id = :id")
                 .param("practice", c.practiceId()).param("patient", patient).param("id", encounter).update();
             journal.audit(c, encounter, "SIGN_PREPARATION_READY", null);
@@ -84,10 +88,13 @@ public class JdbcEncounterSignatures {
             var current = encounters.get(c, patient, encounter, false);
             version(current.version(), request.expectedVersion());
             var preparation = preparation(c, patient, encounter, request.preparationId());
+            var clinicalReview=clinicalReview(c,patient,encounter);
             if (!"READY_TO_SIGN".equals(current.noteState()) || preparation.encounterVersion() != current.version()
                 || preparation.responseRevision() != current.responseRevision() || !preparation.releaseChecksum().equals(current.release().checksum())
                 || !preparation.artifactHash().equals(request.reviewedArtifactHash())
-                || preparation.interventionSetVersion()==null || preparation.interventionSetVersion()!=links.version(c,patient,encounter)) throw new ClinicalAccessException("SIGN_CANDIDATE_STALE", 409);
+                || preparation.interventionSetVersion()==null || preparation.interventionSetVersion()!=links.version(c,patient,encounter)
+                || !Objects.equals(preparation.clinicalReviewId(),clinicalReview==null?null:clinicalReview.reviewId())
+                || !Objects.equals(preparation.clinicalReviewHash(),clinicalReview==null?null:clinicalReview.manifestHash())) throw new ClinicalAccessException("SIGN_CANDIDATE_STALE", 409);
             links.manifest(c,patient,encounter,preparation.interventionManifestId());
             artifacts.archive(c, preparation.artifactId(), preparation.artifactHash());
             var amendment = c.jdbc().sql("SELECT amendment_of_signature_id, amendment_reason FROM clinical_encounter WHERE practice_id = :practice AND patient_id = :patient AND encounter_id = :id")
@@ -120,7 +127,9 @@ public class JdbcEncounterSignatures {
     public byte[] candidateBytes(Context c, UUID patient, UUID encounter, UUID preparationId) {
         var current = encounters.get(c, patient, encounter, false);
         var preparation = preparation(c, patient, encounter, preparationId);
-        if (preparation.encounterVersion() != current.version() || !"READY_TO_SIGN".equals(current.noteState()) || preparation.interventionSetVersion()==null || preparation.interventionSetVersion()!=links.version(c,patient,encounter)) throw new ClinicalAccessException("SIGN_CANDIDATE_STALE", 409);
+        var clinicalReview=clinicalReview(c,patient,encounter);
+        if (preparation.encounterVersion() != current.version() || !"READY_TO_SIGN".equals(current.noteState()) || preparation.interventionSetVersion()==null || preparation.interventionSetVersion()!=links.version(c,patient,encounter)
+            || !Objects.equals(preparation.clinicalReviewId(),clinicalReview==null?null:clinicalReview.reviewId())||!Objects.equals(preparation.clinicalReviewHash(),clinicalReview==null?null:clinicalReview.manifestHash())) throw new ClinicalAccessException("SIGN_CANDIDATE_STALE", 409);
         links.manifest(c,patient,encounter,preparation.interventionManifestId());
         journal.audit(c, encounter, "SIGN_CANDIDATE_READ", null);
         return artifacts.readVerified(c, preparation.artifactId(), preparation.artifactHash());
@@ -153,10 +162,10 @@ public class JdbcEncounterSignatures {
     private Preparation preparation(Context c, UUID patient, UUID encounter, UUID id) {
         return c.jdbc().sql("SELECT * FROM encounter_sign_preparation WHERE practice_id = :practice AND patient_id = :patient AND encounter_id = :encounter AND preparation_id = :id")
             .param("practice", c.practiceId()).param("patient", patient).param("encounter", encounter).param("id", id).query((rs, n) -> new Preparation(id,
-                rs.getLong("response_revision"), rs.getLong("encounter_version"), rs.getObject("artifact_id", UUID.class), rs.getString("artifact_hash"), rs.getString("release_checksum"), rs.getObject("intervention_set_version",Long.class), rs.getObject("intervention_manifest_id",UUID.class)))
+                rs.getLong("response_revision"), rs.getLong("encounter_version"), rs.getObject("artifact_id", UUID.class), rs.getString("artifact_hash"), rs.getString("release_checksum"), rs.getObject("intervention_set_version",Long.class), rs.getObject("intervention_manifest_id",UUID.class),rs.getObject("clinical_review_id",UUID.class),rs.getString("clinical_review_hash")))
             .optional().orElseThrow(() -> new ClinicalAccessException("SIGN_PREPARATION_UNAVAILABLE", 404));
     }
-    private byte[] render(Context c, JdbcEncounterService.Encounter encounter, ph.epr.api.encountertemplates.EncounterInterventionLinks.Manifest manifest) {
+    private byte[] render(Context c, JdbcEncounterService.Encounter encounter, ph.epr.api.encountertemplates.EncounterInterventionLinks.Manifest manifest,ph.epr.api.clinicalchart.ClinicalLists.ReviewManifest clinicalReview) {
         var html = new StringBuilder("<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><title>Synthetic encounter record</title><style>body{font:16px/1.6 sans-serif;max-width:800px;margin:32px auto;padding:24px;color:#192943}h1{font-size:24px}h2{font-size:20px;border-bottom:1px solid #ddd}h3{font-size:16px}p{white-space:pre-wrap;overflow-wrap:anywhere}small{color:#555}</style><body>");
         html.append("<h1>Synthetic encounter record</h1><p>Engineering validation only. Not approved for real-patient issuance.</p><p>")
             .append("Practice: ").append(c.practiceId()).append("<br>Site: ").append(c.siteId()).append("</p><p>").append(escape(encounter.patient().displayName())).append(" · ").append(escape(encounter.patient().recordNumber())).append("</p><p>Care time: ")
@@ -183,6 +192,9 @@ public class JdbcEncounterSignatures {
         }
         if (encounter.episodeSnapshot() != null) html.append("<h2>Pregnancy source at encounter start</h2><p>").append(escape(encounter.episodeSnapshot().episode().source()))
             .append("</p><p>Selected dating estimate: ").append(escape(encounter.episodeSnapshot().selectedDating() == null || encounter.episodeSnapshot().selectedDating().estimatedDate() == null ? "Not recorded" : encounter.episodeSnapshot().selectedDating().estimatedDate().toString())).append("</p>");
+        html.append("<h2>Longitudinal clinical-list review</h2>");
+        if(clinicalReview==null)html.append("<p>Clinical-list capability unavailable for this legacy synthetic scope.</p>");
+        else html.append("<p>Reconciliation ").append(clinicalReview.reviewId()).append(" · ").append(escape(clinicalReview.manifestHash())).append(" · reviewed ").append(clinicalReview.reviewedAt()).append("</p>");
         html.append("<h2>Interventions at note review</h2><p>Snapshot version ").append(manifest.interventionSetVersion()).append(" · ").append(manifest.checksum()).append("</p>");
         if(manifest.items().isEmpty()) html.append("<p>No interventions recorded at this review.</p>");
         for(var item:manifest.items()) {
@@ -202,6 +214,15 @@ public class JdbcEncounterSignatures {
         return value.items().size() + " history items";
     }
     private String escape(String value) { return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;").replace("'", "&#39;"); }
+    private ph.epr.api.clinicalchart.ClinicalLists.ReviewManifest clinicalReview(Context c,UUID patient,UUID encounter){
+        var summary=clinicalLists.summary(c,patient);
+        var readable=java.util.stream.Stream.of(summary.allergies(),summary.medications(),summary.problems()).filter(item->item.actions().read()).count();
+        if(readable==0)return null;
+        if(readable!=3)throw new ClinicalAccessException("CLINICAL_LIST_RECONCILIATION_ACCESS_REQUIRED",403);
+        var review=clinicalLists.reviews(c,patient,encounter).stream().filter(item->item.reviewType().equals("RECONCILIATION")).findFirst()
+            .orElseThrow(()->new ClinicalAccessException("ENCOUNTER_RECONCILIATION_REQUIRED",422));
+        return clinicalLists.requireCurrentReview(c,patient,review.reviewId());
+    }
     private void version(long actual, long expected) { if (actual != expected) throw new ClinicalAccessException("VERSION_CONFLICT", 409); }
     private record AmendmentLink(UUID id, String reason) {}
 }

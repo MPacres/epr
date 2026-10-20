@@ -15,6 +15,5 @@ import ph.epr.api.platformoperations.TenantTransactions;
 class MedicationSafetyController {
  private final TenantTransactions tenants;private final MedicationSafety safety;
  MedicationSafetyController(TenantTransactions tenants,MedicationSafety safety){this.tenants=tenants;this.safety=safety;}
- @PostMapping SafetyReview create(Authentication auth,@PathVariable UUID practice,@PathVariable UUID patient,@RequestParam UUID siteId,@RequestHeader("Idempotency-Key") UUID key,@RequestBody ReviewMedicationSafety request){return tenants.execute(new AuthenticatedActor(auth.getName()),practice,siteId,false,c->safety.record(c,patient,key,request));}
  @GetMapping("/{id}") SafetyReview get(Authentication auth,@PathVariable UUID practice,@PathVariable UUID patient,@PathVariable UUID id,@RequestParam UUID siteId){return tenants.execute(new AuthenticatedActor(auth.getName()),practice,siteId,false,c->safety.require(c,patient,id));}
 }

@@ -7,7 +7,8 @@ import ph.epr.api.prescribing.application.PrescriptionService;
 import ph.epr.api.prescribing.application.PrescriptionService.*;
 import ph.epr.api.carecoordination.application.ReferralService;
 import ph.epr.api.carecoordination.application.ReferralService.*;
-import ph.epr.api.clinicalchart.MedicationSafety;
+import ph.epr.api.clinicalchart.ClinicalLists;
+import ph.epr.api.identitytenancy.ClinicalChartAuthorization.SourceKind;
 import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
@@ -66,7 +67,7 @@ class ConnectedEncounterTests {
     @Autowired ServiceRequestService orders;
     @Autowired PrescriptionService prescribing;
     @Autowired ReferralService referrals;
-    @Autowired MedicationSafety safety;
+    @Autowired ClinicalLists clinicalLists;
     @Autowired EncounterInterventionLinks links;
     @Autowired ph.epr.api.ordersresults.application.IncomingReportService reports;
     @Autowired ph.epr.api.documentscommunication.PrivateClinicalArtifacts artifacts;
@@ -108,6 +109,18 @@ class ConnectedEncounterTests {
         return new UUID[]{practiceId, siteId};
     }
     <T> T run(Function<TenantTransactions.Context, T> work) { return tenants.execute(actor, practice, site, true, work); }
+    void enableClinicalLists() {
+        for(var kind:SourceKind.values()){
+            control.sql("INSERT INTO practice_clinical_chart_capability(practice_id,source_kind,enabled) VALUES(:p,:k,true) ON CONFLICT (practice_id,source_kind) DO UPDATE SET enabled=true").param("p",practice).param("k",kind.name()).update();
+            control.sql("INSERT INTO practice_clinical_chart_grant(practice_id,user_id,site_id,source_kind,can_read,can_propose,can_write,can_review,reason) VALUES(:p,:a,:s,:k,true,true,true,true,'Connected encounter test')").param("p",practice).param("a",clinician).param("s",site).param("k",kind.name()).update();
+        }
+    }
+    ClinicalLists.ReviewManifest reconcile(UUID encounter) {
+        var summary=run(c->clinicalLists.summary(c,patient));
+        return run(c->clinicalLists.reconcile(c,patient,UUID.randomUUID(),new ClinicalLists.Reconcile(UUID.randomUUID(),encounter,
+            Map.of(SourceKind.ALLERGY,summary.allergies().generation(),SourceKind.MEDICATION_USE,summary.medications().generation(),SourceKind.PROBLEM,summary.problems().generation()),
+            List.of(),"Connected encounter reconciliation",true,OffsetDateTime.now())));
+    }
     TemplateDefinition definition() {
         try (var stream = getClass().getResourceAsStream("/encounter-templates/synthetic/obgyn.prenatal.initial.json")) {
             return ClinicalJson.read(new String(stream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8), TemplateDefinition.class);
@@ -306,14 +319,14 @@ class ConnectedEncounterTests {
     @Test void migrationQuarantineFailsClosedAndHistoryCannotBeRewritten() {
         var operation = UUID.randomUUID();
         var version = control.sql("SELECT version FROM practice_tenant_registry WHERE practice_id = :practice").param("practice", practice).query(Long.class).single();
-        var claim = rollout.begin(practice, operation, version, clinician, "Synthetic canary", "11");
+        var claim = rollout.begin(practice, operation, version, clinician, "Synthetic canary", "14");
         assertThatThrownBy(() -> run(patients::list)).hasMessage("CLINICAL_ACCESS_DENIED");
-        rollout.finish(practice, operation, claim.attempt(), clinician, "11", false);
+        rollout.finish(practice, operation, claim.attempt(), clinician, "14", false);
         assertThatThrownBy(() -> run(patients::list)).hasMessage("CLINICAL_ACCESS_DENIED");
-        var retry = rollout.begin(practice, operation, version, clinician, "Synthetic canary", "11");
-        rollout.finish(practice, operation, retry.attempt(), clinician, "11", true);
+        var retry = rollout.begin(practice, operation, version, clinician, "Synthetic canary", "14");
+        rollout.finish(practice, operation, retry.attempt(), clinician, "14", true);
         assertThat(run(patients::list).getFirst().patientId()).isEqualTo(patient);
-        assertThatThrownBy(() -> rollout.begin(practice, operation, version, clinician, "Changed reason", "11")).hasMessage("IDEMPOTENCY_PAYLOAD_CONFLICT");
+        assertThatThrownBy(() -> rollout.begin(practice, operation, version, clinician, "Changed reason", "14")).hasMessage("IDEMPOTENCY_PAYLOAD_CONFLICT");
         assertThatThrownBy(() -> control.sql("DELETE FROM clinical_schema_rollout_event WHERE practice_id = :practice").param("practice", practice).update()).hasMessageContaining("DELETE FROM clinical_schema_rollout_event");
     }
     @Test void twoPracticesRacingReserveOnlyOneActiveEncounter() throws Exception {
@@ -340,6 +353,20 @@ class ConnectedEncounterTests {
     ServiceRequestRecord authorizeLab(ServiceRequestRecord draft) {
         var candidate=run(c->orders.prepare(c,patient,draft.id(),UUID.randomUUID(),new ServiceRequestPrepare(UUID.randomUUID(),draft.version())));
         return run(c->orders.authorize(c,patient,draft.id(),UUID.randomUUID(),new ServiceRequestAuthorize(draft.version(),candidate.preparationId(),candidate.artifactHash(),true,null,"Reviewed repeat synthetic intent")));
+    }
+    @Test void freeTextLabRequestCanBeAuthorizedAndRepeatedIntentNeedsAReason() {
+        var encounter=completeDraft();var time=OffsetDateTime.now();
+        var test=new ServiceRequestData("LAB_ORDER",null,null,null,"Synthetic unlisted test 71","Assess the reported concern","STAT","Synthetic external lab","","","","Fasting required.",LocalDate.now().plusDays(1));
+        var draft=run(c->orders.create(c,patient,UUID.randomUUID(),new ServiceRequestCreate(UUID.randomUUID(),encounter.encounterId(),time,test,null)));
+        var authorized=authorizeLab(draft);
+        assertThat(authorized.data().catalogCode()).isNull();
+        assertThat(new String(run(c->orders.artifact(c,patient,draft.id(),null)),java.nio.charset.StandardCharsets.UTF_8)).contains("Synthetic unlisted test 71","Fasting required.");
+        var repeated=new ServiceRequestData("LAB_ORDER",null,null,null,"  synthetic UNLISTED test 71  ","Assess the reported concern","ROUTINE","Synthetic external lab","","","","",LocalDate.now().plusDays(2));
+        var second=run(c->orders.create(c,patient,UUID.randomUUID(),new ServiceRequestCreate(UUID.randomUUID(),encounter.encounterId(),time,repeated,null)));
+        var candidate=run(c->orders.prepare(c,patient,second.id(),UUID.randomUUID(),new ServiceRequestPrepare(UUID.randomUUID(),second.version())));
+        assertThatThrownBy(()->run(c->orders.authorize(c,patient,second.id(),UUID.randomUUID(),new ServiceRequestAuthorize(second.version(),candidate.preparationId(),candidate.artifactHash(),true,null,null)))).hasMessage("DUPLICATE_INTENT_REASON_REQUIRED");
+        var incomplete=new ServiceRequestData("LAB_ORDER",null,"SYN-LAB-A",null,"Synthetic laboratory service A","Question","ROUTINE","Synthetic external lab","","","","",LocalDate.now());
+        assertThatThrownBy(()->run(c->orders.create(c,patient,UUID.randomUUID(),new ServiceRequestCreate(UUID.randomUUID(),encounter.encounterId(),time,incomplete,null)))).hasMessage("CATALOG_REFERENCE_INCOMPLETE");
     }
     @Test void interventionDraftsPersistAndReplayReauthorizesWithoutChangingNoteRevision() {
         var encounter=completeDraft();var key=UUID.randomUUID();var command=new ServiceRequestCreate(UUID.randomUUID(),encounter.encounterId(),OffsetDateTime.now(),lab("Persist me"),null);
@@ -381,18 +408,38 @@ class ConnectedEncounterTests {
     }
     @Test void prescriptionRequiresReviewedSafetyAndKeepsStrengthSeparateFromDose() {
         var encounter=completeDraft();
+        enableClinicalLists();
         var item=new PrescriptionItem(UUID.randomUUID(),"Synthetic ingredient A","","100 synthetic units","Synthetic tablet",new java.math.BigDecimal("2"),"synthetic dose units","Synthetic route","Synthetic frequency","Synthetic duration",new java.math.BigDecimal("4"),"synthetic tablets",0,"Synthetic instructions","SYN-MED-A","synthetic-1");
         var draft=run(c->prescribing.create(c,patient,UUID.randomUUID(),new PrescriptionCreate(UUID.randomUUID(),encounter.encounterId(),OffsetDateTime.now(),new PrescriptionData("Synthetic indication","",null,List.of(item)),null)));
         assertThatThrownBy(()->run(c->prescribing.prepare(c,patient,draft.id(),UUID.randomUUID(),new PrescriptionPrepare(UUID.randomUUID(),0)))).hasMessage("MEDICATION_SAFETY_REVIEW_REQUIRED");
-        var allergy=run(c->safety.record(c,patient,UUID.randomUUID(),new MedicationSafety.ReviewMedicationSafety(UUID.randomUUID(),"KNOWN",List.of("Synthetic ingredient A"),List.of(),"Explicit synthetic allergy fixture",true)));
-        var withAllergy=run(c->prescribing.update(c,patient,draft.id(),UUID.randomUUID(),new PrescriptionUpdate(0,new PrescriptionData("Synthetic indication","",allergy.reviewId(),List.of(item)))));
+        var allergy=run(c->clinicalLists.createAllergy(c,patient,UUID.randomUUID(),new ClinicalLists.CreateAllergy(UUID.randomUUID(),new ClinicalLists.AllergyData("Synthetic ingredient A",new ClinicalLists.Code("urn:epr:synthetic:medication","SYN-MED-A","synthetic-1","Synthetic ingredient A"),"MEDICATION","ALLERGY","CONFIRMED","HIGH",null,"UNKNOWN",null,"Synthetic patient report",null,null,OffsetDateTime.now(),encounter.encounterId(),List.of(new ClinicalLists.Reaction(UUID.randomUUID(),"Rash","MODERATE",null,null))))));
+        var knownSummary=run(c->clinicalLists.summary(c,patient));
+        var knownCommand=new ClinicalLists.Reconcile(UUID.randomUUID(),encounter.encounterId(),Map.of(SourceKind.ALLERGY,knownSummary.allergies().generation(),SourceKind.MEDICATION_USE,knownSummary.medications().generation(),SourceKind.PROBLEM,knownSummary.problems().generation()),List.of(),"Explicit synthetic reconciliation",true,OffsetDateTime.now());
+        var known=run(c->clinicalLists.reconcile(c,patient,UUID.randomUUID(),knownCommand));
+        var withAllergy=run(c->prescribing.update(c,patient,draft.id(),UUID.randomUUID(),new PrescriptionUpdate(0,new PrescriptionData("Synthetic indication","",known.reviewId(),List.of(item)))));
         assertThatThrownBy(()->run(c->prescribing.prepare(c,patient,draft.id(),UUID.randomUUID(),new PrescriptionPrepare(UUID.randomUUID(),withAllergy.version())))).hasMessage("KNOWN_ALLERGY_MATCH");
-        var review=run(c->safety.record(c,patient,UUID.randomUUID(),new MedicationSafety.ReviewMedicationSafety(UUID.randomUUID(),"NONE_KNOWN",List.of(),List.of(),"Explicit separate reviewed synthetic fixture",true)));
+        run(c->clinicalLists.transitionAllergy(c,patient,allergy.id(),UUID.randomUUID(),new ClinicalLists.Transition(allergy.version(),"RESOLVE","Reviewed historical reaction")));
+        var clearSummary=run(c->clinicalLists.summary(c,patient));
+        var clearCommand=new ClinicalLists.Reconcile(UUID.randomUUID(),encounter.encounterId(),Map.of(SourceKind.ALLERGY,clearSummary.allergies().generation(),SourceKind.MEDICATION_USE,clearSummary.medications().generation(),SourceKind.PROBLEM,clearSummary.problems().generation()),List.of(),"Explicit separate reviewed synthetic fixture",true,OffsetDateTime.now());
+        var review=run(c->clinicalLists.reconcile(c,patient,UUID.randomUUID(),clearCommand));
         var ready=run(c->prescribing.update(c,patient,draft.id(),UUID.randomUUID(),new PrescriptionUpdate(withAllergy.version(),new PrescriptionData("Synthetic indication","",review.reviewId(),List.of(item)))));
         var preparation=run(c->prescribing.prepare(c,patient,draft.id(),UUID.randomUUID(),new PrescriptionPrepare(UUID.randomUUID(),ready.version())));
         var issued=run(c->prescribing.authorize(c,patient,draft.id(),UUID.randomUUID(),new PrescriptionAuthorize(ready.version(),preparation.preparationId(),preparation.artifactHash(),true,null,null)));
         assertThat(issued.data().items().getFirst().strength()).isEqualTo("100 synthetic units");assertThat(issued.data().items().getFirst().dose()).isEqualByComparingTo("2");
         assertThat(issued.state()).isEqualTo("ISSUED");assertThat(issued.deliveryState()).isEqualTo("NOT_SENT");
+    }
+    @Test void clinicalListChangeInvalidatesPreparedNoteAndSignedBytesKeepExactReview() {
+        var encounter=completeDraft();enableClinicalLists();var review=reconcile(encounter.encounterId());
+        var candidate=run(c->signatures.prepare(c,patient,encounter.encounterId(),UUID.randomUUID(),new JdbcEncounterSignatures.Prepare(UUID.randomUUID(),encounter.version())));
+        assertThat(candidate.clinicalReviewId()).isEqualTo(review.reviewId());
+        run(c->clinicalLists.createProblem(c,patient,UUID.randomUUID(),new ClinicalLists.CreateProblem(UUID.randomUUID(),0,new ClinicalLists.ProblemData("Synthetic problem",new ClinicalLists.Code("urn:epr:synthetic:problem","synthetic","1","Synthetic problem"),"CONFIRMED",null,"UNKNOWN",null,"UNKNOWN",null,"Clinician entered",null,OffsetDateTime.now(),encounter.encounterId()))));
+        assertThatThrownBy(()->run(c->signatures.sign(c,patient,encounter.encounterId(),UUID.randomUUID(),new JdbcEncounterSignatures.Sign(candidate.preparationId(),candidate.encounterVersion(),candidate.artifactHash(),true)))).hasMessage("CLINICAL_LIST_REVIEW_STALE");
+        var currentReview=reconcile(encounter.encounterId());
+        var fresh=run(c->signatures.prepare(c,patient,encounter.encounterId(),UUID.randomUUID(),new JdbcEncounterSignatures.Prepare(UUID.randomUUID(),candidate.encounterVersion())));
+        assertThat(fresh.clinicalReviewId()).isEqualTo(currentReview.reviewId());
+        var signed=run(c->signatures.sign(c,patient,encounter.encounterId(),UUID.randomUUID(),new JdbcEncounterSignatures.Sign(fresh.preparationId(),fresh.encounterVersion(),fresh.artifactHash(),true)));
+        var bytes=(byte[])run(c->signatures.signedBytes(c,patient,encounter.encounterId(),signed.signatureId()));
+        assertThat(new String(bytes,java.nio.charset.StandardCharsets.UTF_8)).contains(currentReview.reviewId().toString(),currentReview.manifestHash());
     }
     @Test void summaryAndArtifactCannotBypassRevokedSourceReadPermission() {
         var encounter=completeDraft();var authorized=authorizeLab(labDraft(encounter.encounterId()));

@@ -6,6 +6,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import jakarta.servlet.http.HttpServletResponse;
 import ph.epr.api.identitytenancy.PlatformUserDirectory;
 import ph.epr.api.identitytenancy.SyntheticClinicalCapability;
 
@@ -25,8 +26,9 @@ class SyntheticClinicalCapabilityController {
 
     @PostMapping("/api/v1/admin/practices/{practice}/synthetic-clinical-capability")
     @PreAuthorize("hasRole('SUPERADMIN')")
-    SyntheticClinicalCapability.Result enable(Authentication authentication, @PathVariable UUID practice,
+    SyntheticClinicalCapability.Result enable(Authentication authentication, HttpServletResponse response, @PathVariable UUID practice,
         @RequestHeader("Idempotency-Key") UUID operation, @RequestBody Enable request) {
+        response.setHeader("Cache-Control", "no-store");
         return capability.enable(users.findByUsername(authentication.getName()).orElseThrow(), practice,
             operation, request.expectedVersion(), request.reason());
     }

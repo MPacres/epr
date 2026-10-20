@@ -41,6 +41,18 @@ class ClinicalOpenApiConfiguration {
             Map.entry("CreateEpisode", List.of("clinicalTime")),
             Map.entry("Registration", List.of("birthDate")),
             Map.entry("AddDating", List.of("estimatedDate", "sourceDate"))
+            ,Map.entry("ListSummary", List.of("lastReview"))
+            ,Map.entry("Code", List.of("version", "display"))
+            ,Map.entry("Reaction", List.of("onset", "exposureRoute"))
+            ,Map.entry("AllergyData", List.of("code", "onset", "lastOccurrence", "asserter", "notes", "clinicalTime", "encounterId"))
+            ,Map.entry("MedicationUseData", List.of("code", "brand", "strength", "formulation", "dose", "doseUnit", "route", "frequency", "effectiveStart", "effectiveEnd", "prescriber", "notes", "indicationProblemId", "prescriptionId", "clinicalTime", "encounterId"))
+            ,Map.entry("ProblemData", List.of("code", "onset", "abatement", "severity", "notes", "clinicalTime", "encounterId"))
+            ,Map.entry("ReviewManifest", List.of("encounterId", "clientTime"))
+            ,Map.entry("Proposal", List.of("targetId", "decision", "decisionReason"))
+            ,Map.entry("Propose", List.of("targetId"))
+            ,Map.entry("ReconciliationDecision", List.of("proposalId", "sourceId", "replacement"))
+            ,Map.entry("PrescriptionPreparation", List.of("clinicalReviewId", "clinicalReviewHash"))
+            ,Map.entry("Preparation", List.of("clinicalReviewId", "clinicalReviewHash"))
         );
         return api -> {
             if (api.getComponents() == null) return;

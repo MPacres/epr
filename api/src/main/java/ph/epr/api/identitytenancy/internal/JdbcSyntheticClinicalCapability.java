@@ -44,7 +44,7 @@ class JdbcSyntheticClinicalCapability implements SyntheticClinicalCapability {
             return new Result(true, event.version(), true);
         }
         if (practice.version() != expectedVersion) throw new ClinicalAccessException("VERSION_CONFLICT", 409);
-        if (!practice.schemaVersion().equals("11") || !practice.provisioningStatus().equals("ACTIVE")
+        if (!practice.schemaVersion().equals("14") || !practice.provisioningStatus().equals("ACTIVE")
             || !practice.serviceStatus().equals("ENABLED")
             || jdbc.sql("SELECT EXISTS(SELECT 1 FROM clinical_schema_rollout WHERE practice_id = :practice AND state <> 'READY')")
                 .param("practice", practiceId).query(Boolean.class).single())
@@ -69,6 +69,12 @@ class JdbcSyntheticClinicalCapability implements SyntheticClinicalCapability {
             INSERT INTO practice_clinical_capability(practice_id, enabled)
             VALUES (:practice, true)
             ON CONFLICT (practice_id) DO UPDATE SET enabled = true, updated_at = CURRENT_TIMESTAMP
+            """).param("practice", practiceId).update();
+        jdbc.sql("""
+            INSERT INTO practice_clinical_chart_capability(practice_id, source_kind, enabled)
+            SELECT :practice, source_kind, true
+            FROM (VALUES ('ALLERGY'), ('MEDICATION_USE'), ('PROBLEM')) sources(source_kind)
+            ON CONFLICT (practice_id, source_kind) DO UPDATE SET enabled = true
             """).param("practice", practiceId).update();
         jdbc.sql("UPDATE practice_tenant_registry SET version = version + 1, updated_at = CURRENT_TIMESTAMP WHERE practice_id = :practice")
             .param("practice", practiceId).update();

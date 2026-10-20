@@ -28,6 +28,15 @@ class JdbcClinicalPatientRegistry implements ClinicalPatientRegistry {
             .query((rs, n) -> patient(rs)).optional().orElseThrow(() -> new ClinicalAccessException("PATIENT_UNAVAILABLE", 404));
     }
 
+    public Patient requireSyntheticPatient(Context context, UUID patientId) {
+        var patient = requirePatient(context, patientId);
+        var synthetic = context.jdbc().sql("SELECT synthetic_only FROM clinical_patient WHERE practice_id = :practice AND patient_id = :patient")
+            .param("practice", context.practiceId()).param("patient", patientId)
+            .query(Boolean.class).single();
+        if (!synthetic) throw new ClinicalAccessException("SYNTHETIC_PATIENT_REQUIRED", 422);
+        return patient;
+    }
+
     public List<Patient> list(Context context) {
         var result = context.jdbc().sql(QUERY + " ORDER BY p.received_at DESC LIMIT 100")
             .param("practice", context.practiceId()).param("actor", context.actorId()).query((rs, n) -> patient(rs)).list();

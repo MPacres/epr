@@ -2695,6 +2695,449 @@
         }
       }
     },
+    "/api/v1/practices/{practice}/patients/{patient}/problems": {
+      "get": {
+        "tags": [
+          "clinical-list-controller"
+        ],
+        "operationId": "problems",
+        "parameters": [
+          {
+            "name": "practice",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "patient",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "siteId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "active"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageProblem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "clinical-list-controller"
+        ],
+        "operationId": "createProblem",
+        "parameters": [
+          {
+            "name": "practice",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "patient",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "siteId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProblem"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/practices/{practice}/patients/{patient}/problems/{problem}/encounter-links": {
+      "post": {
+        "tags": [
+          "encounter-clinical-list-controller"
+        ],
+        "operationId": "link",
+        "parameters": [
+          {
+            "name": "practice",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "patient",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "problem",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "siteId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EncounterLink"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/practices/{practice}/patients/{patient}/problems/{id}/transitions": {
+      "post": {
+        "tags": [
+          "clinical-list-controller"
+        ],
+        "operationId": "transitionProblem",
+        "parameters": [
+          {
+            "name": "practice",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "patient",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "siteId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Transition"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/practices/{practice}/patients/{patient}/problems/{id}/revisions": {
+      "post": {
+        "tags": [
+          "clinical-list-controller"
+        ],
+        "operationId": "reviseProblem",
+        "parameters": [
+          {
+            "name": "practice",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "patient",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "siteId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviseProblem"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/practices/{practice}/patients/{patient}/problem-list-reviews": {
+      "post": {
+        "tags": [
+          "clinical-list-controller"
+        ],
+        "operationId": "reviewProblems",
+        "parameters": [
+          {
+            "name": "practice",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "patient",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "siteId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewManifest"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/practices/{practice}/patients/{patient}/prescriptions": {
       "get": {
         "tags": [
@@ -3734,12 +4177,88 @@
         }
       }
     },
-    "/api/v1/practices/{practice}/patients/{patient}/medication-safety-reviews": {
+    "/api/v1/practices/{practice}/patients/{patient}/medication-use": {
+      "get": {
+        "tags": [
+          "clinical-list-controller"
+        ],
+        "operationId": "medications",
+        "parameters": [
+          {
+            "name": "practice",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "patient",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "siteId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "active"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageMedicationUse"
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "tags": [
-          "medication-safety-controller"
+          "clinical-list-controller"
         ],
-        "operationId": "create_6",
+        "operationId": "createMedication",
         "parameters": [
           {
             "name": "practice",
@@ -3782,7 +4301,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ReviewMedicationSafety"
+                "$ref": "#/components/schemas/CreateMedicationUse"
               }
             }
           },
@@ -3794,7 +4313,229 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/SafetyReview"
+                  "$ref": "#/components/schemas/MedicationUse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/practices/{practice}/patients/{patient}/medication-use/{id}/transitions": {
+      "post": {
+        "tags": [
+          "clinical-list-controller"
+        ],
+        "operationId": "transitionMedication",
+        "parameters": [
+          {
+            "name": "practice",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "patient",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "siteId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Transition"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/MedicationUse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/practices/{practice}/patients/{patient}/medication-use/{id}/revisions": {
+      "post": {
+        "tags": [
+          "clinical-list-controller"
+        ],
+        "operationId": "reviseMedication",
+        "parameters": [
+          {
+            "name": "practice",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "patient",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "siteId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviseMedicationUse"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/MedicationUse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/practices/{practice}/patients/{patient}/medication-list-reviews": {
+      "post": {
+        "tags": [
+          "clinical-list-controller"
+        ],
+        "operationId": "reviewMedications",
+        "parameters": [
+          {
+            "name": "practice",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "patient",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "siteId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewManifest"
                 }
               }
             }
@@ -3857,7 +4598,7 @@
         "tags": [
           "encounter-controller"
         ],
-        "operationId": "create_7",
+        "operationId": "create_6",
         "parameters": [
           {
             "name": "practice",
@@ -4490,6 +5231,192 @@
         }
       }
     },
+    "/api/v1/practices/{practice}/patients/{patient}/clinical-record-proposals": {
+      "get": {
+        "tags": [
+          "clinical-list-controller"
+        ],
+        "operationId": "proposals",
+        "parameters": [
+          {
+            "name": "practice",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "patient",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "siteId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Proposal"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "clinical-list-controller"
+        ],
+        "operationId": "propose",
+        "parameters": [
+          {
+            "name": "practice",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "patient",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "siteId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Propose"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/Proposal"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/practices/{practice}/patients/{patient}/clinical-list-reconciliations": {
+      "post": {
+        "tags": [
+          "encounter-clinical-list-controller"
+        ],
+        "operationId": "reconcile_1",
+        "parameters": [
+          {
+            "name": "practice",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "patient",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "siteId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Reconcile"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewManifest"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/practices/{practice}/patients/{patient}/chart-opens": {
       "post": {
         "tags": [
@@ -4554,6 +5481,372 @@
                   "additionalProperties": {
                     "type": "boolean"
                   }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/practices/{practice}/patients/{patient}/allergy-list-reviews": {
+      "post": {
+        "tags": [
+          "clinical-list-controller"
+        ],
+        "operationId": "reviewAllergies",
+        "parameters": [
+          {
+            "name": "practice",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "patient",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "siteId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewManifest"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/practices/{practice}/patients/{patient}/allergies": {
+      "get": {
+        "tags": [
+          "clinical-list-controller"
+        ],
+        "operationId": "allergies",
+        "parameters": [
+          {
+            "name": "practice",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "patient",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "siteId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "active"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageAllergy"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "clinical-list-controller"
+        ],
+        "operationId": "createAllergy",
+        "parameters": [
+          {
+            "name": "practice",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "patient",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "siteId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAllergy"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/Allergy"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/practices/{practice}/patients/{patient}/allergies/{id}/transitions": {
+      "post": {
+        "tags": [
+          "clinical-list-controller"
+        ],
+        "operationId": "transitionAllergy",
+        "parameters": [
+          {
+            "name": "practice",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "patient",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "siteId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Transition"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/Allergy"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/practices/{practice}/patients/{patient}/allergies/{id}/revisions": {
+      "post": {
+        "tags": [
+          "clinical-list-controller"
+        ],
+        "operationId": "reviseAllergy",
+        "parameters": [
+          {
+            "name": "practice",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "patient",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "siteId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviseAllergy"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/Allergy"
                 }
               }
             }
@@ -5047,7 +6340,7 @@
         "tags": [
           "template-controller"
         ],
-        "operationId": "create_8",
+        "operationId": "create_7",
         "parameters": [
           {
             "name": "practice",
@@ -5496,7 +6789,7 @@
         "tags": [
           "clinical-worklist-controller"
         ],
-        "operationId": "reconcile_1",
+        "operationId": "reconcile_2",
         "parameters": [
           {
             "name": "practice",
@@ -5624,7 +6917,7 @@
         "tags": [
           "team-controller"
         ],
-        "operationId": "create_9",
+        "operationId": "create_8",
         "parameters": [
           {
             "name": "practice",
@@ -6430,6 +7723,64 @@
         }
       }
     },
+    "/api/v1/practices/{practice}/patients/{patient}/problems/{id}": {
+      "get": {
+        "tags": [
+          "clinical-list-controller"
+        ],
+        "operationId": "problem",
+        "parameters": [
+          {
+            "name": "practice",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "patient",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "siteId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/practices/{practice}/patients/{patient}/prescriptions/{id}": {
       "get": {
         "tags": [
@@ -6653,6 +8004,64 @@
                   "items": {
                     "$ref": "#/components/schemas/MedicationCatalogEntry"
                   }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/practices/{practice}/patients/{patient}/medication-use/{id}": {
+      "get": {
+        "tags": [
+          "clinical-list-controller"
+        ],
+        "operationId": "medication",
+        "parameters": [
+          {
+            "name": "practice",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "patient",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "siteId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/MedicationUse"
                 }
               }
             }
@@ -7111,6 +8520,248 @@
                   "items": {
                     "$ref": "#/components/schemas/Capability"
                   }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/practices/{practice}/patients/{patient}/clinical-terminology": {
+      "get": {
+        "tags": [
+          "clinical-list-controller"
+        ],
+        "operationId": "terminology",
+        "parameters": [
+          {
+            "name": "practice",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "patient",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "siteId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ALLERGY",
+                "MEDICATION_USE",
+                "PROBLEM"
+              ]
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": ""
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Code"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/practices/{practice}/patients/{patient}/clinical-summary": {
+      "get": {
+        "tags": [
+          "clinical-list-controller"
+        ],
+        "operationId": "summary",
+        "parameters": [
+          {
+            "name": "practice",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "patient",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "siteId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClinicalSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/practices/{practice}/patients/{patient}/clinical-list-reviews": {
+      "get": {
+        "tags": [
+          "clinical-list-controller"
+        ],
+        "operationId": "reviews",
+        "parameters": [
+          {
+            "name": "practice",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "patient",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "siteId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "encounterId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ReviewManifest"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/practices/{practice}/patients/{patient}/allergies/{id}": {
+      "get": {
+        "tags": [
+          "clinical-list-controller"
+        ],
+        "operationId": "allergy",
+        "parameters": [
+          {
+            "name": "practice",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "patient",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "siteId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/Allergy"
                 }
               }
             }
@@ -9101,6 +10752,35 @@
           }
         }
       },
+      "ClinicalListGrant": {
+        "type": "object",
+        "properties": {
+          "siteId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourceKind": {
+            "type": "string",
+            "enum": [
+              "ALLERGY",
+              "MEDICATION_USE",
+              "PROBLEM"
+            ]
+          },
+          "read": {
+            "type": "boolean"
+          },
+          "propose": {
+            "type": "boolean"
+          },
+          "write": {
+            "type": "boolean"
+          },
+          "review": {
+            "type": "boolean"
+          }
+        }
+      },
       "TeamAccess": {
         "type": "object",
         "properties": {
@@ -9127,6 +10807,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/TeamSiteGrant"
+            }
+          },
+          "clinicalListGrants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClinicalListGrant"
             }
           },
           "reason": {
@@ -9188,6 +10874,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/TeamSiteGrant"
+            }
+          },
+          "clinicalListGrants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClinicalListGrant"
             }
           },
           "canReissue": {
@@ -9886,6 +11578,558 @@
           }
         }
       },
+      "Code": {
+        "type": "object",
+        "properties": {
+          "system": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "display": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "CreateProblem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "priority": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ProblemData"
+          }
+        }
+      },
+      "ProblemData": {
+        "type": "object",
+        "properties": {
+          "problemDisplay": {
+            "type": "string"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Code"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "verificationStatus": {
+            "type": "string"
+          },
+          "onset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "onsetPrecision": {
+            "type": "string"
+          },
+          "abatement": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "abatementPrecision": {
+            "type": "string"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "informationSource": {
+            "type": "string"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "clinicalTime": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "encounterId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "Problem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "patientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "clinicalStatus": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdBy": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ProblemData"
+          },
+          "revisions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProblemRevision"
+            }
+          },
+          "encounterIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "duplicateCandidate": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ProblemRevision": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ProblemData"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "actorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "EncounterLink": {
+        "type": "object",
+        "properties": {
+          "encounterId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "Transition": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "transition": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviseProblem": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ProblemData"
+          }
+        }
+      },
+      "ReviewCommand": {
+        "type": "object",
+        "properties": {
+          "reviewId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "interactionsUnavailableAcknowledged": {
+            "type": "boolean"
+          },
+          "clientTime": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "JsonNode": {
+        "type": "object",
+        "properties": {
+          "floatingPointNumber": {
+            "type": "boolean"
+          },
+          "number": {
+            "type": "boolean"
+          },
+          "container": {
+            "type": "boolean"
+          },
+          "valueNode": {
+            "type": "boolean"
+          },
+          "missingNode": {
+            "type": "boolean"
+          },
+          "nodeType": {
+            "type": "string",
+            "enum": [
+              "ARRAY",
+              "BINARY",
+              "BOOLEAN",
+              "MISSING",
+              "NULL",
+              "NUMBER",
+              "OBJECT",
+              "POJO",
+              "STRING"
+            ]
+          },
+          "string": {
+            "type": "boolean"
+          },
+          "integralNumber": {
+            "type": "boolean"
+          },
+          "pojo": {
+            "type": "boolean"
+          },
+          "short": {
+            "type": "boolean"
+          },
+          "int": {
+            "type": "boolean"
+          },
+          "long": {
+            "type": "boolean"
+          },
+          "double": {
+            "type": "boolean"
+          },
+          "bigDecimal": {
+            "type": "boolean"
+          },
+          "bigInteger": {
+            "type": "boolean"
+          },
+          "textual": {
+            "type": "boolean",
+            "deprecated": true
+          },
+          "boolean": {
+            "type": "boolean"
+          },
+          "binary": {
+            "type": "boolean"
+          },
+          "empty": {
+            "type": "boolean"
+          },
+          "array": {
+            "type": "boolean"
+          },
+          "null": {
+            "type": "boolean"
+          },
+          "object": {
+            "type": "boolean"
+          },
+          "float": {
+            "type": "boolean"
+          },
+          "embeddedValue": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ReconciliationDecision": {
+        "type": "object",
+        "properties": {
+          "proposalId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sourceKind": {
+            "type": "string",
+            "enum": [
+              "ALLERGY",
+              "MEDICATION_USE",
+              "PROBLEM"
+            ]
+          },
+          "sourceId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "decision": {
+            "type": "string"
+          },
+          "replacement": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JsonNode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewItem": {
+        "type": "object",
+        "properties": {
+          "sourceKind": {
+            "type": "string",
+            "enum": [
+              "ALLERGY",
+              "MEDICATION_USE",
+              "PROBLEM"
+            ]
+          },
+          "sourceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourceVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "decision": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewKind": {
+        "type": "object",
+        "properties": {
+          "sourceKind": {
+            "type": "string",
+            "enum": [
+              "ALLERGY",
+              "MEDICATION_USE",
+              "PROBLEM"
+            ]
+          },
+          "sourceGeneration": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "assertion": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewManifest": {
+        "type": "object",
+        "properties": {
+          "reviewId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "patientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "siteId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reviewType": {
+            "type": "string"
+          },
+          "encounterId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "interactionsUnavailableAcknowledged": {
+            "type": "boolean"
+          },
+          "reviewedBy": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "clientTime": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reviewedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "manifestHash": {
+            "type": "string"
+          },
+          "kinds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewKind"
+            }
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewItem"
+            }
+          },
+          "decisions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReconciliationDecision"
+            }
+          },
+          "stale": {
+            "type": "boolean"
+          }
+        }
+      },
       "PrescriptionCreate": {
         "type": "object",
         "properties": {
@@ -9940,6 +12184,27 @@
           },
           "artifactHash": {
             "type": "string"
+          },
+          "clinicalReviewId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "clinicalReviewHash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -10146,71 +12411,277 @@
           }
         }
       },
-      "ReviewMedicationSafety": {
+      "CreateMedicationUse": {
         "type": "object",
         "properties": {
-          "reviewId": {
+          "id": {
             "type": "string",
             "format": "uuid"
           },
-          "allergyState": {
+          "data": {
+            "$ref": "#/components/schemas/MedicationUseData"
+          }
+        }
+      },
+      "MedicationUseData": {
+        "type": "object",
+        "properties": {
+          "medicationDisplay": {
             "type": "string"
           },
-          "allergies": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+          "code": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Code"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
-          "currentMedications": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+          "brand": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
-          "source": {
+          "strength": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "formulation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dose": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "doseUnit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "route": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "frequency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "prn": {
+            "type": "boolean"
+          },
+          "effectiveStart": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "effectiveEnd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "effectivePrecision": {
             "type": "string"
           },
-          "interactionsUnavailableAcknowledged": {
+          "informationSource": {
+            "type": "string"
+          },
+          "prescriber": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "adherence": {
+            "type": "string"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "indicationProblemId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "prescriptionId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "clinicalTime": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "encounterId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "MedicationUse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "patientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "data": {
+            "$ref": "#/components/schemas/MedicationUseData"
+          },
+          "revisions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MedicationUseRevision"
+            }
+          },
+          "duplicateCandidate": {
             "type": "boolean"
           }
         }
       },
-      "SafetyReview": {
+      "MedicationUseRevision": {
         "type": "object",
         "properties": {
-          "reviewId": {
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "data": {
+            "$ref": "#/components/schemas/MedicationUseData"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "actorId": {
             "type": "string",
             "format": "uuid"
           },
-          "allergyState": {
-            "type": "string"
-          },
-          "allergies": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "currentMedications": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "source": {
-            "type": "string"
-          },
-          "reviewedBy": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "reviewedAt": {
+          "receivedAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "ReviseMedicationUse": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
           },
-          "interactionsUnavailableAcknowledged": {
-            "type": "boolean"
+          "reason": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/MedicationUseData"
           }
         }
       },
@@ -10277,21 +12748,6 @@
             "format": "uuid"
           },
           "deliveryState": {
-            "type": "string"
-          }
-        }
-      },
-      "Transition": {
-        "type": "object",
-        "properties": {
-          "expectedVersion": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "target": {
-            "type": "string"
-          },
-          "reason": {
             "type": "string"
           }
         }
@@ -10419,6 +12875,27 @@
           "interventionManifestId": {
             "type": "string",
             "format": "uuid"
+          },
+          "clinicalReviewId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "clinicalReviewHash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -10463,12 +12940,388 @@
           }
         }
       },
+      "Propose": {
+        "type": "object",
+        "properties": {
+          "proposalId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourceKind": {
+            "type": "string",
+            "enum": [
+              "ALLERGY",
+              "MEDICATION_USE",
+              "PROBLEM"
+            ]
+          },
+          "proposedAction": {
+            "type": "string"
+          },
+          "targetId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "payload": {
+            "$ref": "#/components/schemas/JsonNode"
+          },
+          "informationSource": {
+            "type": "string"
+          }
+        }
+      },
+      "Proposal": {
+        "type": "object",
+        "properties": {
+          "proposalId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "patientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "siteId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourceKind": {
+            "type": "string",
+            "enum": [
+              "ALLERGY",
+              "MEDICATION_USE",
+              "PROBLEM"
+            ]
+          },
+          "proposedAction": {
+            "type": "string"
+          },
+          "targetId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "payload": {
+            "$ref": "#/components/schemas/JsonNode"
+          },
+          "informationSource": {
+            "type": "string"
+          },
+          "proposedBy": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "proposedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "decision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "decisionReason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "Reconcile": {
+        "type": "object",
+        "properties": {
+          "reviewId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "encounterId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedGenerations": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "decisions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReconciliationDecision"
+            }
+          },
+          "source": {
+            "type": "string"
+          },
+          "interactionsUnavailableAcknowledged": {
+            "type": "boolean"
+          },
+          "clientTime": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "ChartOpen": {
         "type": "object",
         "properties": {
           "duplicateReviewId": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "AllergyData": {
+        "type": "object",
+        "properties": {
+          "substanceDisplay": {
+            "type": "string"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Code"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "category": {
+            "type": "string"
+          },
+          "reactionType": {
+            "type": "string"
+          },
+          "verificationStatus": {
+            "type": "string"
+          },
+          "criticality": {
+            "type": "string"
+          },
+          "onset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "onsetPrecision": {
+            "type": "string"
+          },
+          "lastOccurrence": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "informationSource": {
+            "type": "string"
+          },
+          "asserter": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "clinicalTime": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "encounterId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reactions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Reaction"
+            }
+          }
+        }
+      },
+      "CreateAllergy": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AllergyData"
+          }
+        }
+      },
+      "Reaction": {
+        "type": "object",
+        "properties": {
+          "reactionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "manifestation": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "onset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "exposureRoute": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "Allergy": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "patientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "clinicalStatus": {
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AllergyData"
+          },
+          "revisions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AllergyRevision"
+            }
+          },
+          "duplicateCandidate": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AllergyRevision": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AllergyData"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "actorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ReviseAllergy": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AllergyData"
           }
         }
       },
@@ -10910,6 +13763,12 @@
               "$ref": "#/components/schemas/TeamSiteGrant"
             }
           },
+          "clinicalListGrants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClinicalListGrant"
+            }
+          },
           "reason": {
             "type": "string"
           }
@@ -10953,6 +13812,59 @@
           }
         }
       },
+      "ClinicalReadiness": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "READY",
+              "SCHEMA_UPGRADE_REQUIRED",
+              "CLINICAL_DISABLED",
+              "SOURCE_CAPABILITY_DISABLED",
+              "MIGRATION_IN_PROGRESS",
+              "QUARANTINED"
+            ]
+          },
+          "currentSchemaVersion": {
+            "type": "string"
+          },
+          "requiredSchemaVersion": {
+            "type": "string"
+          },
+          "rolloutState": {
+            "type": "string"
+          },
+          "clinicalEnabled": {
+            "type": "boolean"
+          },
+          "sourceCapabilities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceCapability"
+            }
+          },
+          "latestFailure": {
+            "type": "string"
+          }
+        }
+      },
+      "SourceCapability": {
+        "type": "object",
+        "properties": {
+          "sourceKind": {
+            "type": "string",
+            "enum": [
+              "ALLERGY",
+              "MEDICATION_USE",
+              "PROBLEM"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        }
+      },
       "PatientEdit": {
         "type": "object",
         "properties": {
@@ -10992,6 +13904,29 @@
           }
         }
       },
+      "PageProblem": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "MedicationCatalogEntry": {
         "type": "object",
         "properties": {
@@ -11003,6 +13938,67 @@
           },
           "ingredient": {
             "type": "string"
+          }
+        }
+      },
+      "PageMedicationUse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MedicationUse"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "SafetyReview": {
+        "type": "object",
+        "properties": {
+          "reviewId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "allergyState": {
+            "type": "string"
+          },
+          "allergies": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "currentMedications": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "source": {
+            "type": "string"
+          },
+          "reviewedBy": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reviewedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "interactionsUnavailableAcknowledged": {
+            "type": "boolean"
           }
         }
       },
@@ -11189,6 +14185,132 @@
           }
         }
       },
+      "Actions": {
+        "type": "object",
+        "properties": {
+          "read": {
+            "type": "boolean"
+          },
+          "propose": {
+            "type": "boolean"
+          },
+          "write": {
+            "type": "boolean"
+          },
+          "review": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ClinicalSummary": {
+        "type": "object",
+        "properties": {
+          "allergies": {
+            "$ref": "#/components/schemas/ListSummary"
+          },
+          "medications": {
+            "$ref": "#/components/schemas/ListSummary"
+          },
+          "problems": {
+            "$ref": "#/components/schemas/ListSummary"
+          }
+        }
+      },
+      "ListSummary": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "ALLERGY",
+              "MEDICATION_USE",
+              "PROBLEM"
+            ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "UNAVAILABLE",
+              "NOT_REVIEWED",
+              "EMPTY_REVIEWED",
+              "AVAILABLE",
+              "STALE"
+            ]
+          },
+          "generation": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "activeCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "preview": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Preview"
+            }
+          },
+          "lastReview": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReviewManifest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "actions": {
+            "$ref": "#/components/schemas/Actions"
+          }
+        }
+      },
+      "Preview": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "display": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "code": {
+            "$ref": "#/components/schemas/Code"
+          }
+        }
+      },
+      "PageAllergy": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Allergy"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "DirectoryItem": {
         "type": "object",
         "properties": {
@@ -11359,6 +14481,9 @@
           },
           "schemaVersion": {
             "type": "string"
+          },
+          "clinicalReadiness": {
+            "$ref": "#/components/schemas/ClinicalReadiness"
           }
         }
       }

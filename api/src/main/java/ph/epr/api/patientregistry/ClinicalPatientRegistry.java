@@ -9,6 +9,8 @@ public interface ClinicalPatientRegistry {
     /** Minimal identity for a server-authorized accepted work item; never grants chart access. No direct endpoint. */
     Patient identityForAcceptedWork(Context context, UUID patientId);
     Patient requirePatient(Context context, UUID patientId);
+    /** Fixture-only guard, implemented by the registry that owns the synthetic marker. */
+    Patient requireSyntheticPatient(Context context, UUID patientId);
     List<Patient> list(Context context);
     Patient register(Context context, UUID key, Registration request);
     boolean visitsCurrent(Context c);

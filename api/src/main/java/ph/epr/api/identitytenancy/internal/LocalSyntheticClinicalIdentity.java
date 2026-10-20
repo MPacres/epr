@@ -42,5 +42,14 @@ class LocalSyntheticClinicalIdentity implements SyntheticClinicalIdentity {
             jdbc.sql("INSERT INTO practice_intervention_capability(practice_id,kind,preparation_enabled,authorization_enabled) VALUES(:p,:k,true,true) ON CONFLICT DO NOTHING").param("p",practice).param("k",kind).update();
             jdbc.sql("INSERT INTO practice_intervention_grant(practice_id,user_id,site_id,kind,can_read,can_prepare,can_authorize,reason) VALUES(:p,:u,:s,:k,true,true,true,'Explicit opt-in synthetic intervention fixture') ON CONFLICT DO NOTHING").param("p",practice).param("u",user).param("s",site).param("k",kind).update();
         }
+        for (var kind : java.util.List.of("ALLERGY", "MEDICATION_USE", "PROBLEM")) {
+            jdbc.sql("INSERT INTO practice_clinical_chart_capability(practice_id,source_kind,enabled) VALUES(:p,:k,true) ON CONFLICT (practice_id,source_kind) DO UPDATE SET enabled=true")
+                .param("p",practice).param("k",kind).update();
+            jdbc.sql("""
+                INSERT INTO practice_clinical_chart_grant(practice_id,user_id,site_id,source_kind,can_read,can_propose,can_write,can_review,reason)
+                VALUES(:p,:u,:s,:k,true,true,true,true,'Explicit opt-in synthetic clinical-list fixture')
+                ON CONFLICT (practice_id,user_id,site_id,source_kind) DO NOTHING
+                """).param("p",practice).param("u",user).param("s",site).param("k",kind).update();
+        }
     }
 }

@@ -9,21 +9,11 @@ import ph.epr.api.platformoperations.*;
 import ph.epr.api.platformoperations.TenantTransactions.Context;
 @Service
 public class JdbcMedicationSafety implements MedicationSafety {
- private final ClinicalPatientRegistry patients;private final InterventionAuthorization authorization;private final TenantCommandJournal journal;
- public JdbcMedicationSafety(ClinicalPatientRegistry patients,InterventionAuthorization authorization,TenantCommandJournal journal){this.patients=patients;this.authorization=authorization;this.journal=journal;}
+ private final ClinicalPatientRegistry patients;private final InterventionAuthorization authorization;
+ public JdbcMedicationSafety(ClinicalPatientRegistry patients,InterventionAuthorization authorization){this.patients=patients;this.authorization=authorization;}
  private void access(Context c,UUID patient){patients.requirePatient(c,patient);authorization.require(c.actorId(),c.practiceId(),c.siteId(),"PRESCRIPTION",InterventionAuthorization.Action.READ);}
  public SafetyReview record(Context c,UUID patient,UUID key,ReviewMedicationSafety request){
-  access(c,patient);authorization.require(c.actorId(),c.practiceId(),c.siteId(),"PRESCRIPTION",InterventionAuthorization.Action.AUTHORIZE);
-  if(request.reviewId()==null||request.allergyState()==null||!Set.of("UNKNOWN","KNOWN","NONE_KNOWN").contains(request.allergyState())||request.source()==null||request.source().isBlank()||request.source().length()>2000||request.allergies()==null||request.currentMedications()==null)throw new ClinicalAccessException("SAFETY_REVIEW_REQUIRED",422);
-  if(request.allergies().size()>100||request.currentMedications().size()>100||java.util.stream.Stream.concat(request.allergies().stream(),request.currentMedications().stream()).anyMatch(s->s==null||s.isBlank()||s.length()>200))throw new ClinicalAccessException("INVALID_SAFETY_INGREDIENT",422);
-  if(request.allergyState().equals("KNOWN")!=!request.allergies().isEmpty())throw new ClinicalAccessException("ALLERGY_STATE_CONFLICT",422);
-  return journal.execute(c,"medication-safety/"+patient,key,request,SafetyReview.class,()->{
-   c.jdbc().sql("INSERT INTO medication_safety_review(practice_id,patient_id,review_id,site_id,allergy_state,source,reviewed_by,interactions_unavailable_acknowledged) VALUES(:p,:patient,:id,:site,:state,:source,:a,:ack)")
-    .param("p",c.practiceId()).param("patient",patient).param("id",request.reviewId()).param("site",c.siteId()).param("state",request.allergyState()).param("source",request.source()).param("a",c.actorId()).param("ack",request.interactionsUnavailableAcknowledged()).update();
-   for(var kind:List.of("ALLERGY","MEDICATION"))for(var ingredient:kind.equals("ALLERGY")?request.allergies():request.currentMedications())c.jdbc().sql("INSERT INTO medication_safety_ingredient(practice_id,review_id,kind,ingredient) VALUES(:p,:id,:kind,:ingredient) ON CONFLICT DO NOTHING")
-    .param("p",c.practiceId()).param("id",request.reviewId()).param("kind",kind).param("ingredient",ingredient.trim().toLowerCase(Locale.ROOT)).update();
-   journal.audit(c,request.reviewId(),"SYNTHETIC_MEDICATION_SAFETY_REVIEWED",null);return require(c,patient,request.reviewId());
-  });
+  access(c,patient);throw new ClinicalAccessException("LEGACY_SAFETY_REVIEW_DISABLED",410);
  }
  public SafetyReview require(Context c,UUID patient,UUID id){
   access(c,patient);

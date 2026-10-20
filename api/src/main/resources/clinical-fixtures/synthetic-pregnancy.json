@@ -1,0 +1,30 @@
+{
+  "episodes": [
+    {
+      "key": "current",
+      "status": "ONGOING",
+      "source": "Synthetic development fixture: current pregnancy account; all dates are invented for interface testing.",
+      "dating": {
+        "estimatedDate": "2027-05-18",
+        "sourceDate": "2026-08-11",
+        "sourcePrecision": "APPROXIMATE",
+        "method": "Synthetic patient-reported LMP",
+        "source": "Synthetic development fixture; approximate date has not been clinically reviewed.",
+        "reviewStatus": "NOT_REVIEWED"
+      }
+    },
+    {
+      "key": "prior",
+      "status": "COMPLETED",
+      "source": "Synthetic development fixture: prior pregnancy account; timing and outcome unknown."
+    }
+  ],
+  "history": [
+    {
+      "key": "prior-account",
+      "account": "Synthetic prior pregnancy account. Timing, gestational age, and outcome were not supplied in this fixture.",
+      "source": "Synthetic development fixture; no clinical source verification.",
+      "reviewStatus": "NOT_REVIEWED"
+    }
+  ]
+}

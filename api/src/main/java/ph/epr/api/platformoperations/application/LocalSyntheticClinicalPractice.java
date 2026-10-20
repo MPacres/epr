@@ -28,7 +28,7 @@ class LocalSyntheticClinicalPractice implements SyntheticClinicalPractice {
             "Dr. Isabel Reyes · synthetic", username, new InitialTenantSite(site, "Synthetic Makati Clinic", "", "", "PH", "1300000000", "1300000000", "1380300000"),
             UUID.fromString("c6ac9aeb-3196-4a76-b9df-ff090eac77d1")));
         if (!result.tenant().isRoutable()) throw new IllegalStateException("Synthetic tenant provisioning is unavailable");
-        if (!"11".equals(result.tenant().schemaVersion())) upgrades.upgrade(admin, practice, UUID.nameUUIDFromBytes((practice + "/clinical-schema-11").getBytes(java.nio.charset.StandardCharsets.UTF_8)), result.tenant().version(), "Upgrade opt-in synthetic OB-GYN workspace to schema 11");
+        if (!"14".equals(result.tenant().schemaVersion())) upgrades.upgrade(admin, practice, UUID.nameUUIDFromBytes((practice + "/clinical-schema-14").getBytes(java.nio.charset.StandardCharsets.UTF_8)), result.tenant().version(), "Upgrade opt-in synthetic workspace to schema 14");
         identities.grant(clinician, practice, site, admin.id());
     }
 }

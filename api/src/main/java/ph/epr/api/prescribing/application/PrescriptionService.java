@@ -18,9 +18,9 @@ public class PrescriptionService {
     private final EncounterInterventionLinks links;
     private final TenantCommandJournal journal;
     private final PrivateClinicalArtifacts artifacts;
-    private final ph.epr.api.clinicalchart.MedicationSafety safety;
-    public PrescriptionService(EncounterInterventionLinks links,TenantCommandJournal journal,PrivateClinicalArtifacts artifacts, ph.epr.api.clinicalchart.MedicationSafety safety) {
-        this.links=links;this.journal=journal;this.artifacts=artifacts;this.safety=safety;
+    private final ph.epr.api.clinicalchart.ClinicalLists clinicalLists;
+    public PrescriptionService(EncounterInterventionLinks links,TenantCommandJournal journal,PrivateClinicalArtifacts artifacts, ph.epr.api.clinicalchart.ClinicalLists clinicalLists) {
+        this.links=links;this.journal=journal;this.artifacts=artifacts;this.clinicalLists=clinicalLists;
     }
     public record PrescriptionData(String indication, String instructions, UUID reviewId, List<PrescriptionItem> items) {}
     public record PrescriptionRecord(UUID id,UUID patientId,UUID encounterId,UUID siteId,long version,String state,
@@ -29,7 +29,7 @@ public class PrescriptionService {
     public record PrescriptionCreate(UUID id,UUID encounterId,OffsetDateTime occurredAt,PrescriptionData data,UUID supersedesId) {}
     public record PrescriptionUpdate(long expectedVersion,PrescriptionData data) {}
     public record PrescriptionPrepare(UUID preparationId,long expectedVersion) {}
-    public record PrescriptionPreparation(UUID preparationId,long sourceVersion,UUID artifactId,String artifactHash) {}
+    public record PrescriptionPreparation(UUID preparationId,long sourceVersion,UUID artifactId,String artifactHash,UUID clinicalReviewId,String clinicalReviewHash) {}
     public record PrescriptionAuthorize(long expectedVersion,UUID preparationId,String reviewedArtifactHash,boolean confirmSyntheticReview,String lateActionReason,String duplicateReason) {}
     public record PrescriptionReason(long expectedVersion,String reason) {}
     public record PrescriptionEvidence(long expectedVersion,String outcome,String evidence,OffsetDateTime occurredAt) {}
@@ -87,8 +87,8 @@ public class PrescriptionService {
     }
     public byte[] candidateContent(Context c,UUID patient,UUID id,PrescriptionPrepare request) {
         var before=get(c,patient,id);links.require(c,kind(before.data()),InterventionAuthorization.Action.AUTHORIZE);
-        links.lock(c,patient,before.encounterId());var current=get(c,patient,id);version(current,request.expectedVersion());draft(current);validate(current.data(),true);prerequisites(c,current);
-        return render(c,current);
+        links.lock(c,patient,before.encounterId());var current=get(c,patient,id);version(current,request.expectedVersion());draft(current);validate(current.data(),true);var review=prerequisites(c,current);
+        return render(c,current,review);
     }
     public PrescriptionPreparation prepare(Context c,UUID patient,UUID id,UUID key,PrescriptionPrepare request) {
         return prepare(c,patient,id,key,request,null);
@@ -96,14 +96,14 @@ public class PrescriptionService {
     public PrescriptionPreparation prepare(Context c,UUID patient,UUID id,UUID key,PrescriptionPrepare request,PrivateClinicalArtifacts.Artifact staged) {
         var before=get(c,patient,id);links.require(c,kind(before.data()),InterventionAuthorization.Action.AUTHORIZE);
         return journal.execute(c,"prepare-prescription/"+id,key,request,PrescriptionPreparation.class,()->{
-            links.lock(c,patient,before.encounterId());var current=get(c,patient,id);version(current,request.expectedVersion());draft(current);validate(current.data(),true);prerequisites(c,current);
+            links.lock(c,patient,before.encounterId());var current=get(c,patient,id);version(current,request.expectedVersion());draft(current);validate(current.data(),true);var review=prerequisites(c,current);
             if(request.preparationId()==null) fail("PREPARATION_ID_REQUIRED");
-            var artifact=staged==null?artifacts.stage(c,request.preparationId(),render(c,current)):staged;
+            var artifact=staged==null?artifacts.stage(c,request.preparationId(),render(c,current,review)):staged;
             if(!artifact.artifactId().equals(request.preparationId()))fail("ARTIFACT_CONTEXT_MISMATCH");
-            if(staged!=null) { if(!PrivateClinicalArtifacts.sha256(render(c,current)).equals(staged.sha256())) throw new ClinicalAccessException("INTERVENTION_CANDIDATE_STALE",409); artifacts.attach(c,staged); }
-            c.jdbc().sql("INSERT INTO prescription_preparation(practice_id,id,preparation_id,source_version,artifact_id,artifact_hash,prepared_by) VALUES(:p,:id,:candidate,:v,:artifact,:hash,:a)")
-                .param("p",c.practiceId()).param("id",id).param("candidate",request.preparationId()).param("v",current.version()).param("artifact",artifact.artifactId()).param("hash",artifact.sha256()).param("a",c.actorId()).update();
-            return new PrescriptionPreparation(request.preparationId(),current.version(),artifact.artifactId(),artifact.sha256());
+            if(staged!=null) { if(!PrivateClinicalArtifacts.sha256(render(c,current,review)).equals(staged.sha256())) throw new ClinicalAccessException("INTERVENTION_CANDIDATE_STALE",409); artifacts.attach(c,staged); }
+            c.jdbc().sql("INSERT INTO prescription_preparation(practice_id,id,preparation_id,source_version,artifact_id,artifact_hash,prepared_by,clinical_review_id,clinical_review_hash) VALUES(:p,:id,:candidate,:v,:artifact,:hash,:a,:review,:reviewHash)")
+                .param("p",c.practiceId()).param("id",id).param("candidate",request.preparationId()).param("v",current.version()).param("artifact",artifact.artifactId()).param("hash",artifact.sha256()).param("a",c.actorId()).param("review",review.reviewId()).param("reviewHash",review.manifestHash()).update();
+            return new PrescriptionPreparation(request.preparationId(),current.version(),artifact.artifactId(),artifact.sha256(),review.reviewId(),review.manifestHash());
         });
     }
     public PrescriptionRecord authorize(Context c,UUID patient,UUID id,UUID key,PrescriptionAuthorize request) {
@@ -115,12 +115,12 @@ public class PrescriptionService {
             var encounter=links.context(c,patient,before.encounterId());var current=get(c,patient,id);version(current,request.expectedVersion());draft(current);
             if(!request.confirmSyntheticReview()) fail("DELIBERATE_SYNTHETIC_REVIEW_REQUIRED");
             if(!encounter.careState().equals("IN_PROGRESS")||encounter.noteState().equals("SIGNED")) required(request.lateActionReason(),"LATE_ACTION_REASON_REQUIRED");
-            validate(current.data(),true);prerequisites(c,current);duplicates(c,current,request.duplicateReason());
-            var prep=c.jdbc().sql("SELECT preparation_id,source_version,artifact_id,artifact_hash FROM prescription_preparation WHERE practice_id=:p AND id=:id AND preparation_id=:candidate AND prepared_by=:a")
+            validate(current.data(),true);var review=prerequisites(c,current);duplicates(c,current,request.duplicateReason());
+            var prep=c.jdbc().sql("SELECT preparation_id,source_version,artifact_id,artifact_hash,clinical_review_id,clinical_review_hash FROM prescription_preparation WHERE practice_id=:p AND id=:id AND preparation_id=:candidate AND prepared_by=:a")
                 .param("p",c.practiceId()).param("id",id).param("candidate",request.preparationId()).param("a",c.actorId())
-                .query((r,n)->new PrescriptionPreparation(r.getObject(1,UUID.class),r.getLong(2),r.getObject(3,UUID.class),r.getString(4)))
+                .query((r,n)->new PrescriptionPreparation(r.getObject(1,UUID.class),r.getLong(2),r.getObject(3,UUID.class),r.getString(4),r.getObject(5,UUID.class),r.getString(6)))
                 .optional().orElseThrow(()->new ClinicalAccessException("REVIEW_CANDIDATE_REQUIRED",422));
-            if(prep.sourceVersion()!=current.version()||!prep.artifactHash().equals(request.reviewedArtifactHash())) throw new ClinicalAccessException("INTERVENTION_CANDIDATE_STALE",409);
+            if(prep.sourceVersion()!=current.version()||!prep.artifactHash().equals(request.reviewedArtifactHash())||!review.reviewId().equals(prep.clinicalReviewId())||!review.manifestHash().equals(prep.clinicalReviewHash())) throw new ClinicalAccessException("INTERVENTION_CANDIDATE_STALE",409);
             artifacts.archive(c,prep.artifactId(),prep.artifactHash());
             c.jdbc().sql("UPDATE prescription SET state='ISSUED',version=version+1,authorized_at=CURRENT_TIMESTAMP,artifact_id=:artifact,artifact_hash=:hash,delivery_state='NOT_SENT' WHERE practice_id=:p AND id=:id")
                 .param("artifact",prep.artifactId()).param("hash",prep.artifactHash()).param("p",c.practiceId()).param("id",id).update();
@@ -156,9 +156,9 @@ public class PrescriptionService {
         var current=get(c,patient,id);UUID artifact=current.artifactId();String hash=current.artifactHash();
         if(preparationId!=null) {
             links.require(c,kind(current.data()),InterventionAuthorization.Action.AUTHORIZE);
-            var prep=c.jdbc().sql("SELECT source_version,artifact_id,artifact_hash FROM prescription_preparation WHERE practice_id=:p AND id=:id AND preparation_id=:candidate AND prepared_by=:a")
+            var prep=c.jdbc().sql("SELECT source_version,artifact_id,artifact_hash,clinical_review_id,clinical_review_hash FROM prescription_preparation WHERE practice_id=:p AND id=:id AND preparation_id=:candidate AND prepared_by=:a")
                 .param("p",c.practiceId()).param("id",id).param("candidate",preparationId).param("a",c.actorId())
-                .query((r,n)->new PrescriptionPreparation(preparationId,r.getLong(1),r.getObject(2,UUID.class),r.getString(3)))
+                .query((r,n)->new PrescriptionPreparation(preparationId,r.getLong(1),r.getObject(2,UUID.class),r.getString(3),r.getObject(4,UUID.class),r.getString(5)))
                 .optional().orElseThrow(()->new ClinicalAccessException("ARTIFACT_UNAVAILABLE",404));
             if(prep.sourceVersion()!=current.version()) throw new ClinicalAccessException("INTERVENTION_CANDIDATE_STALE",409);
             artifact=prep.artifactId();hash=prep.artifactHash();
@@ -181,11 +181,12 @@ public class PrescriptionService {
         links.append(c,record.patientId(),record.encounterId(),new Summary(kind(data),record.id(),record.version(),"Prescription · " + data.items().size() + " medicine(s)",data.items().stream().map(i->i.ingredient()+" · brand "+text(i.brand())+" · formulation "+text(i.formulation())+" · product strength "+i.strength()+" · dose "+i.dose()+" "+i.doseUnit()+" · "+i.route()+" · "+i.frequency()+" · "+i.duration()+" · quantity "+i.quantity()+" "+i.quantityUnit()+" · "+i.instructions()).toList(),
             record.state(),record.deliveryState(),record.fulfillmentState(),record.reviewState(),record.ownerId(),null,record.authorizedAt()==null?record.occurredAt():record.authorizedAt(),record.artifactId(),record.artifactHash()));
     }
-    private byte[] render(Context c,PrescriptionRecord record) {
+    private byte[] render(Context c,PrescriptionRecord record,ph.epr.api.clinicalchart.ClinicalLists.SafetyManifest review) {
         var encounter=links.context(c,record.patientId(),record.encounterId());var data=record.data();
         var lines=new ArrayList<String>();lines.add("Synthetic Prescription · reviewed source version "+record.version());
         lines.add("Engineering validation only. Not valid for real-patient issuance.");lines.add(encounter.patientName()+" · "+encounter.recordNumber());
         lines.add("Practice "+c.practiceId()+" · site "+c.siteId());lines.add("Responsible clinician "+record.ownerId());
+        lines.add("Clinical-list reconciliation "+review.reviewId()+" · "+review.manifestHash());
         lines.add("Prescription · " + data.items().size() + " medicine(s)");lines.addAll(data.items().stream().map(i->i.ingredient()+" · brand "+text(i.brand())+" · formulation "+text(i.formulation())+" · product strength "+i.strength()+" · dose "+i.dose()+" "+i.doseUnit()+" · "+i.route()+" · "+i.frequency()+" · "+i.duration()+" · quantity "+i.quantity()+" "+i.quantityUnit()+" · "+i.instructions()).toList());lines.add("Indication: "+text(data.indication()));lines.add("Prescription instructions: "+text(data.instructions()));lines.add("Clinical time "+record.occurredAt());
         lines.add("Authorization is separate from dispensing, performance, receipt and review.");
         return ("<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><title>Synthetic Prescription</title><style>body{font:16px/1.6 sans-serif;color:#192943;max-width:760px;margin:32px auto;padding:24px}p{white-space:pre-wrap;overflow-wrap:anywhere}</style><body>"+
@@ -226,16 +227,16 @@ public class PrescriptionService {
         }
         if(issue){required(data.indication(),"INDICATION_REQUIRED");if(data.reviewId()==null)fail("MEDICATION_SAFETY_REVIEW_REQUIRED");}
     }
-    private void prerequisites(Context c,PrescriptionRecord record){
-        safety.requireCurrent(c,record.patientId(),record.data().reviewId());
-        var review=safety.require(c,record.patientId(),record.data().reviewId());
-        if(review.allergyState().equals("UNKNOWN")||!review.interactionsUnavailableAcknowledged()||review.reviewedAt().isBefore(OffsetDateTime.now().minusHours(24)))fail("CURRENT_REVIEWED_SAFETY_CONTEXT_REQUIRED");
+    private ph.epr.api.clinicalchart.ClinicalLists.SafetyManifest prerequisites(Context c,PrescriptionRecord record){
+        var review=clinicalLists.requireCurrentSafety(c,record.patientId(),record.data().reviewId());
         for(var i:record.data().items()){
-            var ingredient=i.ingredient().trim().toLowerCase(Locale.ROOT);
-            if(review.allergies().contains(ingredient))fail("KNOWN_ALLERGY_MATCH");
-            if(review.currentMedications().contains(ingredient))fail("CURRENT_MEDICATION_DUPLICATE_REVIEW_REQUIRED");
             if(!c.jdbc().sql("SELECT EXISTS(SELECT 1 FROM prescribing_catalog WHERE code=:code AND version=:v AND ingredient=:ingredient AND NOT retired)").param("code",i.catalogCode(),java.sql.Types.VARCHAR).param("v",i.catalogVersion(),java.sql.Types.VARCHAR).param("ingredient",i.ingredient()).query(Boolean.class).single())fail("SYNTHETIC_MEDICATION_SOURCE_REQUIRED");
+            if(review.allergies().stream().anyMatch(entry->entry.code()==null))fail("UNCHECKABLE_ALLERGY_SOURCE");
+            if(review.medications().stream().anyMatch(entry->entry.code()==null))fail("UNCHECKABLE_MEDICATION_SOURCE");
+            if(review.allergies().stream().anyMatch(entry->entry.code().code().equalsIgnoreCase(i.catalogCode())||entry.display().equalsIgnoreCase(i.ingredient())))fail("KNOWN_ALLERGY_MATCH");
+            if(review.medications().stream().anyMatch(entry->entry.code().code().equalsIgnoreCase(i.catalogCode())||entry.display().equalsIgnoreCase(i.ingredient())))fail("CURRENT_MEDICATION_DUPLICATE_REVIEW_REQUIRED");
         }
+        return review;
     }
     private void duplicates(Context c,PrescriptionRecord record,String reason){
         for(var i:record.data().items()){

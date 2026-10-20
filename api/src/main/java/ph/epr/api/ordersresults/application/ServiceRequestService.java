@@ -208,7 +208,11 @@ public class ServiceRequestService {
     private static void fail(String code) { throw new ClinicalAccessException(code,422); }
     private void saveItems(Context c,UUID id,long version,ServiceRequestData data) {}
     private void obligation(Context c,ServiceRequestRecord record) {work.register(c,new ph.epr.api.carecoordination.OwnedClinicalWork.Obligation(record.id(),kind(record.data()).name(),record.patientId(),record.encounterId(),record.siteId(),record.ownerId(),record.version(),"Review outcome for "+record.data().serviceName(),record.data().requestedDate()));}
-    private void prerequisites(Context c,ServiceRequestRecord record) { if(!catalog(c).stream().anyMatch(x->x.code().equals(record.data().catalogCode())&&x.version().equals(record.data().catalogVersion())&&x.kind().equals(record.data().kind())&&x.label().equals(record.data().serviceName())))fail("APPROVED_SYNTHETIC_SERVICE_REQUIRED"); }
+    private void prerequisites(Context c,ServiceRequestRecord record) {
+        var data=record.data();
+        if(data.kind().equals("LAB_ORDER") && (data.catalogCode()==null||data.catalogCode().isBlank()))return;
+        if(catalog(c).stream().noneMatch(x->x.code().equals(data.catalogCode())&&x.version().equals(data.catalogVersion())&&x.kind().equals(data.kind())&&x.label().equals(data.serviceName())))fail("APPROVED_SYNTHETIC_SERVICE_REQUIRED");
+    }
 public record ServiceCatalogEntry(String code,String version,String kind,String label) {}
     public List<ServiceCatalogEntry> catalog(Context c){
         var kinds=java.util.stream.Stream.of(Kind.LAB_ORDER,Kind.IMAGING_ORDER).filter(k->{try{links.require(c,k,InterventionAuthorization.Action.READ);return true;}catch(ClinicalAccessException e){return false;}}).map(Enum::name).toList();
@@ -217,10 +221,17 @@ public record ServiceCatalogEntry(String code,String version,String kind,String 
     private void validate(ServiceRequestData data,boolean authorize){
         if(data==null||data.kind()==null||!Set.of("LAB_ORDER","IMAGING_ORDER").contains(data.kind()))fail("SUPPORTED_REQUEST_KIND_REQUIRED");
         required(data.serviceName(),"SERVICE_REQUIRED");
-        if(authorize){required(data.catalogCode(),"CATALOG_CODE_REQUIRED");required(data.catalogVersion(),"CATALOG_VERSION_REQUIRED");required(data.indication(),"CLINICAL_QUESTION_REQUIRED");required(data.destination(),"DESTINATION_REQUIRED");required(data.priority(),"PRIORITY_REQUIRED");if(data.requestedDate()==null)fail("REQUESTED_DATE_REQUIRED");}
+        boolean hasCode=data.catalogCode()!=null&&!data.catalogCode().isBlank(), hasVersion=data.catalogVersion()!=null&&!data.catalogVersion().isBlank();
+        if(hasCode!=hasVersion)fail("CATALOG_REFERENCE_INCOMPLETE");
+        if(authorize){if(data.kind().equals("IMAGING_ORDER")){required(data.catalogCode(),"CATALOG_CODE_REQUIRED");required(data.catalogVersion(),"CATALOG_VERSION_REQUIRED");}required(data.indication(),"CLINICAL_QUESTION_REQUIRED");required(data.destination(),"DESTINATION_REQUIRED");required(data.priority(),"PRIORITY_REQUIRED");if(data.requestedDate()==null)fail("REQUESTED_DATE_REQUIRED");}
     }
     private void duplicates(Context c,ServiceRequestRecord record,String reason){
-        if(c.jdbc().sql("SELECT EXISTS(SELECT 1 FROM service_request s JOIN service_request_revision r ON r.practice_id=s.practice_id AND r.id=s.id AND r.version=s.version WHERE s.practice_id=:p AND s.patient_id=:patient AND s.id<>:id AND s.state='AUTHORIZED' AND s.fulfillment_state<>'FULFILLED' AND r.catalog_code=:code)").param("p",c.practiceId()).param("patient",record.patientId()).param("id",record.id()).param("code",record.data().catalogCode()).query(Boolean.class).single())required(reason,"DUPLICATE_INTENT_REASON_REQUIRED");
+        var data=record.data();
+        boolean coded=data.catalogCode()!=null&&!data.catalogCode().isBlank();
+        var match=coded?"r.catalog_code=:code":"(r.catalog_code IS NULL OR btrim(r.catalog_code)='') AND lower(btrim(r.service_name))=lower(btrim(:name))";
+        var query=c.jdbc().sql("SELECT EXISTS(SELECT 1 FROM service_request s JOIN service_request_revision r ON r.practice_id=s.practice_id AND r.id=s.id AND r.version=s.version WHERE s.practice_id=:p AND s.patient_id=:patient AND s.id<>:id AND s.state='AUTHORIZED' AND s.fulfillment_state<>'FULFILLED' AND "+match+")").param("p",c.practiceId()).param("patient",record.patientId()).param("id",record.id());
+        if(coded)query.param("code",data.catalogCode());else query.param("name",data.serviceName());
+        if(query.query(Boolean.class).single())required(reason,"DUPLICATE_INTENT_REASON_REQUIRED");
     }
     public record ServiceRequestBatch(UUID groupId,List<ServiceRequestCreate> requests) {}
     public record ServiceRequestBatchResult(UUID groupId,List<ServiceRequestRecord> requests) {}

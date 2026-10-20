@@ -28,6 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import ph.epr.api.identitytenancy.PlatformUser;
 import ph.epr.api.identitytenancy.PlatformUserDirectory;
+import ph.epr.api.identitytenancy.ClinicalReadiness;
 import ph.epr.api.identitytenancy.PracticeTenant;
 import ph.epr.api.identitytenancy.PracticeAdministrationPage;
 import ph.epr.api.identitytenancy.PracticeAdministrationView;
@@ -268,6 +269,7 @@ class TenantProvisioningController {
 		String status,
 		String serviceStatus,
 		String schemaVersion,
+		ClinicalReadiness clinicalReadiness,
 		int provisioningAttempts,
 		String failureCode,
 		String failureMessage,
@@ -290,6 +292,7 @@ class TenantProvisioningController {
 				tenant.status().name(),
 				tenant.serviceStatus().name(),
 				tenant.schemaVersion(),
+				view.clinicalReadiness(),
 				tenant.provisioningAttempts(),
 				tenant.failureCode(),
 				tenant.failureMessage(),

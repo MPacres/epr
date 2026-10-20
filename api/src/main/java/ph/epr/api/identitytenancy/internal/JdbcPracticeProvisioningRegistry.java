@@ -5,6 +5,7 @@ import java.sql.SQLException;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import ph.epr.api.identitytenancy.PracticeAdministrationConflictException;
+import ph.epr.api.identitytenancy.ClinicalReadiness;
 import ph.epr.api.identitytenancy.PracticeAdministrationPage;
 import ph.epr.api.identitytenancy.PracticeAdministrationRegistry;
 import ph.epr.api.identitytenancy.PracticeAdministrationView;
@@ -295,11 +297,16 @@ class JdbcPracticeProvisioningRegistry implements PracticeProvisioningRegistry, 
 			.single();
 		parameters.put("limit", size);
 		parameters.put("offset", page * size);
-		var items = jdbcClient.sql("""
-			SELECT %s,
-				i.display_name AS administrator_name,
-				i.email AS administrator_email,
-				i.setup_status AS administrator_setup_status
+			var items = jdbcClient.sql("""
+				SELECT %s,
+					i.display_name AS administrator_name,
+					i.email AS administrator_email,
+					i.setup_status AS administrator_setup_status,
+					COALESCE((SELECT enabled FROM practice_clinical_capability c WHERE c.practice_id=r.practice_id),false) AS clinical_enabled,
+					(SELECT state FROM clinical_schema_rollout rollout WHERE rollout.practice_id=r.practice_id) AS clinical_rollout_state,
+					EXISTS(SELECT 1 FROM practice_clinical_chart_capability capability WHERE capability.practice_id=r.practice_id AND capability.source_kind='ALLERGY' AND capability.enabled) AS allergy_enabled,
+					EXISTS(SELECT 1 FROM practice_clinical_chart_capability capability WHERE capability.practice_id=r.practice_id AND capability.source_kind='MEDICATION_USE' AND capability.enabled) AS medication_use_enabled,
+					EXISTS(SELECT 1 FROM practice_clinical_chart_capability capability WHERE capability.practice_id=r.practice_id AND capability.source_kind='PROBLEM' AND capability.enabled) AS problem_enabled
 			FROM practice_tenant_registry r
 			LEFT JOIN practice_administrator_setup i ON i.practice_id = r.practice_id
 			%s
@@ -316,11 +323,16 @@ class JdbcPracticeProvisioningRegistry implements PracticeProvisioningRegistry, 
 	@Transactional(readOnly = true)
 	public Optional<PracticeAdministrationView> findAdministrationView(UUID practiceId) {
 		enablePlatformOperationsContext();
-		return jdbcClient.sql("""
-			SELECT %s,
-				i.display_name AS administrator_name,
-				i.email AS administrator_email,
-				i.setup_status AS administrator_setup_status
+			return jdbcClient.sql("""
+				SELECT %s,
+					i.display_name AS administrator_name,
+					i.email AS administrator_email,
+					i.setup_status AS administrator_setup_status,
+					COALESCE((SELECT enabled FROM practice_clinical_capability c WHERE c.practice_id=r.practice_id),false) AS clinical_enabled,
+					(SELECT state FROM clinical_schema_rollout rollout WHERE rollout.practice_id=r.practice_id) AS clinical_rollout_state,
+					EXISTS(SELECT 1 FROM practice_clinical_chart_capability capability WHERE capability.practice_id=r.practice_id AND capability.source_kind='ALLERGY' AND capability.enabled) AS allergy_enabled,
+					EXISTS(SELECT 1 FROM practice_clinical_chart_capability capability WHERE capability.practice_id=r.practice_id AND capability.source_kind='MEDICATION_USE' AND capability.enabled) AS medication_use_enabled,
+					EXISTS(SELECT 1 FROM practice_clinical_chart_capability capability WHERE capability.practice_id=r.practice_id AND capability.source_kind='PROBLEM' AND capability.enabled) AS problem_enabled
 			FROM practice_tenant_registry r
 			LEFT JOIN practice_administrator_setup i ON i.practice_id = r.practice_id
 			WHERE r.practice_id = :practiceId
@@ -612,11 +624,28 @@ class JdbcPracticeProvisioningRegistry implements PracticeProvisioningRegistry, 
 	}
 
 	private PracticeAdministrationView mapAdministrationView(ResultSet resultSet, int rowNumber) throws SQLException {
+		var tenant = mapTenant(resultSet, rowNumber);
+		var rolloutState = resultSet.getString("clinical_rollout_state");
+		var failure = tenant.failureMessage();
+		if (failure == null && "QUARANTINED".equals(rolloutState)) {
+			failure = "The most recent tenant schema upgrade was quarantined.";
+		}
+		var readiness = ClinicalReadiness.evaluate(
+			tenant.schemaVersion(), rolloutState, resultSet.getBoolean("clinical_enabled"),
+			List.of(
+				new ClinicalReadiness.SourceCapability(ClinicalReadiness.SourceKind.ALLERGY, resultSet.getBoolean("allergy_enabled")),
+				new ClinicalReadiness.SourceCapability(ClinicalReadiness.SourceKind.MEDICATION_USE, resultSet.getBoolean("medication_use_enabled")),
+				new ClinicalReadiness.SourceCapability(ClinicalReadiness.SourceKind.PROBLEM, resultSet.getBoolean("problem_enabled"))
+			),
+			tenant.status() == PracticeProvisioningStatus.QUARANTINED,
+			failure
+		);
 		return new PracticeAdministrationView(
-			mapTenant(resultSet, rowNumber),
+			tenant,
 			resultSet.getString("administrator_name"),
 			resultSet.getString("administrator_email"),
-			resultSet.getString("administrator_setup_status")
+			resultSet.getString("administrator_setup_status"),
+			readiness
 		);
 	}
 

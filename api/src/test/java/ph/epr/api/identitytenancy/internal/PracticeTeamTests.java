@@ -38,6 +38,7 @@ class PracticeTeamTests {
     @Autowired PlatformUserDirectory users;
     @Autowired TenantProvisioningService provisioning;
     @Autowired ClinicalAuthorization clinical;
+    @Autowired ClinicalChartAuthorization clinicalLists;
     @Autowired SyntheticClinicalCapability syntheticCapability;
     @Autowired ph.epr.api.platformoperations.application.TenantSchemaUpgradeService schemaUpgrades;
     @Autowired JdbcClient jdbc;
@@ -93,6 +94,11 @@ class PracticeTeamTests {
             .isInstanceOf(ClinicalAccessException.class).hasMessage("IDEMPOTENCY_PAYLOAD_CONFLICT");
         assertThat(clinical.available(actor)).hasSize(1);
         clinical.authorizePatient(actor,practice,site,ClinicalAuthorization.PatientOperation.DIRECTORY_READ);
+        assertThat(jdbc.sql("SELECT source_kind FROM practice_clinical_chart_capability WHERE practice_id=:p AND enabled ORDER BY source_kind")
+            .param("p",practice).query(String.class).list()).containsExactly("ALLERGY","MEDICATION_USE","PROBLEM");
+        assertThat(jdbc.sql("SELECT count(*) FROM practice_clinical_chart_grant WHERE practice_id=:p")
+            .param("p",practice).query(Long.class).single()).isZero();
+        assertThat(team.scopes(actor).getFirst().clinicalReadiness().state()).isEqualTo(ClinicalReadiness.State.READY);
         assertThat(jdbc.sql("SELECT count(*) FROM practice_administration_event WHERE practice_id=:p AND event_type='SYNTHETIC_CLINICAL_ENABLED'")
             .param("p",practice).query(Long.class).single()).isEqualTo(1);
     }
@@ -142,6 +148,48 @@ class PracticeTeamTests {
         var current=team.member(actor,practice,admin);
         assertThatThrownBy(()->commands.update(actor,practice,admin,UUID.randomUUID(),new TeamAccess(current.version(),true,List.of(TeamRole.PRACTICE_ADMINISTRATOR),List.of(),"Remove clinical access"))).isInstanceOf(TeamException.class).hasMessageContaining("care-continuity");
     }
+    @Test void grantsClinicalListProfilesAtomicallyAndBlocksEveryReduction(){
+        var provider=users.findByUsername("superadmin").orElseThrow();
+        var practiceVersion=jdbc.sql("SELECT version FROM practice_tenant_registry WHERE practice_id=:p").param("p",practice).query(Long.class).single();
+        schemaUpgrades.upgrade(provider,practice,UUID.randomUUID(),practiceVersion,"Prepare list access tests");
+        var member=team.member(actor,practice,admin);
+        var siteAccess=commands.update(actor,practice,admin,UUID.randomUUID(),new TeamAccess(member.version(),true,
+            List.of(TeamRole.PRACTICE_ADMINISTRATOR,TeamRole.CLINICIAN),List.of(new TeamSiteGrant(site,false)),"Assign synthetic doctor site"));
+        var enabledVersion=jdbc.sql("SELECT version FROM practice_tenant_registry WHERE practice_id=:p").param("p",practice).query(Long.class).single();
+        syntheticCapability.enable(provider,practice,UUID.randomUUID(),enabledVersion,"Enable synthetic list access");
+        assertThat(clinicalLists.capabilities(admin,practice,site)).isEmpty();
+
+        var profiles=List.of(
+            new ClinicalListGrant(site,ClinicalListSource.ALLERGY,true,false,false,false),
+            new ClinicalListGrant(site,ClinicalListSource.MEDICATION_USE,true,true,false,false),
+            new ClinicalListGrant(site,ClinicalListSource.PROBLEM,true,true,true,true));
+        var granted=commands.update(actor,practice,admin,UUID.randomUUID(),new TeamAccess(siteAccess.member().version(),true,
+            siteAccess.member().roles(),siteAccess.member().siteGrants(),profiles,"Grant reviewed list profiles"));
+        assertThat(granted.member().clinicalListGrants()).containsExactlyElementsOf(profiles);
+        assertThat(clinicalLists.capabilities(admin,practice,site)).extracting(ClinicalChartAuthorization.Capability::sourceKind)
+            .containsExactly(ClinicalChartAuthorization.SourceKind.ALLERGY,ClinicalChartAuthorization.SourceKind.MEDICATION_USE,ClinicalChartAuthorization.SourceKind.PROBLEM);
+        var event=team.events(actor,practice,admin,0).getFirst();
+        assertThat(event.afterAccess()).contains("clinicalListGrants","MEDICATION_USE","review");
+
+        var reduced=List.of(profiles.get(0),profiles.get(1),new ClinicalListGrant(site,ClinicalListSource.PROBLEM,true,true,true,false));
+        assertThatThrownBy(()->commands.update(actor,practice,admin,UUID.randomUUID(),new TeamAccess(granted.member().version(),true,
+            granted.member().roles(),granted.member().siteGrants(),reduced,"Attempt to remove review")))
+            .isInstanceOf(TeamException.class).hasMessageContaining("reduction");
+        assertThat(team.member(actor,practice,admin).clinicalListGrants()).containsExactlyElementsOf(profiles);
+    }
+    @Test void clinicalListGrantValidationAndReadinessFailClosedWithoutPartialAccess(){
+        var member=team.member(actor,practice,admin);
+        var roles=List.of(TeamRole.PRACTICE_ADMINISTRATOR,TeamRole.CLINICIAN);
+        var sites=List.of(new TeamSiteGrant(site,false));
+        var invalid=List.of(new ClinicalListGrant(site,ClinicalListSource.ALLERGY,false,true,false,false));
+        assertThatThrownBy(()->commands.update(actor,practice,admin,UUID.randomUUID(),new TeamAccess(member.version(),true,roles,sites,invalid,"Invalid action lattice")))
+            .isInstanceOf(TeamException.class).hasMessageContaining("permission profile");
+        var viewOnly=List.of(new ClinicalListGrant(site,ClinicalListSource.ALLERGY,true,false,false,false));
+        assertThatThrownBy(()->commands.update(actor,practice,admin,UUID.randomUUID(),new TeamAccess(member.version(),true,roles,sites,viewOnly,"Practice is not ready")))
+            .isInstanceOf(TeamException.class).hasMessageContaining("readiness");
+        assertThat(team.member(actor,practice,admin).siteGrants()).isEmpty();
+        assertThat(team.member(actor,practice,admin).clinicalListGrants()).isEmpty();
+    }
     @Test void preservesLastAdministratorAndRejectsStaleEdits(){
         assertThatThrownBy(()->commands.update(actor,practice,admin,UUID.randomUUID(),new TeamAccess(0,false,List.of(TeamRole.PRACTICE_ADMINISTRATOR),List.of(),"Suspend sole administrator"))).isInstanceOf(TeamException.class).hasMessageContaining("at least one");
         var created=staff().member();
@@ -188,7 +236,7 @@ class PracticeTeamTests {
         String role="team_rls_"+UUID.randomUUID().toString().replace("-","");
         jdbc.sql("CREATE ROLE "+role+" NOLOGIN NOSUPERUSER NOBYPASSRLS").update();
         jdbc.sql("GRANT USAGE ON SCHEMA public TO "+role).update();
-        jdbc.sql("GRANT SELECT, UPDATE, DELETE ON practice_member_event,practice_member_command,practice_member_onboarding,practice_member_resolution_limit TO "+role).update();
+        jdbc.sql("GRANT SELECT, UPDATE, DELETE ON practice_member_event,practice_member_command,practice_member_onboarding,practice_member_resolution_limit,practice_clinical_chart_grant,practice_clinical_chart_capability TO "+role).update();
         try(var connection=java.sql.DriverManager.getConnection(POSTGRES.getJdbcUrl(),POSTGRES.getUsername(),POSTGRES.getPassword())) {
             connection.setAutoCommit(false);
             try(var statement=connection.createStatement()) {

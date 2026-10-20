@@ -21,12 +21,13 @@
 .team-search input:not([type=checkbox]) { padding-left: 38px; }
 .team-table { width: 100%; border-collapse: collapse; font-size: 14px; table-layout: fixed; }
 .team-table th { color: #65738b; font-size: 12px; font-weight: 500; text-align: left; background: #f8fafc; padding: 14px 20px; }
-.team-table th:first-child { width: 25%; }
+.team-table th:first-child { width: 22%; }
 .team-table th:last-child { width: 125px; }
 .team-table td { padding: 20px; border-top: 1px solid #e0e7f0; vertical-align: top; overflow-wrap: anywhere; }
 .team-role, .team-site-label { display: block; line-height: 1.65; }
 .team-status { display: inline-block; color: #087953; background: #eaf8f2; font-size: 12px; padding: 3px 7px; border-radius: 5px; }
 .team-status.pending { color: #805014; background: #fff5e4; }
+.team-list-status { display: inline-flex; color: #25436f; background: #edf4ff; font-size: 12px; line-height: 1.4; padding: 4px 7px; border-radius: 5px; }
 .team-pagination, .team-pagination > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .team-pagination { padding: 18px 20px; border-top: 1px solid #e0e7f0; font-size: 13px; font-variant-numeric: tabular-nums; }
 .team-empty { padding: 48px 24px; text-align: center; }
@@ -46,6 +47,22 @@
 .team-identity-confirm { display: flex; flex-direction: column; gap: 8px; background: #f6f8fc; padding: 16px; margin-top: 16px; border-radius: 8px; }
 .team-site-choice { padding: 16px 0; border-bottom: 1px solid #e0e7f0; }
 .team-reproductive { margin-left: 30px; }
+.team-readiness-warning { display: flex; align-items: flex-start; gap: 10px; padding: 14px 16px; border: 1px solid #ead6ad; border-radius: 8px; background: #fff8eb; color: #704b17; }
+.team-readiness-warning svg { margin-top: 2px; }
+.team-readiness-warning span { display: grid; gap: 3px; }
+.team-list-access-sites { display: grid; gap: 16px; }
+.team-list-access-site { border: 1px solid #dce5f1 !important; border-radius: 10px; padding: 18px !important; background: #fbfcfe; }
+.team-list-access-site legend { max-width: 100%; padding: 0 8px; color: #10234a; font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
+.team-apply-profile { display: grid !important; grid-template-columns: minmax(0, 1fr) minmax(210px, 280px); align-items: center; gap: 16px !important; padding: 2px 0 14px; border-bottom: 1px solid #e0e7f0; }
+.team-list-access-rows { display: grid; }
+.team-list-access-row { display: grid !important; grid-template-columns: minmax(0, 1fr) minmax(210px, 280px); align-items: center; gap: 16px !important; padding: 14px 0; border-bottom: 1px solid #e7edf5; }
+.team-list-access-row:last-child { border-bottom: 0; padding-bottom: 0; }
+.team-list-access-row > span { min-width: 0; }
+.team-list-access-row strong { display: block; color: #263852; font-size: 14px; }
+.team-list-access-row small { margin-top: 2px; }
+.team-list-access-row select:disabled, .team-apply-profile select:disabled { background: #f1f4f8; color: #64738a; cursor: not-allowed; }
+.team-list-review { margin: 12px 0 18px; padding-left: 20px; color: #40516b; font-size: 13px; line-height: 1.6; }
+p.team-list-review { padding-left: 0; }
 .team-hint { font-size: 13px; color: #65738b; }
 .team-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
 .team-actions button { white-space: normal; }
@@ -55,6 +72,13 @@
 .team-history li { padding: 18px 0; border-bottom: 1px solid #e0e7f0; }
 .team-history li > span { display: block; color: #65738b; font-size: 12px; margin: 4px 0 8px; }
 .team-history summary { color: #245ce5; cursor: pointer; padding: 12px 0; }
+.team-history-comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.team-access-evidence { min-width: 0; padding: 14px; border: 1px solid #e0e7f0; border-radius: 8px; background: #f8fafc; }
+.team-access-evidence > strong { color: #10234a; font-size: 13px; }
+.team-access-evidence > p { margin: 5px 0 10px; color: #65738b; font-size: 12px; }
+.team-access-evidence > div { padding: 10px 0; border-top: 1px solid #e0e7f0; }
+.team-access-evidence > div > span { display: block; margin-bottom: 4px; color: #263852; font-size: 12px; font-weight: 600; }
+.team-access-evidence > div > small { overflow-wrap: anywhere; }
 .team-success > svg { color: #087953; width: 24px; height: 24px; margin-bottom: 12px; }
 .team-success p { margin: 12px 0; }
 .team-success label { max-width: 500px; margin: 18px 0; }
@@ -62,6 +86,7 @@
   .team-filters { grid-template-columns: 1fr 1fr; }
   .team-table th, .team-table td { padding: 14px 12px; }
   .team-table th:last-child { width: 115px; }
+  .team-list-access-row, .team-apply-profile { grid-template-columns: minmax(0, 1fr) minmax(190px, 240px); }
 }
 @media (max-width: 640px) {
   .team-workspace .page-heading { align-items: flex-start; flex-direction: column; gap: 16px; }
@@ -81,6 +106,9 @@
   .team-role-options { grid-template-columns: 1fr; }
   .team-identity-fields { align-items: stretch; flex-direction: column; }
   .team-reproductive { margin-left: 0; }
+  .team-list-access-site { padding: 15px !important; }
+  .team-list-access-row, .team-apply-profile { grid-template-columns: 1fr; gap: 8px !important; }
+  .team-history-comparison { grid-template-columns: 1fr; }
   .team-actions { flex-direction: column; }
   .team-boundary { flex-wrap: wrap; }
 }

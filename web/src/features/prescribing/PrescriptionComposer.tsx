@@ -3,39 +3,59 @@ import { useFieldArray, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery } from '@tanstack/react-query'
 import { z } from 'zod'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, X } from 'lucide-react'
 import { Button } from '../../components/ui/button'
 import { createUuid } from '../../lib/create-uuid'
+import { clinicalListApi, clinicalListKey, type ListSummary } from '../clinical-chart/clinical-list-api'
 import { atSite, request, clinicalKey, type Scope } from '../encounters/services/encounter-api'
 import { Field, ComposerActions } from '../interventions/components/ComposerFields'
-const itemSchema = z.object({ itemId: z.string(), catalogCode: z.string().min(1, 'Select an ingredient.'), ingredient: z.string(), brand: z.string(), strength: z.string(), formulation: z.string(), dose: z.string(), doseUnit: z.string(), route: z.string(), frequency: z.string(), duration: z.string(), quantity: z.string(), quantityUnit: z.string(), instructions: z.string(), catalogVersion: z.string(), repeats: z.number() })
+import { latestEligibleSafetyReview, safetyReviewSchema } from './prescription-safety'
+
+const itemSchema = z.object({ itemId: z.string(), catalogCode: z.string().min(1, 'Select a medicine.'), ingredient: z.string(), brand: z.string(), strength: z.string(), formulation: z.string(), dose: z.string(), doseUnit: z.string(), route: z.string(), frequency: z.string(), duration: z.string(), quantity: z.string(), quantityUnit: z.string(), instructions: z.string(), catalogVersion: z.string(), repeats: z.number() })
 const schema = z.object({ indication: z.string().max(4000), instructions: z.string().max(4000), items: z.array(itemSchema).min(1).max(30) })
-const blankItem = (): z.infer<typeof itemSchema> => ({ itemId: createUuid(), catalogCode: '', ingredient: '', brand: '', strength: '', formulation: '', dose: '', doseUnit: '', route: '', frequency: '', duration: '', quantity: '', quantityUnit: '', instructions: '', catalogVersion: '', repeats: 0 })
-export function PrescriptionComposer({ scope, patient, initial, busy, onDirty, onSave, onCancel }: { scope: Scope; patient: string; initial?: Record<string, unknown>; busy: boolean; onDirty: (v: boolean) => void; onSave: (data: Record<string, unknown>, safety?: Record<string, unknown>) => void; onCancel: () => void }) {
+type Values = z.infer<typeof schema>
+const blankItem = (): Values['items'][number] => ({ itemId: createUuid(), catalogCode: '', ingredient: '', brand: '', strength: '', formulation: '', dose: '', doseUnit: '', route: '', frequency: '', duration: '', quantity: '', quantityUnit: '', instructions: '', catalogVersion: '', repeats: 0 })
+function safetySummary(item: ListSummary) {
+  if (!item.actions.read || item.state === 'UNAVAILABLE') return 'Unavailable'
+  if (item.state === 'NOT_REVIEWED') return 'Not reviewed'
+  if (item.state === 'EMPTY_REVIEWED') return 'None known · reviewed'
+  const preview = item.preview.slice(0, 2).map(record => record.display).join(', ')
+  const remaining = item.activeCount > 2 ? ` +${item.activeCount - 2} more` : ''
+  return `${item.state === 'STALE' ? 'Review due · ' : ''}${preview || 'No active entries'}${remaining}`
+}
+
+export function PrescriptionComposer({ scope, patient, initial, busy, onDirty, onSave, onCancel }: { scope: Scope; patient: string; initial?: Record<string, unknown>; busy: boolean; onDirty: (v: boolean) => void; onSave: (data: Record<string, unknown>) => void; onCancel: () => void }) {
+  const [openedAt] = useState(() => Date.now())
   const oldItems = initial?.items as Array<Record<string, unknown>> | undefined
-  const form = useForm<z.infer<typeof schema>>({ resolver: zodResolver(schema), defaultValues: { indication: String(initial?.indication ?? ''), instructions: String(initial?.instructions ?? ''), items: oldItems?.map(i => ({ ...blankItem(), ...i, dose: String(i.dose ?? ''), quantity: String(i.quantity ?? '') })) ?? [blankItem()] } })
+  const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { indication: String(initial?.indication ?? ''), instructions: String(initial?.instructions ?? ''), items: oldItems?.map(item => ({ ...blankItem(), ...item, dose: String(item.dose ?? ''), quantity: String(item.quantity ?? '') })) ?? [blankItem()] } })
   const items = useFieldArray({ control: form.control, name: 'items' })
-  const [review, setReview] = useState(false)
-  const [allergyState, setAllergyState] = useState('UNKNOWN')
-  const [allergies, setAllergies] = useState('')
-  const [medications, setMedications] = useState('')
-  const [source, setSource] = useState('')
-  const [acknowledged, setAcknowledged] = useState(false)
-  const [reviewId] = useState(createUuid)
   const catalog = useQuery({ queryKey: [...clinicalKey(scope, patient), 'medication-catalog'], queryFn: ({ signal }) => request(atSite(scope, `/patients/${patient}/prescriptions/catalog`), z.array(z.object({ code: z.string(), version: z.string(), ingredient: z.string() })), { signal }), retry: false })
-  useEffect(() => { onDirty(form.formState.isDirty || review || !!source || !!allergies || !!medications || acknowledged) }, [onDirty, form.formState.isDirty, review, source, allergies, medications, acknowledged])
-  return <form data-clinical-autosave className="intervention-composer" onSubmit={form.handleSubmit(values => onSave({ ...values, reviewId: review ? reviewId : initial?.reviewId ?? undefined, items: values.items.map(i => ({ ...i, dose: i.dose ? Number(i.dose) : undefined, quantity: i.quantity ? Number(i.quantity) : undefined })) }, review ? { reviewId, allergyState, allergies: allergies.split('\n').map(s => s.trim()).filter(Boolean), currentMedications: medications.split('\n').map(s => s.trim()).filter(Boolean), source, interactionsUnavailableAcknowledged: acknowledged } : undefined))}>
-    <p className="clinical-alert">Synthetic medication data only. Interaction checking and clinical prescribing approval are unavailable.</p>
-    {catalog.error ? <p role="alert">Medication sources are unavailable. Draft inputs remain here.</p> : null}<fieldset disabled={busy || !catalog.data}>
-      <Field label="Indication"><textarea maxLength={4000} {...form.register('indication')} /></Field>
-      {items.fields.map((item, index) => <section className="prescription-item" key={item.id}><div className="intervention-section-heading"><h3>Medicine {index + 1}</h3>{items.fields.length > 1 ? <Button type="button" variant="ghost" onClick={() => items.remove(index)}><Trash2 aria-hidden="true" />Remove draft item</Button> : null}</div>
-        <Field label={`Generic ingredient · medicine ${index + 1}`} error={form.formState.errors.items?.[index]?.catalogCode?.message}><select required {...form.register(`items.${index}.catalogCode`, { onChange: e => { const entry = catalog.data?.find(x => x.code === e.target.value); if (entry) { form.setValue(`items.${index}.ingredient`, entry.ingredient, { shouldDirty: true }); form.setValue(`items.${index}.catalogVersion`, entry.version, { shouldDirty: true }) } } })}><option value="">Select a synthetic ingredient</option>{catalog.data?.map(x => <option key={x.code} value={x.code}>{x.ingredient}</option>)}</select></Field>
-        <div className="intervention-field-grid">
-          {(['brand', 'strength', 'formulation', 'dose', 'doseUnit', 'route', 'frequency', 'duration', 'quantity', 'quantityUnit'] as const).map(field => <Field key={field} label={`${({ brand: 'Brand (optional)', strength: 'Product strength', formulation: 'Formulation', dose: 'Dose', doseUnit: 'Dose unit', route: 'Route', frequency: 'Frequency / timing', duration: 'Duration', quantity: 'Quantity', quantityUnit: 'Quantity unit' })[field]} · medicine ${index + 1}`}><input type={field === 'dose' || field === 'quantity' ? 'number' : 'text'} min={field === 'dose' || field === 'quantity' ? '0.000001' : undefined} step="any" {...form.register(`items.${index}.${field}`)} /></Field>)}
-        </div><Field label={`Patient instructions · medicine ${index + 1}`}><textarea maxLength={2000} {...form.register(`items.${index}.instructions`)} /></Field>
-      </section>)}<Button variant="outline" type="button" disabled={items.fields.length >= 30} onClick={() => items.append(blankItem())}><Plus aria-hidden="true" />Add medicine</Button>
-      <section className="medication-safety-review"><h3>Allergy and medication review</h3><p>Existing review: {initial?.reviewId ? 'A saved review is linked. The server will recheck its freshness and contents.' : 'Not recorded. Prescription issuance is blocked until reviewed.'}</p><label className="clinical-checkbox"><input type="checkbox" checked={review} onChange={e => setReview(e.target.checked)} />Record a new explicit synthetic source review with this draft</label>
-        {review ? <><Field label="Allergy status"><select value={allergyState} onChange={e => setAllergyState(e.target.value)}><option value="UNKNOWN">Unknown / not reviewed</option><option value="NONE_KNOWN">Reviewed · none known in synthetic source</option><option value="KNOWN">Known allergies in synthetic source</option></select></Field><Field label="Allergy ingredients · one per line"><textarea value={allergies} onChange={e => setAllergies(e.target.value)} /></Field><Field label="Current medication ingredients · one per line"><textarea value={medications} onChange={e => setMedications(e.target.value)} /></Field><Field label="Reviewed source / evidence"><textarea required maxLength={2000} value={source} onChange={e => setSource(e.target.value)} /></Field><label className="clinical-checkbox"><input type="checkbox" checked={acknowledged} onChange={e => setAcknowledged(e.target.checked)} />I reviewed this synthetic source and acknowledge that interaction support is unavailable.</label></> : null}
-      </section>
-    </fieldset><ComposerActions busy={busy || !catalog.data} onCancel={onCancel} /></form>
+  const clinicalSummary = useQuery({ queryKey: [...clinicalListKey(scope, patient), 'summary'], queryFn: ({ signal }) => clinicalListApi.summary(scope, patient, signal), retry: false })
+  const reviews = useQuery({ queryKey: [...clinicalListKey(scope, patient), 'reviews'], queryFn: ({ signal }) => request(atSite(scope, `/patients/${patient}/clinical-list-reviews`), z.array(safetyReviewSchema), { signal }), retry: false, refetchOnMount: 'always' })
+  const currentReview = latestEligibleSafetyReview(reviews.data ?? [], scope.siteId, openedAt)
+  useEffect(() => { onDirty(form.formState.isDirty) }, [onDirty, form.formState.isDirty])
+
+  function save(values: Values) {
+    onSave({ ...values, reviewId: currentReview?.reviewId ?? initial?.reviewId ?? undefined, items: values.items.map(item => ({ ...item, dose: item.dose ? Number(item.dose) : undefined, quantity: item.quantity ? Number(item.quantity) : undefined })) })
+  }
+
+  return <form data-clinical-autosave className="intervention-composer prescription-composer" onSubmit={form.handleSubmit(save)}>
+    <div className="medication-safety-review" role="note"><strong>Medication safety</strong>{clinicalSummary.isPending ? <p role="status">Loading allergies and current medicines…</p> : clinicalSummary.error ? <p role="alert">Allergy and medication status unavailable.</p> : clinicalSummary.data ? <><p><b>Allergies:</b> {safetySummary(clinicalSummary.data.allergies)}</p><p><b>Current medicines:</b> {safetySummary(clinicalSummary.data.medications)}</p></> : null}<p>{currentReview ? 'Recent review linked. The server checks it again before issuing.' : 'Review both lists before issuing.'} Interactions are not checked.</p></div>
+    {catalog.isPending ? <p role="status">Loading medicines…</p> : catalog.error ? <p role="alert">Medicines could not be loaded. Your draft stays here.</p> : null}
+    <fieldset disabled={busy || !catalog.data}>
+      <Field label="Reason"><input {...form.register('indication')} maxLength={4000} /></Field>
+      {items.fields.map((item, index) => <section className="prescription-item" key={item.id} aria-labelledby={`medicine-${item.id}`}>
+        <div className="prescription-item-heading"><h3 id={`medicine-${item.id}`}>Medicine {index + 1}</h3>{items.fields.length > 1 ? <Button type="button" variant="ghost" aria-label={`Remove medicine ${index + 1}`} onClick={() => items.remove(index)}><X aria-hidden="true" />Remove</Button> : null}</div>
+        <Field label="Medicine" error={form.formState.errors.items?.[index]?.catalogCode?.message}><select required {...form.register(`items.${index}.catalogCode`, { onChange: event => { const entry = catalog.data?.find(value => value.code === event.target.value); form.setValue(`items.${index}.ingredient`, entry?.ingredient ?? '', { shouldDirty: true }); form.setValue(`items.${index}.catalogVersion`, entry?.version ?? '', { shouldDirty: true }) } })}><option value="">Select a medicine</option>{catalog.data?.map(entry => <option key={entry.code} value={entry.code}>{entry.ingredient}</option>)}</select></Field>
+        <div className="intervention-field-grid"><Field label="Strength"><input {...form.register(`items.${index}.strength`)} /></Field><Field label="Form"><input {...form.register(`items.${index}.formulation`)} placeholder="Tablet, syrup…" /></Field></div>
+        <div className="prescription-pair"><Field label="Dose"><input type="number" min="0.000001" step="any" {...form.register(`items.${index}.dose`)} /></Field><Field label="Unit"><input {...form.register(`items.${index}.doseUnit`)} placeholder="mg, mL…" /></Field></div>
+        <div className="intervention-field-grid"><Field label="How to take"><input {...form.register(`items.${index}.route`)} placeholder="By mouth…" /></Field><Field label="How often"><input {...form.register(`items.${index}.frequency`)} placeholder="Once daily…" /></Field></div>
+        <div className="intervention-field-grid"><Field label="For how long"><input {...form.register(`items.${index}.duration`)} placeholder="7 days…" /></Field><div className="prescription-pair"><Field label="Amount to give"><input type="number" min="0.000001" step="any" {...form.register(`items.${index}.quantity`)} /></Field><Field label="Unit"><input {...form.register(`items.${index}.quantityUnit`)} placeholder="tablets, mL…" /></Field></div></div>
+        <Field label="Patient directions"><textarea {...form.register(`items.${index}.instructions`)} maxLength={2000} rows={2} /></Field>
+        <details className="prescription-more" open={Boolean(item.brand)}><summary>Brand, if needed</summary><Field label="Brand"><input {...form.register(`items.${index}.brand`)} /></Field></details>
+      </section>)}
+      <Button variant="outline" type="button" disabled={items.fields.length >= 30} onClick={() => items.append(blankItem())}><Plus aria-hidden="true" />Add medicine</Button>
+      <details className="prescription-more" open={Boolean(initial?.instructions)}><summary>Prescription note</summary><Field label="Additional note"><textarea {...form.register('instructions')} maxLength={4000} rows={2} /></Field></details>
+    </fieldset><ComposerActions busy={busy || !catalog.data} onCancel={onCancel} allowAddAnother={false} />
+  </form>
 }

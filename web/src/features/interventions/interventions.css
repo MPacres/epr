@@ -19,7 +19,13 @@
 .sheet-content:has(.intervention-dialog) { width: min(760px, 100vw); max-width: 100vw; }
 .intervention-dialog { min-width: 0; overflow-wrap: anywhere; }
 .intervention-dialog p { line-height: 1.6; }
-.intervention-context { background: #edf4ff; border: 1px solid #d8e4fc; border-radius: 8px; padding: 12px; margin: 0 0 20px; }
+.intervention-context { display: flex; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; border-bottom: 1px solid #e0e7f0; padding: 0 0 12px; margin: 0 0 20px; }
+.intervention-context span { color: #65738b; }
+.intervention-copy .clinical-field { display: grid; gap: 6px; margin-bottom: 12px; }
+.intervention-copy select { box-sizing: border-box; width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid #b8c9ec; border-radius: 8px; color: #192943; background: white; font: inherit; }
+.lab-replacement { margin-bottom: 12px; }
+.lab-replacement summary { width: fit-content; color: #245ce5; cursor: pointer; }
+.lab-replacement .clinical-field { margin-top: 12px; }
 .intervention-search { display: flex; gap: 10px; align-items: center; border: 1px solid #b8c9ec; border-radius: 8px; padding: 10px 12px; }
 .intervention-search svg { width: 20px; color: #65738b; flex-shrink: 0; }
 .intervention-search input { border: 0; background: transparent; width: 100%; min-width: 0; font: inherit; padding: 4px; }
@@ -33,11 +39,36 @@
 .intervention-composer textarea { min-height: 88px; resize: vertical; }
 .intervention-composer input[type=checkbox] { width: 18px; height: 18px; padding: 0; flex-shrink: 0; }
 .intervention-field-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
+.lab-test-entry { position: relative; display: grid; gap: 6px; }
+.lab-test-search { display: flex; align-items: center; gap: 8px; }
+.lab-test-search > svg { width: 18px; flex: none; color: #65738b; }
+.intervention-composer .lab-test-search input { flex: 1; width: auto; }
+.lab-test-search button { flex: none; }
+.lab-test-suggestions { position: absolute; z-index: 2; top: 100%; left: 26px; right: 70px; max-height: 240px; overflow-y: auto; list-style: none; margin: 4px 0 0; padding: 4px; background: white; border: 1px solid #b8c9ec; border-radius: 8px; box-shadow: 0 10px 24px #10234a1a; }
+.lab-test-suggestions button { display: block; width: 100%; border: 0; border-radius: 5px; padding: 10px 12px; background: white; color: #192943; font: inherit; text-align: left; cursor: pointer; }
+.lab-test-suggestions button:hover, .lab-test-suggestions button:focus-visible { background: #edf4ff; outline: 2px solid #245ce5; outline-offset: -2px; }
+.lab-test-search-note { margin: 0; color: #65738b; font-size: 13px; }
+.lab-selected h3 { margin: 0 0 8px; font-size: 14px; }
+.lab-selected > p { margin: 0; color: #65738b; }
+.lab-selected ul { list-style: none; padding: 0; margin: 0; border-block: 1px solid #e0e7f0; }
+.lab-selected li { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; border-bottom: 1px solid #e0e7f0; }
+.lab-selected li:last-child { border-bottom: 0; }
+.lab-selected li span { min-width: 0; overflow-wrap: anywhere; }
+.lab-selected li button { min-width: 44px; min-height: 44px; flex: none; }
+.lab-order-flags { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+.lab-order-flags .clinical-checkbox { margin: 0; }
+.lab-more-details summary { width: fit-content; color: #245ce5; cursor: pointer; }
+.lab-more-details .clinical-field { margin-top: 12px; }
 .intervention-composer-actions { display: flex; justify-content: flex-end; gap: 12px; padding: 20px 0 8px; background: white; }
-.prescription-item { padding: 20px 0; border-block: 1px solid #e0e7f0; display: grid; gap: 16px; }
-.medication-safety-review { margin-top: 20px; display: grid; gap: 14px; }
-.medication-safety-review h3 { margin: 8px 0 0; }
-.medication-safety-review p { margin: 0; }
+.prescription-item { padding: 20px 0; border-top: 1px solid #e0e7f0; display: grid; gap: 16px; }
+.prescription-item-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.prescription-item-heading h3 { margin: 0; font-size: 16px; }
+.prescription-item-heading button { min-height: 44px; }
+.prescription-pair { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr); gap: 12px; min-width: 0; }
+.prescription-more summary { width: fit-content; color: #245ce5; cursor: pointer; }
+.prescription-more .clinical-field { margin-top: 12px; }
+.medication-safety-review { margin-bottom: 16px; padding: 14px 16px; border: 1px solid #b8c9ec; border-radius: 8px; background: #f2f6ff; }
+.medication-safety-review p { margin: 4px 0 0; }
 .intervention-document-review iframe { width: 100%; height: 52vh; border: 1px solid #e0e7f0; background: white; }
 .intervention-document-review .clinical-field { display: grid; gap: 8px; margin-block: 16px; }
 .intervention-document-review .clinical-checkbox { display: flex; align-items: flex-start; gap: 10px; margin-block: 16px; }
@@ -51,6 +82,7 @@
  .intervention-list li > button { margin-left: 52px; min-height: 44px; }
  .intervention-row-content { flex-basis: calc(100% - 60px); }
  .intervention-field-grid { grid-template-columns: minmax(0,1fr); }
+ .prescription-pair { grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
  .intervention-composer input,.intervention-composer select,.intervention-composer textarea { font-size: 16px; min-height: 44px; }
  .intervention-composer input[type=checkbox] { min-height: 18px; }
  .intervention-composer-actions { padding-bottom: max(16px,env(safe-area-inset-bottom)); }
@@ -59,3 +91,4 @@
 .intervention-composer .clinical-checkbox { display: flex; align-items: flex-start; gap: 10px; margin-block: 12px; }
 .intervention-composer .clinical-checkbox input { width: 18px; height: 18px; min-height: 18px; flex: 0 0 auto; margin-top: 3px; }
 @media (max-width: 600px) { .intervention-composer-actions { flex-wrap: wrap; } .intervention-composer-actions button { flex: 1 1 auto; min-height: 44px; } }
+@media (max-width: 600px) { .lab-test-suggestions { right: 65px; } }

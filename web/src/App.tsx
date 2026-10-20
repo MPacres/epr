@@ -24,6 +24,9 @@ function WorkspaceRoute() {
   const connected: { params: { practiceId?: string; siteId?: string; patientId?: string; encounterId?: string } } | null = matchPath('/clinical/:practiceId/:siteId/worklist', location.pathname) ?? matchPath('/clinical/:practiceId/:siteId/queue', location.pathname) ?? matchPath('/clinical/:practiceId/:siteId/patients/:patientId/encounters/:encounterId', location.pathname) ?? matchPath('/clinical/:practiceId/:siteId/patients/:patientId/edit', location.pathname) ?? matchPath('/clinical/:practiceId/:siteId/patients/:patientId', location.pathname) ?? matchPath('/clinical/:practiceId/:siteId', location.pathname)
   const isTeam = location.pathname === '/practices' || location.pathname.startsWith('/practices/')
   const isConnected = location.pathname === '/clinical' || location.pathname === '/patients' || location.pathname === '/patients/new' || !!connected
+  const isConnectedPatient = Boolean(connected?.params.patientId)
+  const isConnectedEncounter = Boolean(connected?.params.encounterId)
+  const isConnectedPatientEdit = isConnectedPatient && location.pathname.endsWith('/edit')
   const edit = matchPath('/patients/preview/:practiceId/:patientId/edit', location.pathname)
   const chart = matchPath('/patients/preview/:practiceId/:patientId/chart', location.pathname)
   const notes = matchPath('/patients/preview/:practiceId/:patientId/notes', location.pathname)
@@ -39,10 +42,10 @@ function WorkspaceRoute() {
   const view = isSchedule ? 'schedule' : isDirectory || isNew || edit || chart || notes || encounter ? 'patients' : 'dashboard'
   useEffect(() => {
     if (isTeam) return
-    document.title = `${isConnected ? (isDirectory ? 'My Patients' : 'Connected encounters') : isChart ? 'Patient chart' : isNotes ? 'Clinical notes' : isEncounter ? 'Encounter' : isNew ? 'New patient' : isEdit ? 'Edit patient' : isDirectory ? 'My Patients' : isSchedule ? 'Schedule' : isDashboard ? 'Dashboard' : 'Page unavailable'} · EPR`
+    document.title = `${isConnected ? (isDirectory ? 'My Patients' : isConnectedEncounter ? 'Encounter' : isConnectedPatientEdit ? 'Edit patient' : isConnectedPatient ? 'Patient chart' : 'Connected clinical workspace') : isChart ? 'Patient chart' : isNotes ? 'Clinical notes' : isEncounter ? 'Encounter' : isNew ? 'New patient' : isEdit ? 'Edit patient' : isDirectory ? 'My Patients' : isSchedule ? 'Schedule' : isDashboard ? 'Dashboard' : 'Page unavailable'} · EPR`
     document.getElementById('main-content')?.focus({ preventScroll:true })
     window.scrollTo({top:0,behavior:'instant'})
-  }, [location.pathname, isNew, isDirectory, isSchedule, isDashboard, isEdit, isChart, isNotes, isEncounter, isConnected, isTeam])
+  }, [location.pathname, isNew, isDirectory, isSchedule, isDashboard, isEdit, isChart, isNotes, isEncounter, isConnected, isConnectedPatient, isConnectedEncounter, isConnectedPatientEdit, isTeam])
   if (isTeam) return <PracticeTeam />
   if (isConnected) return <ConnectedClinical registrationView={location.pathname === '/patients/new' || location.pathname.endsWith('/edit')} worklistView={location.pathname.endsWith('/worklist')} queueView={location.pathname.endsWith('/queue')} key={location.pathname} practiceId={connected?.params.practiceId} siteId={connected?.params.siteId} patientId={connected?.params.patientId} encounterId={connected?.params.encounterId} />
   const workspace = isSchedule ? <Schedule /> : chart ? <PatientChart practiceId={chart.params.practiceId!} patientId={chart.params.patientId!} /> : notes ? <PatientNotes practiceId={notes.params.practiceId!} patientId={notes.params.patientId!} /> : encounter ? <Encounter practiceId={encounter.params.practiceId!} patientId={encounter.params.patientId!} encounterId={encounter.params.encounterId!} /> : isNew ? <PatientForm practiceId={new URLSearchParams(location.search).get('practice') ?? 'practice-a'} /> : edit ? <PatientForm practiceId={edit.params.practiceId!} patientId={edit.params.patientId!} /> : undefined

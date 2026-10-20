@@ -110,6 +110,25 @@
 .practice-admin-record > .button { margin-left: auto; }
 .practice-detail-note { display: flex; align-items: flex-start; gap: 8px; margin-top: 17px; padding-top: 15px; border-top: 1px solid #e8edf4; color: #64738a; font-size: 11px; line-height: 1.5; }
 .practice-detail-note svg { width: 15px; height: 15px; margin-top: 1px; color: #5b76bf; }
+.practice-readiness-summary { display: flex; align-items: flex-start; gap: 12px; margin-top: 18px; }
+.practice-readiness-summary > p { color: #5f6f88; font-size: 12px; line-height: 1.55; }
+.practice-readiness-state { flex: 0 0 auto; padding: 5px 8px; border-radius: 6px; background: #fff5e4; color: #805014; font-size: 10px; font-weight: 600; text-transform: capitalize; }
+.practice-readiness-state.ready { background: #eaf8f2; color: #087953; }
+.practice-readiness-state.quarantined { background: #fff0f0; color: #a52c3d; }
+.practice-readiness-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 16px; border-block: 1px solid #e8edf4; }
+.practice-readiness-grid > div { min-width: 0; padding: 13px 12px 13px 0; }
+.practice-readiness-grid > div + div { padding-left: 16px; border-left: 1px solid #e8edf4; }
+.practice-readiness-grid dt { color: #65738b; font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: .3px; }
+.practice-readiness-grid dd { margin: 5px 0 0; color: #293b56; font-size: 12px; font-weight: 500; overflow-wrap: anywhere; }
+.practice-source-capabilities { list-style: none; margin: 12px 0 0; padding: 0; }
+.practice-source-capabilities li { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 42px; border-bottom: 1px solid #edf1f6; color: #34445d; font-size: 12px; }
+.practice-source-capabilities strong { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 500; }
+.practice-source-capabilities strong.enabled { color: #087953; }
+.practice-source-capabilities strong.disabled { color: #8a3140; }
+.practice-source-capabilities svg { width: 14px; height: 14px; }
+.practice-readiness-failure { display: flex; align-items: flex-start; gap: 8px; margin-top: 14px; padding: 11px 12px; border-radius: 8px; background: #fff0f0; color: #9a3040; font-size: 11px; line-height: 1.5; }
+.practice-readiness-failure svg { flex: 0 0 auto; width: 15px; height: 15px; margin-top: 1px; }
+.practice-readiness-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
 .practice-control-panel { position: sticky; top: 98px; padding: 22px; }
 .practice-control-status { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 18px 0 14px; padding: 12px; border-radius: 8px; background: #f5f7fa; }
 .practice-control-status > span { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 500; }
@@ -132,6 +151,7 @@
 .practice-lifecycle-icon.suspend { background: #fff0f0; color: #a52c3d; }
 .practice-lifecycle-icon.reactivate { background: #eaf8f2; color: #087953; }
 .practice-lifecycle-icon.credential { background: #e7f0ff; color: #075cdf; }
+.practice-lifecycle-icon.clinical { background: #edf4ff; color: #245ce5; }
 .temporary-password-dialog { width: min(560px, calc(100% - 32px)); }
 .temporary-password-dialog .temporary-credential { margin-top: 18px; }
 .practice-lifecycle-dialog h2 { margin-top: 17px; color: #10234a; font-size: 21px; letter-spacing: -.3px; }
@@ -199,6 +219,13 @@
   .practice-definition-grid { grid-template-columns: 1fr; }
   .practice-definition-grid > div, .practice-definition-grid > div:nth-child(even) { padding: 14px 0; border-left: 0; }
   .practice-definition-grid > div + div { border-top: 1px solid #e8edf4; }
+  .practice-readiness-summary { display: grid; }
+  .practice-readiness-state { width: fit-content; }
+  .practice-readiness-grid { grid-template-columns: 1fr; }
+  .practice-readiness-grid > div, .practice-readiness-grid > div + div { padding: 12px 0; border-left: 0; }
+  .practice-readiness-grid > div + div { border-top: 1px solid #e8edf4; }
+  .practice-readiness-actions { display: grid; }
+  .practice-readiness-actions .button { width: 100%; }
   .practice-admin-record { grid-template-columns: auto minmax(0, 1fr); }
   .practice-setup-status { grid-column: 2; width: fit-content; }
   .practice-admin-record > .button { grid-column: 2; width: fit-content; margin-left: 0; }

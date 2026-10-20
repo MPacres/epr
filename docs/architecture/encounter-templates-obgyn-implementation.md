@@ -44,6 +44,8 @@ For the normal `epr.test` URL, run the enabled API on port 8080 (stop the existi
 
 Open `http://localhost:5174/#/clinical`. The opt-in seeder creates `obgyn-demo@epr.test` with the development password `ClinicalDemo123!`; override it before first seed with `EPR_CLINICAL_DEMO_PASSWORD`. Clinical capability and seeding default to false and controllers require the local profile. The seeder does not re-enable a revoked grant. Use synthetic data only.
 
+The demo-account seeder also gives its synthetic Sofia Dela Cruz patient a repeatable pregnancy fixture: one ongoing episode with approximate, **not reviewed** dating evidence, one completed prior episode with unknown outcome, and one **not reviewed** obstetric-history account. The fixture dates and narratives are invented for development. No dating basis is selected automatically.
+
 The local document adapter writes private, hash-verified HTML artifacts under `~/.local/share/epr/synthetic-artifacts`, or `epr.clinical.artifact-directory`. Files and directories are restricted to the local user; writes use a temporary file, fsync and atomic move. PostgreSQL and the filesystem are not one transaction. Orphan staged files may require reconciliation; never delete files referenced by a signed record. This adapter is not S3 archival, PDF signing, cryptographic signing or approved legal assurance.
 
 Export/generate contracts from the enabled local API:
@@ -56,9 +58,52 @@ node scripts/generate-template-schema.mjs
 
 The exporter only accepts localhost/127.0.0.1, uses an in-memory login cookie, and writes no session credentials. `EPR_CONTRACT_BASE_URL`, `EPR_CONTRACT_USERNAME`, and `EPR_CLINICAL_DEMO_PASSWORD` override its development defaults. Do not run concurrent Maven builds against the same `api/target` directory.
 
+## Seed templates for an existing synthetic Practice site
+
+The demo-account seeder only populates its own synthetic Practice. It does not populate a newly created Practice. Encounter-type options are derived from the selected site's published releases; there is no separate encounter-type lookup table to seed.
+
+`LocalExistingPracticeTemplateSeeder` installs the existing provisional pack at one explicitly configured Practice/site. It is restricted to the `local` profile and requires an enabled synthetic clinical capability, schema 14, and a current clinician membership with explicit reproductive and template-approver access at that site. It does not grant access, create patients, or enable clinical capability. A doctor or Practice-administrator role alone is insufficient.
+
+Run this one-shot command from the repository root, replacing the three scope values with the intended existing scope. It starts on an ephemeral port, leaving the normal API running, and exits after a successful seed. Supply the same database/credential configuration as the normal local API. Do not run it concurrently with another Maven build using `api/target`.
+
+```sh
+./api/mvnw -f api/pom.xml spring-boot:run \
+  -Dspring-boot.run.profiles=local \
+  -Dspring-boot.run.arguments='--server.port=0 --epr.clinical.enabled=true --epr.interventions.worker-enabled=false --epr.clinical.template-pack-seed.enabled=true --epr.clinical.template-pack-seed.practice-id=<practice-uuid> --epr.clinical.template-pack-seed.site-id=<site-uuid> --epr.clinical.template-pack-seed.username=<authorized-clinician-username> --epr.clinical.template-pack-seed.exit-after-seed=true'
+```
+
+| Specialty | Encounter type | Template key | Initial business version |
+| --- | --- | --- | --- |
+| General | `OUTPATIENT` | `general.outpatient` | `1.0.0` |
+| OB-GYN | `PRENATAL_INITIAL` | `obgyn.prenatal.initial` | `1.0.0` |
+| OB-GYN | `PRENATAL_FOLLOWUP` | `obgyn.prenatal.followup` | `1.0.0` |
+| OB-GYN | `GYNECOLOGY_INITIAL` | `obgyn.gynecology.initial` | `1.0.0` |
+| OB-GYN | `GYNECOLOGY_FOLLOWUP` | `obgyn.gynecology.followup` | `1.0.0` |
+| OB-GYN | `POSTPARTUM_FOLLOWUP` | `obgyn.postpartum.followup` | `1.0.0` |
+
+These are application categories consistent with the accepted initial catalog, not a national coding standard. The selection was checked on 20 October 2026 against [Southern Philippines Medical Center's prenatal, gynecology and postpartum services](https://spmc.doh.gov.ph/obstetrics-and-gynecology/), [WHO antenatal care](https://www.who.int/activities/promoting-healthy-pregnancy/promoting-healthy-pregnancy), [WHO postnatal care guidance](https://www.who.int/publications/i/item/9789240045989), and [ACOG's well-woman visit guidance](https://www.acog.org/clinical/clinical-guidance/committee-opinion/articles/2018/10/well-woman-visit). The initial/follow-up split and version `1.0.0` are local product choices. The sources support visit families; they do not approve this pack's fields, release version, or clinical completeness. Family planning, preconception, menopause, infertility and procedure-specific packs remain future clinically governed work.
+
+Seeding validates and publishes through the existing registry, preserving synthetic approval evidence. The complete pack commits in one authorized tenant transaction with a Practice-scoped lock. Repeat and concurrent runs reuse immutable releases without new drafts or duplicate evidence. A second authorized site gets its own availability rows for the same Practice releases. Explicit retirement is preserved. A checksum mismatch fails the seed without rewriting history or partially installing the pack; publish a new governed version instead. Reload encounter setup after completion. With OB-GYN selected, five encounter types are available; general outpatient appears under General.
+
+Seeder verification: `./api/mvnw -f api/pom.xml -Dtest=LocalSyntheticTemplatePackTests test` exercises PostgreSQL publication, repeat/concurrent seeds, site availability, preserved retirement, authorization denial on replay, and atomic rollback on conflicting published content.
+
+## Seed pregnancy fixtures for an existing synthetic patient
+
+`LocalExistingPatientPregnancySeeder` uses the same [synthetic pregnancy fixture](../../api/src/main/resources/clinical-fixtures/synthetic-pregnancy.json) for one explicitly selected patient. It runs only with the `local` profile, checks current clinician/site/reproductive access and patient care assignment, and requires the patient registry's `synthetic_only` marker. It creates source records through the pregnancy module in one tenant transaction. Repeat runs preserve the records and any later clinician history corrections. It does not create a patient, grant access, select or review dating, or alter an existing non-fixture episode.
+
+From the repository root, replace the scope values with those of the intended synthetic patient and authorized clinician. Supply the normal local API's database/credential configuration. The command exits after a successful seed and must not run concurrently with another Maven build using `api/target`.
+
+```sh
+./api/mvnw -f api/pom.xml spring-boot:run \
+  -Dspring-boot.run.profiles=local \
+  -Dspring-boot.run.arguments='--server.port=0 --epr.clinical.enabled=true --epr.interventions.worker-enabled=false --epr.clinical.pregnancy-fixture-seed.enabled=true --epr.clinical.pregnancy-fixture-seed.practice-id=<practice-uuid> --epr.clinical.pregnancy-fixture-seed.site-id=<site-uuid> --epr.clinical.pregnancy-fixture-seed.patient-id=<patient-uuid> --epr.clinical.pregnancy-fixture-seed.username=<authorized-clinician-username> --epr.clinical.pregnancy-fixture-seed.exit-after-seed=true'
+```
+
+`./api/mvnw -f api/pom.xml -Dtest=LocalSyntheticPregnancyFixturesTests test` verifies sourced fixture data, repeat safety and denied access against PostgreSQL.
+
 ## Additive schema rollout and rollback
 
-Control-plane migrations V9–V12 add explicit grants, active-care/session references and rollout history. Tenant migrations V3–V5 add the clinical records. New tenant provisioning applies these additive migrations without enabling clinical access. Clinical routing now requires tenant schema `11`; see [the intervention extension](encounter-interventions-implementation.md) for V8–V11 and [the patient-registration extension](patient-registration-implementation.md) for V6–V7 and patient capabilities.
+Control-plane migrations V9–V12 add explicit grants, active-care/session references and rollout history. Tenant migrations V3–V5 add the clinical records. New tenant provisioning applies these additive migrations without enabling clinical access. Clinical routing now requires tenant schema `14`; see [the intervention extension](encounter-interventions-implementation.md) for V8–V11, [the patient-registration extension](patient-registration-implementation.md) for V6–V7 and patient capabilities, and [the longitudinal clinical-list extension](clinical-lists-reconciliation-implementation-plan.md) for V12–V14.
 
 The local support-only `POST /api/v1/admin/practices/{practiceId}/schema-upgrade` command takes an operation UUID in `Idempotency-Key`, plus `expectedVersion` and `reason` in the JSON body. Run one canary Practice first, verify it, then proceed serially; this endpoint is not an automated fleet orchestrator. A control-plane claim marks the route migrating, Flyway runs with that tenant's migration credential, and completion records `READY` or `QUARANTINED`. Attempts are fenced; an expired migration claim permits recovery, never ordinary clinical routing. Verify tenant identity and Flyway history before retrying a quarantined Practice. Rollout events are append-only.
 

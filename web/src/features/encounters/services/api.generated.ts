@@ -9,6 +9,13 @@ export type AcceptWork = {
   "reason"?: string
 }
 
+export type Actions = {
+  "read"?: boolean
+  "propose"?: boolean
+  "write"?: boolean
+  "review"?: boolean
+}
+
 export type AddDating = {
   "assessmentId"?: string
   "expectedVersion"?: number
@@ -18,6 +25,44 @@ export type AddDating = {
   "method"?: string
   "source"?: string
   "reviewStatus"?: string
+}
+
+export type Allergy = {
+  "id"?: string
+  "patientId"?: string
+  "version"?: number
+  "clinicalStatus"?: string
+  "createdBy"?: string
+  "createdAt"?: string
+  "data"?: AllergyData
+  "revisions"?: Array<AllergyRevision>
+  "duplicateCandidate"?: boolean
+}
+
+export type AllergyData = {
+  "substanceDisplay"?: string
+  "code"?: Code | null
+  "category"?: string
+  "reactionType"?: string
+  "verificationStatus"?: string
+  "criticality"?: string
+  "onset"?: string | null
+  "onsetPrecision"?: string
+  "lastOccurrence"?: string | null
+  "informationSource"?: string
+  "asserter"?: string | null
+  "notes"?: string | null
+  "clinicalTime"?: string | null
+  "encounterId"?: string | null
+  "reactions"?: Array<Reaction>
+}
+
+export type AllergyRevision = {
+  "version"?: number
+  "data"?: AllergyData
+  "reason"?: string
+  "actorId"?: string
+  "receivedAt"?: string
 }
 
 export type Amendment = {
@@ -78,6 +123,25 @@ export type ChartOpen = {
   "duplicateReviewId"?: string
 }
 
+export type ClinicalListGrant = {
+  "siteId"?: string
+  "sourceKind"?: "ALLERGY" | "MEDICATION_USE" | "PROBLEM"
+  "read"?: boolean
+  "propose"?: boolean
+  "write"?: boolean
+  "review"?: boolean
+}
+
+export type ClinicalReadiness = {
+  "state"?: "READY" | "SCHEMA_UPGRADE_REQUIRED" | "CLINICAL_DISABLED" | "SOURCE_CAPABILITY_DISABLED" | "MIGRATION_IN_PROGRESS" | "QUARANTINED"
+  "currentSchemaVersion"?: string
+  "requiredSchemaVersion"?: string
+  "rolloutState"?: string
+  "clinicalEnabled"?: boolean
+  "sourceCapabilities"?: Array<SourceCapability>
+  "latestFailure"?: string
+}
+
 export type ClinicalScope = {
   "practiceId"?: string
   "siteId"?: string
@@ -85,6 +149,19 @@ export type ClinicalScope = {
   "siteName"?: string
   "clinicianName"?: string
   "patientCapabilities"?: Array<string>
+}
+
+export type ClinicalSummary = {
+  "allergies"?: ListSummary
+  "medications"?: ListSummary
+  "problems"?: ListSummary
+}
+
+export type Code = {
+  "system"?: string
+  "code"?: string
+  "version"?: string | null
+  "display"?: string | null
 }
 
 export type Create = {
@@ -95,11 +172,27 @@ export type Create = {
   "clinicalTime"?: string
 }
 
+export type CreateAllergy = {
+  "id"?: string
+  "data"?: AllergyData
+}
+
 export type CreateEpisode = {
   "episodeId"?: string
   "status"?: string
   "source"?: string
   "clinicalTime"?: string | null
+}
+
+export type CreateMedicationUse = {
+  "id"?: string
+  "data"?: MedicationUseData
+}
+
+export type CreateProblem = {
+  "id"?: string
+  "priority"?: number
+  "data"?: ProblemData
 }
 
 export type DatingAssessment = {
@@ -179,6 +272,11 @@ export type Encounter = {
   "savedAt"?: string | null
   "sessionId"?: string | null
   "queueEntryId"?: string | null
+}
+
+export type EncounterLink = {
+  "encounterId"?: string
+  "reason"?: string
 }
 
 export type Entry = {
@@ -320,6 +418,43 @@ export type Item = {
   "summary"?: Summary
 }
 
+export type JsonNode = {
+  "floatingPointNumber"?: boolean
+  "number"?: boolean
+  "container"?: boolean
+  "valueNode"?: boolean
+  "missingNode"?: boolean
+  "nodeType"?: "ARRAY" | "BINARY" | "BOOLEAN" | "MISSING" | "NULL" | "NUMBER" | "OBJECT" | "POJO" | "STRING"
+  "string"?: boolean
+  "integralNumber"?: boolean
+  "pojo"?: boolean
+  "short"?: boolean
+  "int"?: boolean
+  "long"?: boolean
+  "double"?: boolean
+  "bigDecimal"?: boolean
+  "bigInteger"?: boolean
+  "textual"?: boolean
+  "boolean"?: boolean
+  "binary"?: boolean
+  "empty"?: boolean
+  "array"?: boolean
+  "null"?: boolean
+  "object"?: boolean
+  "float"?: boolean
+  "embeddedValue"?: boolean
+}
+
+export type ListSummary = {
+  "kind"?: "ALLERGY" | "MEDICATION_USE" | "PROBLEM"
+  "state"?: "UNAVAILABLE" | "NOT_REVIEWED" | "EMPTY_REVIEWED" | "AVAILABLE" | "STALE"
+  "generation"?: number
+  "activeCount"?: number
+  "preview"?: Array<Preview>
+  "lastReview"?: ReviewManifest | null
+  "actions"?: Actions
+}
+
 export type Manifest = {
   "manifestId"?: string
   "interventionSetVersion"?: number
@@ -342,6 +477,50 @@ export type MedicationCatalogEntry = {
   "ingredient"?: string
 }
 
+export type MedicationUse = {
+  "id"?: string
+  "patientId"?: string
+  "version"?: number
+  "status"?: string
+  "createdBy"?: string
+  "createdAt"?: string
+  "data"?: MedicationUseData
+  "revisions"?: Array<MedicationUseRevision>
+  "duplicateCandidate"?: boolean
+}
+
+export type MedicationUseData = {
+  "medicationDisplay"?: string
+  "code"?: Code | null
+  "brand"?: string | null
+  "strength"?: string | null
+  "formulation"?: string | null
+  "dose"?: number | null
+  "doseUnit"?: string | null
+  "route"?: string | null
+  "frequency"?: string | null
+  "prn"?: boolean
+  "effectiveStart"?: string | null
+  "effectiveEnd"?: string | null
+  "effectivePrecision"?: string
+  "informationSource"?: string
+  "prescriber"?: string | null
+  "adherence"?: string
+  "notes"?: string | null
+  "indicationProblemId"?: string | null
+  "prescriptionId"?: string | null
+  "clinicalTime"?: string | null
+  "encounterId"?: string | null
+}
+
+export type MedicationUseRevision = {
+  "version"?: number
+  "data"?: MedicationUseData
+  "reason"?: string
+  "actorId"?: string
+  "receivedAt"?: string
+}
+
 export type OwnerChoice = {
   "userId"?: string
   "displayName"?: string
@@ -353,6 +532,27 @@ export type Page = {
   "total"?: number
   "page"?: number
   "pageSize"?: number
+}
+
+export type PageAllergy = {
+  "items"?: Array<Allergy>
+  "page"?: number
+  "pageSize"?: number
+  "total"?: number
+}
+
+export type PageMedicationUse = {
+  "items"?: Array<MedicationUse>
+  "page"?: number
+  "pageSize"?: number
+  "total"?: number
+}
+
+export type PageProblem = {
+  "items"?: Array<Problem>
+  "page"?: number
+  "pageSize"?: number
+  "total"?: number
 }
 
 export type Patient = {
@@ -442,6 +642,8 @@ export type Preparation = {
   "releaseChecksum"?: string
   "interventionSetVersion"?: number
   "interventionManifestId"?: string
+  "clinicalReviewId"?: string | null
+  "clinicalReviewHash"?: string | null
 }
 
 export type Prepare = {
@@ -504,6 +706,8 @@ export type PrescriptionPreparation = {
   "sourceVersion"?: number
   "artifactId"?: string
   "artifactHash"?: string
+  "clinicalReviewId"?: string | null
+  "clinicalReviewHash"?: string | null
 }
 
 export type PrescriptionPrepare = {
@@ -542,6 +746,75 @@ export type PrescriptionUpdate = {
   "data"?: PrescriptionData
 }
 
+export type Preview = {
+  "id"?: string
+  "version"?: number
+  "display"?: string
+  "status"?: string
+  "code"?: Code
+}
+
+export type Problem = {
+  "id"?: string
+  "patientId"?: string
+  "version"?: number
+  "clinicalStatus"?: string
+  "priority"?: number
+  "createdBy"?: string
+  "createdAt"?: string
+  "data"?: ProblemData
+  "revisions"?: Array<ProblemRevision>
+  "encounterIds"?: Array<string>
+  "duplicateCandidate"?: boolean
+}
+
+export type ProblemData = {
+  "problemDisplay"?: string
+  "code"?: Code | null
+  "verificationStatus"?: string
+  "onset"?: string | null
+  "onsetPrecision"?: string
+  "abatement"?: string | null
+  "abatementPrecision"?: string
+  "severity"?: string | null
+  "informationSource"?: string
+  "notes"?: string | null
+  "clinicalTime"?: string | null
+  "encounterId"?: string | null
+}
+
+export type ProblemRevision = {
+  "version"?: number
+  "data"?: ProblemData
+  "reason"?: string
+  "actorId"?: string
+  "receivedAt"?: string
+}
+
+export type Proposal = {
+  "proposalId"?: string
+  "patientId"?: string
+  "siteId"?: string
+  "sourceKind"?: "ALLERGY" | "MEDICATION_USE" | "PROBLEM"
+  "proposedAction"?: string
+  "targetId"?: string | null
+  "payload"?: JsonNode
+  "informationSource"?: string
+  "proposedBy"?: string
+  "proposedAt"?: string
+  "decision"?: string | null
+  "decisionReason"?: string | null
+}
+
+export type Propose = {
+  "proposalId"?: string
+  "sourceKind"?: "ALLERGY" | "MEDICATION_USE" | "PROBLEM"
+  "proposedAction"?: string
+  "targetId"?: string | null
+  "payload"?: JsonNode
+  "informationSource"?: string
+}
+
 export type Publication = {
   "releaseId"?: string
   "expectedVersion"?: number
@@ -569,6 +842,14 @@ export type QueueTransition = {
   "reason"?: string
 }
 
+export type Reaction = {
+  "reactionId"?: string
+  "manifestation"?: string
+  "severity"?: string
+  "onset"?: string | null
+  "exposureRoute"?: string | null
+}
+
 export type ReceiveReport = {
   "id"?: string
   "kind"?: string
@@ -577,6 +858,28 @@ export type ReceiveReport = {
   "content"?: string
   "occurredAt"?: string
   "correctsId"?: string
+}
+
+export type Reconcile = {
+  "reviewId"?: string
+  "encounterId"?: string
+  "expectedGenerations"?: {
+
+}
+  "decisions"?: Array<ReconciliationDecision>
+  "source"?: string
+  "interactionsUnavailableAcknowledged"?: boolean
+  "clientTime"?: string
+}
+
+export type ReconciliationDecision = {
+  "proposalId"?: string | null
+  "sourceKind"?: "ALLERGY" | "MEDICATION_USE" | "PROBLEM"
+  "sourceId"?: string | null
+  "expectedVersion"?: number
+  "decision"?: string
+  "replacement"?: JsonNode | null
+  "reason"?: string
 }
 
 export type ReferralAuthorize = {
@@ -673,13 +976,63 @@ export type Resolve = {
   "reason"?: string
 }
 
-export type ReviewMedicationSafety = {
+export type ReviewCommand = {
   "reviewId"?: string
-  "allergyState"?: string
-  "allergies"?: Array<string>
-  "currentMedications"?: Array<string>
+  "outcome"?: string
   "source"?: string
   "interactionsUnavailableAcknowledged"?: boolean
+  "clientTime"?: string
+}
+
+export type ReviewItem = {
+  "sourceKind"?: "ALLERGY" | "MEDICATION_USE" | "PROBLEM"
+  "sourceId"?: string
+  "sourceVersion"?: number
+  "decision"?: string
+}
+
+export type ReviewKind = {
+  "sourceKind"?: "ALLERGY" | "MEDICATION_USE" | "PROBLEM"
+  "sourceGeneration"?: number
+  "assertion"?: string
+}
+
+export type ReviewManifest = {
+  "reviewId"?: string
+  "patientId"?: string
+  "siteId"?: string
+  "reviewType"?: string
+  "encounterId"?: string | null
+  "outcome"?: string
+  "source"?: string
+  "interactionsUnavailableAcknowledged"?: boolean
+  "reviewedBy"?: string
+  "clientTime"?: string | null
+  "reviewedAt"?: string
+  "manifestHash"?: string
+  "kinds"?: Array<ReviewKind>
+  "items"?: Array<ReviewItem>
+  "decisions"?: Array<ReconciliationDecision>
+  "stale"?: boolean
+}
+
+export type ReviseAllergy = {
+  "expectedVersion"?: number
+  "reason"?: string
+  "data"?: AllergyData
+}
+
+export type ReviseMedicationUse = {
+  "expectedVersion"?: number
+  "reason"?: string
+  "data"?: MedicationUseData
+}
+
+export type ReviseProblem = {
+  "expectedVersion"?: number
+  "reason"?: string
+  "priority"?: number
+  "data"?: ProblemData
 }
 
 export type Rule = {
@@ -885,6 +1238,11 @@ export type Source = {
   "description"?: string
 }
 
+export type SourceCapability = {
+  "sourceKind"?: "ALLERGY" | "MEDICATION_USE" | "PROBLEM"
+  "enabled"?: boolean
+}
+
 export type Summary = {
   "kind"?: "PRESCRIPTION" | "LAB_ORDER" | "IMAGING_ORDER" | "REFERRAL" | "FOLLOW_UP"
   "sourceId"?: string
@@ -924,6 +1282,7 @@ export type TeamAccess = {
   "enabled"?: boolean
   "roles"?: Array<"PRACTICE_ADMINISTRATOR" | "CLINICIAN" | "NURSE" | "SECRETARY">
   "siteGrants"?: Array<TeamSiteGrant>
+  "clinicalListGrants"?: Array<ClinicalListGrant>
   "reason"?: string
 }
 
@@ -933,6 +1292,7 @@ export type TeamCreate = {
   "confirmedUserId"?: string
   "roles"?: Array<"PRACTICE_ADMINISTRATOR" | "CLINICIAN" | "NURSE" | "SECRETARY">
   "siteGrants"?: Array<TeamSiteGrant>
+  "clinicalListGrants"?: Array<ClinicalListGrant>
   "reason"?: string
 }
 
@@ -960,6 +1320,7 @@ export type TeamMember = {
   "version"?: number
   "roles"?: Array<"PRACTICE_ADMINISTRATOR" | "CLINICIAN" | "NURSE" | "SECRETARY">
   "siteGrants"?: Array<TeamSiteGrant>
+  "clinicalListGrants"?: Array<ClinicalListGrant>
   "canReissue"?: boolean
   "clinicalRemovalBlocked"?: boolean
 }
@@ -994,6 +1355,7 @@ export type TeamScope = {
   "practiceName"?: string
   "clinicalEnabled"?: boolean
   "schemaVersion"?: string
+  "clinicalReadiness"?: ClinicalReadiness
 }
 
 export type TeamSite = {
@@ -1036,7 +1398,7 @@ export type TransferWork = {
 
 export type Transition = {
   "expectedVersion"?: number
-  "target"?: string
+  "transition"?: string
   "reason"?: string
 }
 

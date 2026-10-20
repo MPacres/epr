@@ -5,23 +5,84 @@ const uuid = z.uuid()
 export const teamRoleSchema = z.enum(['PRACTICE_ADMINISTRATOR', 'CLINICIAN', 'NURSE', 'SECRETARY'])
 export type TeamRole = z.infer<typeof teamRoleSchema>
 export const roleLabels: Record<TeamRole, string> = { PRACTICE_ADMINISTRATOR: 'Practice administrator', CLINICIAN: 'Doctor', NURSE: 'Nurse', SECRETARY: 'Secretary' }
-export const teamScopeSchema = z.object({ practiceId: uuid, practiceName: z.string(), clinicalEnabled: z.boolean(), schemaVersion: z.string() })
+export const clinicalListSourceSchema = z.enum(['ALLERGY', 'MEDICATION_USE', 'PROBLEM'])
+export type ClinicalListSource = z.infer<typeof clinicalListSourceSchema>
+export const clinicalListSourceLabels: Record<ClinicalListSource, string> = {
+  ALLERGY: 'Allergies and adverse reactions',
+  MEDICATION_USE: 'Reported medications',
+  PROBLEM: 'Problems and diagnoses',
+}
+export const clinicalListSources = clinicalListSourceSchema.options
+export const clinicalReadinessSchema = z.object({
+  state: z.enum(['READY', 'SCHEMA_UPGRADE_REQUIRED', 'CLINICAL_DISABLED', 'SOURCE_CAPABILITY_DISABLED', 'MIGRATION_IN_PROGRESS', 'QUARANTINED']),
+  currentSchemaVersion: z.string().nullable(),
+  requiredSchemaVersion: z.string(),
+  rolloutState: z.string().nullable(),
+  clinicalEnabled: z.boolean(),
+  sourceCapabilities: z.array(z.object({ sourceKind: clinicalListSourceSchema, enabled: z.boolean() })),
+  latestFailure: z.string().nullable(),
+})
+export type ClinicalReadiness = z.infer<typeof clinicalReadinessSchema>
+export const teamScopeSchema = z.object({ practiceId: uuid, practiceName: z.string(), clinicalEnabled: z.boolean(), schemaVersion: z.string(), clinicalReadiness: clinicalReadinessSchema })
 export type TeamScope = z.infer<typeof teamScopeSchema>
 export const siteSchema = z.object({ siteId: uuid, name: z.string() })
 export type TeamSite = z.infer<typeof siteSchema>
 const grantSchema = z.object({ siteId: uuid, reproductiveAccess: z.boolean() })
-export const memberSchema = z.object({ userId: uuid, displayName: z.string(), username: z.string(), accountEnabled: z.boolean(), setupRequired: z.boolean(), enabled: z.boolean(), version: z.number().int().nonnegative(), roles: z.array(teamRoleSchema), siteGrants: z.array(grantSchema), canReissue: z.boolean(), clinicalRemovalBlocked: z.boolean() })
+export const clinicalListGrantSchema = z.object({ siteId: uuid, sourceKind: clinicalListSourceSchema, read: z.boolean(), propose: z.boolean(), write: z.boolean(), review: z.boolean() })
+export type ClinicalListGrant = z.infer<typeof clinicalListGrantSchema>
+export const memberSchema = z.object({ userId: uuid, displayName: z.string(), username: z.string(), accountEnabled: z.boolean(), setupRequired: z.boolean(), enabled: z.boolean(), version: z.number().int().nonnegative(), roles: z.array(teamRoleSchema), siteGrants: z.array(grantSchema), clinicalListGrants: z.array(clinicalListGrantSchema).default([]), canReissue: z.boolean(), clinicalRemovalBlocked: z.boolean() })
 export type TeamMember = z.infer<typeof memberSchema>
 export const resolutionSchema = z.object({ userId: uuid.nullable(), displayName: z.string(), username: z.string(), existing: z.boolean() })
 export type TeamResolution = z.infer<typeof resolutionSchema>
 export const resultSchema = z.object({ member: memberSchema, temporaryPassword: z.string().nullable(), replayed: z.boolean() })
 export type TeamResult = z.infer<typeof resultSchema>
-export const accessSchema = z.object({ expectedVersion: z.number().int().nonnegative(), enabled: z.boolean(), roles: z.array(teamRoleSchema).min(1), siteGrants: z.array(grantSchema), reason: z.string().trim().min(1, 'Enter a reason for this access change.').max(500) }).superRefine((data, ctx) => {
+export const accessSchema = z.object({ expectedVersion: z.number().int().nonnegative(), enabled: z.boolean(), roles: z.array(teamRoleSchema).min(1), siteGrants: z.array(grantSchema), clinicalListGrants: z.array(clinicalListGrantSchema), reason: z.string().trim().min(1, 'Enter a reason for this access change.').max(500) }).superRefine((data, ctx) => {
   if (data.roles.includes('CLINICIAN') && data.siteGrants.length === 0) ctx.addIssue({ code: 'custom', path: ['siteGrants'], message: 'Choose at least one clinical site for a doctor.' })
   if (!data.roles.includes('CLINICIAN') && data.siteGrants.length > 0) ctx.addIssue({ code: 'custom', path: ['siteGrants'], message: 'Clinical site access requires the doctor role.' })
+  const siteIds = new Set(data.siteGrants.map(grant => grant.siteId))
+  const identities = new Set<string>()
+  data.clinicalListGrants.forEach((grant, index) => {
+    const identity = `${grant.siteId}/${grant.sourceKind}`
+    if (identities.has(identity)) ctx.addIssue({ code: 'custom', path: ['clinicalListGrants', index], message: 'Choose one profile for each clinical list.' })
+    identities.add(identity)
+    if (!siteIds.has(grant.siteId)) ctx.addIssue({ code: 'custom', path: ['clinicalListGrants', index], message: 'Clinical-list permissions require access to the same site.' })
+    if (!permissionProfileForGrant(grant)) ctx.addIssue({ code: 'custom', path: ['clinicalListGrants', index], message: 'Choose a supported clinical-list permission profile.' })
+  })
+  if (!data.roles.includes('CLINICIAN') && data.clinicalListGrants.some(grant => grant.read || grant.propose || grant.write || grant.review)) ctx.addIssue({ code: 'custom', path: ['clinicalListGrants'], message: 'Clinical-list permissions require the doctor role.' })
 })
 export type TeamAccess = z.infer<typeof accessSchema>
-export type TeamCreate = { email: string; displayName: string; confirmedUserId: string | null; roles: TeamRole[]; siteGrants: TeamAccess['siteGrants']; reason: string }
+export type TeamCreate = { email: string; displayName: string; confirmedUserId: string | null; roles: TeamRole[]; siteGrants: TeamAccess['siteGrants']; clinicalListGrants: TeamAccess['clinicalListGrants']; reason: string }
+
+export const permissionProfileSchema = z.enum(['NO_ACCESS', 'VIEW', 'CONTRIBUTE', 'MAINTAIN', 'MAINTAIN_AND_REVIEW'])
+export type PermissionProfile = z.infer<typeof permissionProfileSchema>
+export const permissionProfileLabels: Record<PermissionProfile, string> = {
+  NO_ACCESS: 'No access',
+  VIEW: 'View only',
+  CONTRIBUTE: 'Contribute',
+  MAINTAIN: 'Maintain',
+  MAINTAIN_AND_REVIEW: 'Maintain and review',
+}
+export const permissionProfiles = permissionProfileSchema.options
+export function clinicalListGrant(siteId: string, sourceKind: ClinicalListSource, profile: PermissionProfile): ClinicalListGrant {
+  const rank = permissionProfiles.indexOf(profile)
+  return { siteId, sourceKind, read: rank >= 1, propose: rank >= 2, write: rank >= 3, review: rank >= 4 }
+}
+export function permissionProfileForGrant(grant: Pick<ClinicalListGrant, 'read' | 'propose' | 'write' | 'review'>): PermissionProfile | null {
+  return permissionProfiles.find(profile => {
+    const expected = clinicalListGrant('00000000-0000-4000-8000-000000000000', 'ALLERGY', profile)
+    return expected.read === grant.read && expected.propose === grant.propose && expected.write === grant.write && expected.review === grant.review
+  }) ?? null
+}
+export function clinicalListStatus(member: TeamMember, scope: TeamScope) {
+  const available = scope.clinicalReadiness.state === 'READY' && member.accountEnabled && member.enabled && member.roles.includes('CLINICIAN') && member.siteGrants.length > 0
+  if (!available) return 'No access'
+  const profiles = member.siteGrants.flatMap(site => clinicalListSources.map(source => permissionProfileForGrant(
+    member.clinicalListGrants.find(grant => grant.siteId === site.siteId && grant.sourceKind === source) ?? clinicalListGrant(site.siteId, source, 'NO_ACCESS'),
+  ) ?? 'NO_ACCESS'))
+  if (profiles.every(profile => profile === 'NO_ACCESS')) return 'No access'
+  if (profiles.every(profile => profile === profiles[0])) return permissionProfileLabels[profiles[0]]
+  return 'Mixed by site'
+}
 export class TeamRequestError extends Error {
   readonly status: number
   constructor(status: number, message: string) { super(message); this.status = status }

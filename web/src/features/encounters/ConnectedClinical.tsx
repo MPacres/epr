@@ -13,6 +13,10 @@ import { EncounterWorkspace } from './EncounterWorkspace'
 import { patientPath } from './services/encounter-api'
 import { PregnancySources } from './PregnancySources'
 import { PatientContextHeader } from './PatientContextHeader'
+import { ClinicalChartNavigation } from '../clinical-chart/ClinicalChartNavigation'
+import { ClinicalSummary } from '../clinical-chart/ClinicalSummary'
+import { ClinicalListsPanel } from '../clinical-chart/ClinicalListsPanel'
+import { clinicalListApi, clinicalListKey, type ClinicalListKind } from '../clinical-chart/clinical-list-api'
 import { ClinicalWorklist } from './ClinicalWorklist'
 import { loadTasks } from './services/worklist-api'
 import { QueueWorkspace } from './QueueWorkspace'
@@ -26,6 +30,7 @@ import { createUuid } from '../../lib/create-uuid'
 import { serviceDateTime } from './services/encounter-setup'
 import '../dashboard/dashboard.css'
 import './encounters.css'
+import '../clinical-chart/clinical-chart.css'
 export function ConnectedClinical({ practiceId, siteId, patientId, encounterId, queueView = false, worklistView = false, registrationView = false }: { registrationView?: boolean; worklistView?: boolean; queueView?: boolean; practiceId?: string; siteId?: string; patientId?: string; encounterId?: string }) {
   const navigate = useNavigate()
   const auth = useAuth()
@@ -97,18 +102,28 @@ function ConnectedPatientChart({ scope, patient, sex, onStart }: { scope: Scope;
   const auxiliary = useFormEdits()
   const blocker = useBlocker(() => auxiliary.dirty)
   const [confirmStart, setConfirmStart] = useState(false)
+  const [selectedList, setSelectedList] = useState<ClinicalListKind>('ALLERGY')
   const navigate = useNavigate()
   const encounters = useQuery({ queryKey: [...clinicalKey(scope, patient.patientId), 'history'], queryFn: ({ signal }) => clinicalApi.encounters(scope, patient.patientId, signal), retry: false })
+  const clinicalLists = useQuery({ queryKey: [...clinicalListKey(scope, patient.patientId), 'summary'], queryFn: ({ signal }) => clinicalListApi.summary(scope, patient.patientId, signal), retry: false })
+  const allergy = clinicalLists.data?.allergies
+  const allergyStatus = !allergy ? 'Allergies/alerts unavailable' : allergy.state === 'EMPTY_REVIEWED' ? 'Allergies: none known · reviewed' : allergy.preview.length ? `Allergy: ${allergy.preview.map(item => item.display).join(', ')}${allergy.state === 'STALE' ? ' · review due' : ''}` : allergy.state === 'NOT_REVIEWED' ? 'Allergies: not reviewed' : allergy.state === 'UNAVAILABLE' ? 'Allergies/alerts unavailable' : 'Allergies: review due'
+  function openList(kind: ClinicalListKind) { setSelectedList(kind); requestAnimationFrame(() => { const target = document.getElementById('clinical-lists-title'); target?.focus({ preventScroll: true }); target?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }) }) }
   return <main onChangeCapture={auxiliary.onChangeCapture} id="main-content" className="dashboard connected-clinical connected-chart" tabIndex={-1}>
     <Button className="clinical-back" variant="ghost" onClick={() => navigate(`/patients?scope=${encodeURIComponent(`${scope.practiceId}/${scope.siteId}`)}`)}><ArrowLeft aria-hidden="true" />My Patients</Button>
-    <PatientContextHeader patient={patient} sex={sex} actions={<Button onClick={() => auxiliary.dirty ? setConfirmStart(true) : onStart()}><Plus aria-hidden="true" />New encounter</Button>} />
-    <div className="clinical-alert" role="note"><p><strong>Allergies and critical alerts: unavailable.</strong> Do not infer reviewed absence.</p></div>
+    <PatientContextHeader patient={patient} sex={sex} allergyStatus={allergyStatus} actions={<Button onClick={() => auxiliary.dirty ? setConfirmStart(true) : onStart()}><Plus aria-hidden="true" />New encounter</Button>} />
+    <div className="clinical-alert" role="note"><p><strong>{allergyStatus}.</strong> {allergy?.state === 'EMPTY_REVIEWED' ? 'The reviewed absence is bound to the recorded source and review time.' : 'Check the longitudinal source before care; do not infer reviewed absence.'}</p></div>
     {openError ? <p role="status">{openError}</p> : null}
     <div className="connected-chart-content">
-      <div className="connected-chart-actions"><Button variant="outline" disabled={!scope.patientCapabilities?.includes('DEMOGRAPHIC_EDIT')} onClick={() => navigate(`${patientPath(scope,patient.patientId)}/edit`)}>Edit patient details</Button></div>
+      <ClinicalChartNavigation
+        patientDetailsEnabled={Boolean(scope.patientCapabilities?.includes('DEMOGRAPHIC_EDIT'))}
+        onOpenPatientDetails={() => navigate(`${patientPath(scope,patient.patientId)}/edit`)}
+      />
+      <ClinicalSummary practiceName={scope.practiceName} siteName={scope.siteName} data={clinicalLists.data} pending={clinicalLists.isPending} error={clinicalLists.error} onRetry={() => void clinicalLists.refetch()} onManage={openList} />
+      {clinicalLists.data ? <ClinicalListsPanel scope={scope} patient={patient} summary={clinicalLists.data} selectedKind={selectedList} onSelectKind={setSelectedList} /> : null}
       <PregnancySources scope={scope} patientId={patient.patientId} />
       <section className="connected-chart-history" aria-labelledby="chart-history-title">
-        <div className="page-heading"><div><h2 id="chart-history-title">Encounter history</h2><p>{scope.practiceName} · {scope.siteName}</p></div></div>
+        <div className="page-heading"><div><h2 id="chart-history-title" tabIndex={-1}>Encounter history</h2><p>{scope.practiceName} · {scope.siteName}</p></div></div>
         {encounters.isPending ? <p role="status">Loading encounter history…</p> : encounters.error ? <p role="alert">{encounters.error.message}</p> : <div className="clinical-directory">{encounters.data.map(encounter => <button className="clinical-directory-row" key={encounter.encounterId} onClick={() => navigate(`${patientPath(scope, patient.patientId)}/encounters/${encounter.encounterId}`)}><FileText aria-hidden="true" /><span><strong>{encounter.release.definition.title}</strong><small>{serviceDateTime(new Date(encounter.clinicalTime)).serviceDate} · Release {encounter.release.definition.businessVersion} · {encounter.careState.replaceAll('_', ' ').toLowerCase()} · {encounter.noteState.toLowerCase()}</small></span><span>{encounter.careState === 'FINISHED' ? 'Open note' : 'Resume'}<ArrowRight aria-hidden="true" /></span></button>)}{encounters.data.length === 0 ? <p className="clinical-empty">No encounters recorded. Chart review has not created an encounter.</p> : null}</div>}
       </section>
     </div>

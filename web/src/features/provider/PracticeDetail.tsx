@@ -1,16 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Building2, CircleAlert, CircleCheck, CirclePause, Copy, Database, FileClock, KeyRound, Pencil, RotateCcw, Save, ShieldCheck, TriangleAlert, UserRound } from 'lucide-react'
+import { ArrowLeft, Building2, CircleAlert, CircleCheck, CirclePause, Copy, Database, DatabaseZap, FileClock, KeyRound, Pencil, RotateCcw, Save, ShieldCheck, Stethoscope, TriangleAlert, UserRound } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '../../components/ui/button'
 import { copyTextToClipboard } from '../../lib/clipboard'
 import { createUuid } from './tenant-creation-client'
-import { changePracticeServiceStatus, getPractice, updatePracticeName, type PracticeAdministration, type PracticeServiceStatus } from './practice-administration-client'
+import { changePracticeServiceStatus, enableSyntheticClinicalWorkflows, getPractice, PracticeAdministrationError, updatePracticeName, upgradeClinicalSchema, type PracticeAdministration, type PracticeServiceStatus } from './practice-administration-client'
 import { formatPracticeDate } from './practice-administration-model'
 import { PracticeLifecycleDialog } from './PracticeLifecycleDialog'
 import { PracticeStatus } from './PracticeStatus'
 import { TemporaryPasswordDialog } from './TemporaryPasswordDialog'
 import { issueAdministratorTemporaryPassword } from './practice-administration-client'
+import { ClinicalReadinessDialog, type ClinicalReadinessAction } from './ClinicalReadinessDialog'
 import './practice-administration.css'
 
 type IdempotentCommand = { fingerprint: string; idempotencyKey: string }
@@ -43,9 +44,11 @@ export function PracticeDetail({ practiceId }: { practiceId: string }) {
   const [lifecycleTarget, setLifecycleTarget] = useState<PracticeServiceStatus | null>(null)
   const [copyState, setCopyState] = useState<'copied' | 'failed' | null>(null)
   const [temporaryPasswordOpen, setTemporaryPasswordOpen] = useState(false)
+  const [clinicalAction, setClinicalAction] = useState<ClinicalReadinessAction | null>(null)
   const nameCommandRef = useRef<IdempotentCommand | null>(null)
   const lifecycleCommandRef = useRef<IdempotentCommand | null>(null)
   const temporaryPasswordCommandRef = useRef<IdempotentCommand | null>(null)
+  const clinicalCommandRef = useRef<IdempotentCommand | null>(null)
   const practiceQuery = useQuery({
     queryKey: ['provider', 'practice', practiceId],
     queryFn: () => getPractice(practiceId),
@@ -90,6 +93,21 @@ export function PracticeDetail({ practiceId }: { practiceId: string }) {
       void queryClient.invalidateQueries({ queryKey: ['provider', 'practices'] })
     },
   })
+  const clinicalMutation = useMutation({
+    mutationFn: async ({ practice, action, reason, idempotencyKey }: { practice: PracticeAdministration; action: ClinicalReadinessAction; reason: string; idempotencyKey: string }) => {
+      if (action === 'upgrade') await upgradeClinicalSchema({ practiceId: practice.practiceId, reason, version: practice.version, idempotencyKey })
+      else await enableSyntheticClinicalWorkflows({ practiceId: practice.practiceId, reason, version: practice.version, idempotencyKey })
+    },
+    onSuccess: async () => {
+      clinicalCommandRef.current = null
+      setClinicalAction(null)
+      await practiceQuery.refetch()
+      void queryClient.invalidateQueries({ queryKey: ['provider', 'practices'] })
+    },
+    onError: error => {
+      if (error instanceof PracticeAdministrationError && error.kind === 'conflict') void practiceQuery.refetch()
+    },
+  })
 
   function saveName(practice: PracticeAdministration, displayName: string) {
     const fingerprint = `${practice.practiceId}:${practice.version}:${displayName.trim()}`
@@ -109,6 +127,12 @@ export function PracticeDetail({ practiceId }: { practiceId: string }) {
     temporaryPasswordMutation.mutate({ practice, reason, idempotencyKey: temporaryPasswordCommandRef.current.idempotencyKey })
   }
 
+  function changeClinicalReadiness(practice: PracticeAdministration, action: ClinicalReadinessAction, reason: string) {
+    const fingerprint = `${practice.practiceId}:${practice.version}:${action}:${reason.trim()}`
+    if (clinicalCommandRef.current?.fingerprint !== fingerprint) clinicalCommandRef.current = { fingerprint, idempotencyKey: createUuid() }
+    clinicalMutation.mutate({ practice, action, reason, idempotencyKey: clinicalCommandRef.current.idempotencyKey })
+  }
+
   async function copyPracticeId(value: string) {
     try {
       await copyTextToClipboard(value)
@@ -126,6 +150,9 @@ export function PracticeDetail({ practiceId }: { practiceId: string }) {
   const canChangeService = practice.status === 'ACTIVE'
   const suspending = practice.serviceStatus === 'ENABLED'
   const canIssueTemporaryPassword = practice.administratorSetupStatus === 'PASSWORD_NOT_ISSUED' || practice.administratorSetupStatus === 'TEMPORARY_PASSWORD_ISSUED'
+  const readiness = practice.clinicalReadiness
+  const canUpgradeClinicalSchema = practice.status === 'ACTIVE' && practice.serviceStatus === 'ENABLED' && readiness.state === 'SCHEMA_UPGRADE_REQUIRED'
+  const canEnableClinical = practice.status === 'ACTIVE' && practice.serviceStatus === 'ENABLED' && readiness.state === 'CLINICAL_DISABLED'
   const administratorStatus = practice.administratorSetupStatus === 'PASSWORD_NOT_ISSUED' ? 'Password not issued'
     : practice.administratorSetupStatus === 'TEMPORARY_PASSWORD_ISSUED' ? 'Temporary password issued'
       : practice.administratorSetupStatus === 'PASSWORD_SET' ? 'Private password set'
@@ -168,6 +195,20 @@ export function PracticeDetail({ practiceId }: { practiceId: string }) {
             <div><dt>Service access</dt><dd>{practice.serviceStatus === 'ENABLED' ? 'Enabled' : 'Suspended'}</dd></div>
           </dl>
         </section>
+
+        <section className="practice-detail-section practice-clinical-readiness" aria-labelledby="practice-clinical-readiness-heading">
+          <div className="practice-section-title"><div><h2 id="practice-clinical-readiness-heading">Clinical readiness</h2><p>Support controls tenant rollout and Practice capability. Individual doctor grants remain with the Practice administrator.</p></div><Stethoscope aria-hidden="true" /></div>
+          <div className="practice-readiness-summary"><span className={`practice-readiness-state ${readiness.state.toLowerCase()}`}>{readiness.state.toLowerCase().replaceAll('_', ' ')}</span><p>{readiness.state === 'READY' ? 'Synthetic clinical-list workflows are ready for explicit Practice-admin grants.' : readiness.state === 'SCHEMA_UPGRADE_REQUIRED' ? 'Upgrade the tenant before clinical workflows can be enabled.' : readiness.state === 'CLINICAL_DISABLED' ? 'The tenant is current, but synthetic clinical workflows are disabled.' : readiness.state === 'SOURCE_CAPABILITY_DISABLED' ? 'At least one longitudinal-list source capability is disabled.' : readiness.state === 'MIGRATION_IN_PROGRESS' ? 'The tenant migration is still in progress; clinical access remains closed.' : 'The clinical rollout is quarantined and remains closed.'}</p></div>
+          <dl className="practice-readiness-grid">
+            <div><dt>Tenant schema</dt><dd>Current {readiness.currentSchemaVersion ?? 'unavailable'} · Required {readiness.requiredSchemaVersion}</dd></div>
+            <div><dt>Rollout state</dt><dd>{readiness.rolloutState?.toLowerCase() ?? 'Not started'}</dd></div>
+            <div><dt>Practice capability</dt><dd>{readiness.clinicalEnabled ? 'Enabled' : 'Disabled'}</dd></div>
+          </dl>
+          <ul className="practice-source-capabilities" aria-label="Clinical-list source capabilities">{readiness.sourceCapabilities.map(source => <li key={source.sourceKind}><span>{source.sourceKind === 'ALLERGY' ? 'Allergies and adverse reactions' : source.sourceKind === 'MEDICATION_USE' ? 'Reported medications' : 'Problems and diagnoses'}</span><strong className={source.enabled ? 'enabled' : 'disabled'}>{source.enabled ? <CircleCheck aria-hidden="true" /> : <CircleAlert aria-hidden="true" />}{source.enabled ? 'Enabled' : 'Disabled'}</strong></li>)}</ul>
+          {readiness.latestFailure ? <p className="practice-readiness-failure" role="alert"><TriangleAlert aria-hidden="true" />{readiness.latestFailure}</p> : null}
+          <div className="practice-readiness-actions"><Button variant="outline" disabled={!canUpgradeClinicalSchema || clinicalMutation.isPending} onClick={() => { clinicalMutation.reset(); clinicalCommandRef.current = null; setClinicalAction('upgrade') }}><DatabaseZap aria-hidden="true" />Upgrade to schema 14</Button><Button disabled={!canEnableClinical || clinicalMutation.isPending} onClick={() => { clinicalMutation.reset(); clinicalCommandRef.current = null; setClinicalAction('enable') }}><Stethoscope aria-hidden="true" />Enable synthetic clinical workflows</Button></div>
+          {readiness.state === 'SOURCE_CAPABILITY_DISABLED' ? <p className="practice-control-help">Source-capability repair is fail-closed. Review the control-plane migration before granting doctor access.</p> : null}
+        </section>
       </div>
 
       <aside className="practice-control-panel" aria-labelledby="practice-controls-heading">
@@ -207,5 +248,6 @@ export function PracticeDetail({ practiceId }: { practiceId: string }) {
       onCancel={() => { temporaryPasswordMutation.reset(); temporaryPasswordCommandRef.current = null; setTemporaryPasswordOpen(false) }}
       onConfirm={reason => issueTemporaryPassword(practice, reason)}
     />
+    <ClinicalReadinessDialog open={clinicalAction !== null} action={clinicalAction ?? 'upgrade'} practiceName={practice.displayName} pending={clinicalMutation.isPending} error={clinicalMutation.isError ? clinicalMutation.error.message : null} onCancel={() => { clinicalMutation.reset(); clinicalCommandRef.current = null; setClinicalAction(null) }} onConfirm={reason => clinicalAction ? changeClinicalReadiness(practice, clinicalAction, reason) : undefined} />
   </div>
 }

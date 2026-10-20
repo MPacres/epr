@@ -16,7 +16,7 @@ function patientAge(birthDate: string | null): string {
   return age === null ? 'Unknown' : age === 0 ? 'Under 1 year' : `${age} years`
 }
 
-export function PatientContextHeader({ patient, sex, actions }: { patient: Patient; sex?: string; actions?: ReactNode }) {
+export function PatientContextHeader({ patient, sex, allergyStatus = 'Allergies/alerts unavailable', actions }: { patient: Patient; sex?: string; allergyStatus?: string; actions?: ReactNode }) {
   const headerRef = useRef<HTMLElement>(null)
   useLayoutEffect(() => {
     const header = headerRef.current
@@ -51,11 +51,11 @@ export function PatientContextHeader({ patient, sex, actions }: { patient: Patie
         <span
           className="patient-context-safety"
           role="note"
-          aria-label="Allergies and critical alerts unavailable. Check the appropriate clinical source before care."
-          title="Allergies and critical alerts unavailable. Check the appropriate clinical source before care."
+          aria-label={allergyStatus}
+          title={allergyStatus}
         >
           <TriangleAlert aria-hidden="true" />
-          Allergies/alerts unavailable
+          {allergyStatus}
         </span>
       </div>
     </div>

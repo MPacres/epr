@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { changePracticeServiceStatus, issueAdministratorTemporaryPassword, listPractices, updatePracticeName } from './practice-administration-client'
+import { changePracticeServiceStatus, enableSyntheticClinicalWorkflows, issueAdministratorTemporaryPassword, listPractices, updatePracticeName, upgradeClinicalSchema } from './practice-administration-client'
 
 const practice = {
   practiceId: '8fb6b6e2-0e49-4879-80d7-e48ef5ab1259',
@@ -12,6 +12,7 @@ const practice = {
   status: 'ACTIVE',
   serviceStatus: 'ENABLED',
   schemaVersion: '2',
+  clinicalReadiness: { state: 'SCHEMA_UPGRADE_REQUIRED', currentSchemaVersion: '2', requiredSchemaVersion: '14', rolloutState: null, clinicalEnabled: false, sourceCapabilities: [{ sourceKind: 'ALLERGY', enabled: false }, { sourceKind: 'MEDICATION_USE', enabled: false }, { sourceKind: 'PROBLEM', enabled: false }], latestFailure: null },
   provisioningAttempts: 1,
   failureCode: null,
   failureMessage: null,
@@ -93,5 +94,23 @@ describe('practice administration client', () => {
     expect(result.temporaryPassword).toBe('Temporary1!Password')
     expect(fetchMock.mock.calls[1][0]).toContain('/administrator/temporary-password')
     expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ reason: 'Personal setup with the physician.', version: 1 })
+  })
+  it('uses guarded, versioned support commands for schema rollout and clinical enablement', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ headerName: 'X-XSRF-TOKEN', token: 'csrf' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ state: 'READY', schemaVersion: '14', attempt: 1 }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ headerName: 'X-XSRF-TOKEN', token: 'csrf' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ enabled: true, version: 3, replayed: false }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const schemaUpgrade = await upgradeClinicalSchema({ practiceId: practice.practiceId, reason: 'Approved synthetic rollout', version: 1, idempotencyKey: '383997dc-174b-47a4-8d61-242a0a46875a' })
+    await enableSyntheticClinicalWorkflows({ practiceId: practice.practiceId, reason: 'Approved synthetic activation', version: 2, idempotencyKey: '28ccfe54-2890-42fd-a580-5021b75f6ebf' })
+
+    expect(schemaUpgrade).toEqual({ state: 'READY', schemaVersion: '14', attempt: 1 })
+    expect(fetchMock.mock.calls[1][0]).toContain('/schema-upgrade')
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ expectedVersion: 1, reason: 'Approved synthetic rollout' })
+    expect(fetchMock.mock.calls[3][0]).toContain('/synthetic-clinical-capability')
+    expect(fetchMock.mock.calls[3][1].headers).toMatchObject({ 'Idempotency-Key': '28ccfe54-2890-42fd-a580-5021b75f6ebf' })
+    expect(fetchMock.mock.calls[3][1].cache).toBe('no-store')
   })
 })

@@ -15,16 +15,16 @@ public class TenantSchemaUpgradeService {
     public Result upgrade(PlatformUser actor, UUID practice, UUID operation, long expectedVersion, String reason) {
         if (actor == null || actor.role() != PlatformRole.SUPERADMIN || !actor.enabled() || actor.passwordResetRequired()) throw new ClinicalAccessException("SCHEMA_ADMINISTRATION_DENIED", 403);
         if (operation == null || reason == null || reason.isBlank() || reason.length() > 500) throw new ClinicalAccessException("MIGRATION_REASON_REQUIRED", 422);
-        var claim = rollout.begin(practice, operation, expectedVersion, actor.id(), reason, "14");
-        if (!claim.required()) return new Result("READY", "14", claim.attempt());
+        var claim = rollout.begin(practice, operation, expectedVersion, actor.id(), reason, "15");
+        if (!claim.required()) return new Result("READY", "15", claim.attempt());
         try {
             var tenant = registry.findByPracticeId(practice).orElseThrow();
             var version = databases.upgrade(tenant);
-            if (!"14".equals(version)) throw new ClinicalAccessException("UNSUPPORTED_SCHEMA_VERSION", 503);
+            if (!"15".equals(version)) throw new ClinicalAccessException("UNSUPPORTED_SCHEMA_VERSION", 503);
             rollout.finish(practice, operation, claim.attempt(), actor.id(), version, true);
             return new Result("READY", version, claim.attempt());
         } catch (RuntimeException e) {
-            rollout.finish(practice, operation, claim.attempt(), actor.id(), "14", false);
+            rollout.finish(practice, operation, claim.attempt(), actor.id(), "15", false);
             throw new ClinicalAccessException("TENANT_MIGRATION_QUARANTINED", 503);
         }
     }

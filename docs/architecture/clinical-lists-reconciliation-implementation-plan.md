@@ -9,7 +9,7 @@ Prepared: 2026-10-07.
 The backend now provides the planned longitudinal source and reconciliation boundary:
 
 - control-plane V18 adds action-specific allergy, medication-use and problem capabilities; tenant V12 adds source heads, immutable revisions, generations, assertions, proposals and exact review manifests; tenant V13 makes reconciliation decisions immutable; tenant V14 adds patient-consistent encounter, problem and prescription provenance constraints;
-- current tenant routing and local synthetic enablement require schema 14 and continue to fail closed for disabled, migrating, mismatched or unauthorized Practice routes;
+- current tenant routing and local synthetic enablement require schema 15 after the prescribing catalog/refill extension and continue to fail closed for disabled, migrating, mismatched or unauthorized Practice routes;
 - `clinicalchart` exposes practice/patient/site-authorized summaries, paginated active/history reads, revision and transition commands, explicit absence reviews, terminology fixtures, proposals, exact reconciliation and safety-manifest reads;
 - commands use client UUIDs, idempotency receipts, optimistic versions, immutable history and append-only clinical audit events; accepted reconciliation changes and their exact decisions share one tenant transaction;
 - new prescription preparation and issuance consume a current canonical allergy/medication manifest and bind its ID/hash into immutable issued bytes; creation of legacy flat safety reviews is disabled while historical reads remain available; and

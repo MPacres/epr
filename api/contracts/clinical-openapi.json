@@ -9779,6 +9779,14 @@
           },
           "catalogVersion": {
             "type": "string"
+          },
+          "sourcePrescriptionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourceItemId": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       },
@@ -11862,13 +11870,13 @@
       "JsonNode": {
         "type": "object",
         "properties": {
-          "floatingPointNumber": {
-            "type": "boolean"
-          },
           "number": {
             "type": "boolean"
           },
           "container": {
+            "type": "boolean"
+          },
+          "floatingPointNumber": {
             "type": "boolean"
           },
           "valueNode": {
@@ -13937,6 +13945,18 @@
             "type": "string"
           },
           "ingredient": {
+            "type": "string"
+          },
+          "strength": {
+            "type": "string"
+          },
+          "formulation": {
+            "type": "string"
+          },
+          "doseUnit": {
+            "type": "string"
+          },
+          "quantityUnit": {
             "type": "string"
           }
         }

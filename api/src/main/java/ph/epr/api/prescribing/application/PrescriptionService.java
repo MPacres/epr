@@ -63,6 +63,7 @@ public class PrescriptionService {
         links.context(c,patient,request.encounterId());links.require(c,kind(request.data()),InterventionAuthorization.Action.PREPARE);
         return journal.execute(c,"create-prescription/"+patient,key,request,PrescriptionRecord.class,()->{
             var encounter=links.lock(c,patient,request.encounterId());newDecision(encounter);
+            validateRefills(c,patient,request.data());
             if(request.supersedesId()!=null) {
                 var original=get(c,patient,request.supersedesId());
                 if(!original.state().equals("ISSUED") && !original.state().equals("CANCELLED")) fail("AUTHORIZED_ORIGINAL_REQUIRED");
@@ -80,6 +81,7 @@ public class PrescriptionService {
         return journal.execute(c,"update-prescription/"+id,key,request,PrescriptionRecord.class,()->{
             var encounter=links.lock(c,patient,before.encounterId());newDecision(encounter);
             var current=get(c,patient,id);version(current,request.expectedVersion());draft(current);
+            validateRefills(c,patient,request.data());
             if(kind(current.data())!=kind(request.data())) fail("KIND_IMMUTABLE");
             bump(c,id);revision(c,id,current.version()+1,request.data(),null);
             var result=get(c,patient,id);publish(c,result);journal.audit(c,id,"PRESCRIPTION_DRAFT_UPDATED",null);return result;
@@ -87,7 +89,7 @@ public class PrescriptionService {
     }
     public byte[] candidateContent(Context c,UUID patient,UUID id,PrescriptionPrepare request) {
         var before=get(c,patient,id);links.require(c,kind(before.data()),InterventionAuthorization.Action.AUTHORIZE);
-        links.lock(c,patient,before.encounterId());var current=get(c,patient,id);version(current,request.expectedVersion());draft(current);validate(current.data(),true);var review=prerequisites(c,current);
+        links.lock(c,patient,before.encounterId());var current=get(c,patient,id);version(current,request.expectedVersion());draft(current);validate(current.data(),true);validateRefills(c,patient,current.data());var review=prerequisites(c,current);
         return render(c,current,review);
     }
     public PrescriptionPreparation prepare(Context c,UUID patient,UUID id,UUID key,PrescriptionPrepare request) {
@@ -96,7 +98,7 @@ public class PrescriptionService {
     public PrescriptionPreparation prepare(Context c,UUID patient,UUID id,UUID key,PrescriptionPrepare request,PrivateClinicalArtifacts.Artifact staged) {
         var before=get(c,patient,id);links.require(c,kind(before.data()),InterventionAuthorization.Action.AUTHORIZE);
         return journal.execute(c,"prepare-prescription/"+id,key,request,PrescriptionPreparation.class,()->{
-            links.lock(c,patient,before.encounterId());var current=get(c,patient,id);version(current,request.expectedVersion());draft(current);validate(current.data(),true);var review=prerequisites(c,current);
+            links.lock(c,patient,before.encounterId());var current=get(c,patient,id);version(current,request.expectedVersion());draft(current);validate(current.data(),true);validateRefills(c,patient,current.data());var review=prerequisites(c,current);
             if(request.preparationId()==null) fail("PREPARATION_ID_REQUIRED");
             var artifact=staged==null?artifacts.stage(c,request.preparationId(),render(c,current,review)):staged;
             if(!artifact.artifactId().equals(request.preparationId()))fail("ARTIFACT_CONTEXT_MISMATCH");
@@ -111,11 +113,12 @@ public class PrescriptionService {
         return journal.execute(c,"authorize-prescription/"+id,key,request,PrescriptionRecord.class,()->{
             var original=before.supersedesId()==null?null:get(c,patient,before.supersedesId());
             var boundaries=new java.util.TreeSet<UUID>();boundaries.add(before.encounterId());if(original!=null)boundaries.add(original.encounterId());
+            for(var item:before.data().items())if(item.sourcePrescriptionId()!=null)boundaries.add(get(c,patient,item.sourcePrescriptionId()).encounterId());
             for(var boundary:boundaries)links.lock(c,patient,boundary);
             var encounter=links.context(c,patient,before.encounterId());var current=get(c,patient,id);version(current,request.expectedVersion());draft(current);
             if(!request.confirmSyntheticReview()) fail("DELIBERATE_SYNTHETIC_REVIEW_REQUIRED");
             if(!encounter.careState().equals("IN_PROGRESS")||encounter.noteState().equals("SIGNED")) required(request.lateActionReason(),"LATE_ACTION_REASON_REQUIRED");
-            validate(current.data(),true);var review=prerequisites(c,current);duplicates(c,current,request.duplicateReason());
+            validate(current.data(),true);validateRefills(c,patient,current.data());var review=prerequisites(c,current);duplicates(c,current,request.duplicateReason());
             var prep=c.jdbc().sql("SELECT preparation_id,source_version,artifact_id,artifact_hash,clinical_review_id,clinical_review_hash FROM prescription_preparation WHERE practice_id=:p AND id=:id AND preparation_id=:candidate AND prepared_by=:a")
                 .param("p",c.practiceId()).param("id",id).param("candidate",request.preparationId()).param("a",c.actorId())
                 .query((r,n)->new PrescriptionPreparation(r.getObject(1,UUID.class),r.getLong(2),r.getObject(3,UUID.class),r.getString(4),r.getObject(5,UUID.class),r.getString(6)))
@@ -201,18 +204,18 @@ public class PrescriptionService {
     private static String escape(String s) { return text(s).replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace("\"","&quot;"); }
     private static void required(String s,String code) { if(s==null||s.isBlank()||s.length()>4000) fail(code); }
     private static void fail(String code) { throw new ClinicalAccessException(code,422); }
-    public record PrescriptionItem(UUID itemId,String ingredient,String brand,String strength,String formulation,java.math.BigDecimal dose,String doseUnit,String route,String frequency,String duration,java.math.BigDecimal quantity,String quantityUnit,int repeats,String instructions,String catalogCode,String catalogVersion) {}
-    public record MedicationCatalogEntry(String code,String version,String ingredient) {}
-    public List<MedicationCatalogEntry> catalog(Context c){ links.require(c,Kind.PRESCRIPTION,InterventionAuthorization.Action.READ);return c.jdbc().sql("SELECT code,version,ingredient FROM prescribing_catalog WHERE NOT retired ORDER BY code").query((r,n)->new MedicationCatalogEntry(r.getString(1),r.getString(2),r.getString(3))).list(); }
+    public record PrescriptionItem(UUID itemId,String ingredient,String brand,String strength,String formulation,java.math.BigDecimal dose,String doseUnit,String route,String frequency,String duration,java.math.BigDecimal quantity,String quantityUnit,int repeats,String instructions,String catalogCode,String catalogVersion,UUID sourcePrescriptionId,UUID sourceItemId) {}
+    public record MedicationCatalogEntry(String code,String version,String ingredient,String strength,String formulation,String doseUnit,String quantityUnit) {}
+    public List<MedicationCatalogEntry> catalog(Context c){ links.require(c,Kind.PRESCRIPTION,InterventionAuthorization.Action.READ);return c.jdbc().sql("SELECT code,version,ingredient,strength,formulation,dose_unit,quantity_unit FROM prescribing_catalog WHERE NOT retired ORDER BY ingredient").query((r,n)->new MedicationCatalogEntry(r.getString(1),r.getString(2),r.getString(3),r.getString(4),r.getString(5),r.getString(6),r.getString(7))).list(); }
     private List<PrescriptionItem> items(Context c,UUID id,long version){
         return c.jdbc().sql("SELECT * FROM prescription_item_revision WHERE practice_id=:p AND prescription_id=:id AND version=:v ORDER BY item_id")
-            .param("p",c.practiceId()).param("id",id).param("v",version).query((r,n)->new PrescriptionItem(r.getObject("item_id",UUID.class),r.getString("ingredient"),r.getString("brand"),r.getString("strength"),r.getString("formulation"),r.getBigDecimal("dose"),r.getString("dose_unit"),r.getString("route"),r.getString("frequency"),r.getString("duration"),r.getBigDecimal("quantity"),r.getString("quantity_unit"),r.getInt("repeats"),r.getString("instructions"),r.getString("catalog_code"),r.getString("catalog_version"))).list();
+            .param("p",c.practiceId()).param("id",id).param("v",version).query((r,n)->new PrescriptionItem(r.getObject("item_id",UUID.class),r.getString("ingredient"),r.getString("brand"),r.getString("strength"),r.getString("formulation"),r.getBigDecimal("dose"),r.getString("dose_unit"),r.getString("route"),r.getString("frequency"),r.getString("duration"),r.getBigDecimal("quantity"),r.getString("quantity_unit"),r.getInt("repeats"),r.getString("instructions"),r.getString("catalog_code"),r.getString("catalog_version"),r.getObject("source_prescription_id",UUID.class),r.getObject("source_item_id",UUID.class))).list();
     }
     private void saveItems(Context c,UUID id,long version,PrescriptionData data){
-        for(var i:data.items())c.jdbc().sql("INSERT INTO prescription_item_revision(practice_id,prescription_id,version,item_id,ingredient,brand,strength,formulation,dose,dose_unit,route,frequency,duration,quantity,quantity_unit,repeats,instructions,catalog_code,catalog_version) VALUES(:p,:id,:v,:item,:ingredient,:brand,:strength,:formulation,:dose,:unit,:route,:frequency,:duration,:quantity,:quantityUnit,:repeats,:instructions,:code,:catalogVersion)")
+        for(var i:data.items())c.jdbc().sql("INSERT INTO prescription_item_revision(practice_id,prescription_id,version,item_id,ingredient,brand,strength,formulation,dose,dose_unit,route,frequency,duration,quantity,quantity_unit,repeats,instructions,catalog_code,catalog_version,source_prescription_id,source_item_id) VALUES(:p,:id,:v,:item,:ingredient,:brand,:strength,:formulation,:dose,:unit,:route,:frequency,:duration,:quantity,:quantityUnit,:repeats,:instructions,:code,:catalogVersion,:sourcePrescription,:sourceItem)")
             .param("p",c.practiceId()).param("id",id).param("v",version).param("item",i.itemId()).param("ingredient",i.ingredient()).param("brand",i.brand(),java.sql.Types.VARCHAR).param("strength",i.strength(),java.sql.Types.VARCHAR).param("formulation",i.formulation(),java.sql.Types.VARCHAR)
             .param("dose",i.dose(),java.sql.Types.NUMERIC).param("unit",i.doseUnit(),java.sql.Types.VARCHAR).param("route",i.route(),java.sql.Types.VARCHAR).param("frequency",i.frequency(),java.sql.Types.VARCHAR).param("duration",i.duration(),java.sql.Types.VARCHAR).param("quantity",i.quantity(),java.sql.Types.NUMERIC)
-            .param("quantityUnit",i.quantityUnit(),java.sql.Types.VARCHAR).param("repeats",i.repeats()).param("instructions",i.instructions(),java.sql.Types.VARCHAR).param("code",i.catalogCode(),java.sql.Types.VARCHAR).param("catalogVersion",i.catalogVersion(),java.sql.Types.VARCHAR).update();
+            .param("quantityUnit",i.quantityUnit(),java.sql.Types.VARCHAR).param("repeats",i.repeats()).param("instructions",i.instructions(),java.sql.Types.VARCHAR).param("code",i.catalogCode(),java.sql.Types.VARCHAR).param("catalogVersion",i.catalogVersion(),java.sql.Types.VARCHAR).param("sourcePrescription",i.sourcePrescriptionId(),java.sql.Types.OTHER).param("sourceItem",i.sourceItemId(),java.sql.Types.OTHER).update();
     }
     private void validate(PrescriptionData data,boolean issue){
         if(data==null||data.items()==null||data.items().isEmpty()||data.items().size()>30)fail("PRESCRIPTION_ITEMS_REQUIRED");
@@ -221,16 +224,30 @@ public class PrescriptionService {
             if(item==null||item.itemId()==null||!ids.add(item.itemId()))fail("UNIQUE_ITEM_ID_REQUIRED");
             required(item.ingredient(),"GENERIC_INGREDIENT_REQUIRED");
             if(item.ingredient().length()>200)fail("INGREDIENT_TOO_LONG");
+            if((item.sourcePrescriptionId()==null)!=(item.sourceItemId()==null))fail("REFILL_SOURCE_PAIR_REQUIRED");
+            if((item.catalogCode()==null||item.catalogCode().isBlank())!=(item.catalogVersion()==null||item.catalogVersion().isBlank()))fail("CATALOG_SOURCE_PAIR_REQUIRED");
             if(!ingredients.add(item.ingredient().trim().toLowerCase(Locale.ROOT)))fail("DUPLICATE_INGREDIENT_IN_PRESCRIPTION");
             if(issue){required(item.strength(),"PRODUCT_STRENGTH_REQUIRED");required(item.formulation(),"FORMULATION_REQUIRED");required(item.doseUnit(),"DOSE_UNIT_REQUIRED");required(item.route(),"ROUTE_REQUIRED");required(item.frequency(),"FREQUENCY_REQUIRED");required(item.duration(),"DURATION_REQUIRED");required(item.quantityUnit(),"QUANTITY_UNIT_REQUIRED");required(item.instructions(),"PATIENT_INSTRUCTIONS_REQUIRED");
                 if(item.dose()==null||item.dose().signum()<=0||item.quantity()==null||item.quantity().signum()<=0||item.repeats()!=0)fail("POSITIVE_DOSE_QUANTITY_AND_NO_REPEATS_REQUIRED");}
         }
         if(issue){required(data.indication(),"INDICATION_REQUIRED");if(data.reviewId()==null)fail("MEDICATION_SAFETY_REVIEW_REQUIRED");}
     }
+    private void validateRefills(Context c,UUID patient,PrescriptionData data){
+        var sources=new HashSet<String>();
+        for(var item:data.items()){
+            if(item.sourcePrescriptionId()==null)continue;
+            var source=get(c,patient,item.sourcePrescriptionId());
+            if(!source.state().equals("ISSUED"))fail("ISSUED_REFILL_SOURCE_REQUIRED");
+            var original=source.data().items().stream().filter(i->i.itemId().equals(item.sourceItemId())).findFirst()
+                .orElseThrow(()->new ClinicalAccessException("REFILL_ITEM_UNAVAILABLE",422));
+            if(!original.ingredient().equalsIgnoreCase(item.ingredient()) || !Objects.equals(original.catalogCode(),item.catalogCode()))fail("REFILL_MEDICINE_CHANGED");
+            if(!sources.add(item.sourcePrescriptionId()+"/"+item.sourceItemId()))fail("DUPLICATE_REFILL_SOURCE");
+        }
+    }
     private ph.epr.api.clinicalchart.ClinicalLists.SafetyManifest prerequisites(Context c,PrescriptionRecord record){
         var review=clinicalLists.requireCurrentSafety(c,record.patientId(),record.data().reviewId());
         for(var i:record.data().items()){
-            if(!c.jdbc().sql("SELECT EXISTS(SELECT 1 FROM prescribing_catalog WHERE code=:code AND version=:v AND ingredient=:ingredient AND NOT retired)").param("code",i.catalogCode(),java.sql.Types.VARCHAR).param("v",i.catalogVersion(),java.sql.Types.VARCHAR).param("ingredient",i.ingredient()).query(Boolean.class).single())fail("SYNTHETIC_MEDICATION_SOURCE_REQUIRED");
+            if(i.catalogCode()!=null && !i.catalogCode().isBlank() && !c.jdbc().sql("SELECT EXISTS(SELECT 1 FROM prescribing_catalog WHERE code=:code AND version=:v AND ingredient=:ingredient AND NOT retired)").param("code",i.catalogCode()).param("v",i.catalogVersion()).param("ingredient",i.ingredient()).query(Boolean.class).single())fail("SYNTHETIC_MEDICATION_SOURCE_REQUIRED");
             if(review.allergies().stream().anyMatch(entry->entry.code()==null))fail("UNCHECKABLE_ALLERGY_SOURCE");
             if(review.medications().stream().anyMatch(entry->entry.code()==null))fail("UNCHECKABLE_MEDICATION_SOURCE");
             if(review.allergies().stream().anyMatch(entry->entry.code().code().equalsIgnoreCase(i.catalogCode())||entry.display().equalsIgnoreCase(i.ingredient())))fail("KNOWN_ALLERGY_MATCH");

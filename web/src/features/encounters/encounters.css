@@ -101,6 +101,9 @@
 .clinical-start-heading h2 { font-size: 20px; }
 .clinical-start-heading p { margin-top: 4px; color: var(--secondary); font-size: 12px; }
 .clinical-start-explanation { margin-top: 14px; color: #43536d; font-size: 13px; }
+.clinical-start-active-care { margin-top: 16px; }
+.clinical-start-active-care h3 { color: var(--ink); font-size: 14px; font-weight: 700; }
+.clinical-start-active-care p { margin: 5px 0 12px; }
 .clinical-start-body > p[role], .clinical-start-body > .clinical-error { margin-top: 12px; }
 .clinical-start-body > p:not([role]):not(.clinical-start-explanation) { margin-top: 12px; color: var(--secondary); font-size: 12px; }
 .start-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 24px 0; border: 0; }

@@ -12,7 +12,7 @@ public record ClinicalReadiness(
     List<SourceCapability> sourceCapabilities,
     String latestFailure
 ) {
-    public static final String REQUIRED_SCHEMA_VERSION = "14";
+    public static final String REQUIRED_SCHEMA_VERSION = "15";
 
     public ClinicalReadiness {
         sourceCapabilities = sourceCapabilities == null ? List.of() : List.copyOf(sourceCapabilities);

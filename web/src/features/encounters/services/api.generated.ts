@@ -419,9 +419,9 @@ export type Item = {
 }
 
 export type JsonNode = {
-  "floatingPointNumber"?: boolean
   "number"?: boolean
   "container"?: boolean
+  "floatingPointNumber"?: boolean
   "valueNode"?: boolean
   "missingNode"?: boolean
   "nodeType"?: "ARRAY" | "BINARY" | "BOOLEAN" | "MISSING" | "NULL" | "NUMBER" | "OBJECT" | "POJO" | "STRING"
@@ -475,6 +475,10 @@ export type MedicationCatalogEntry = {
   "code"?: string
   "version"?: string
   "ingredient"?: string
+  "strength"?: string
+  "formulation"?: string
+  "doseUnit"?: string
+  "quantityUnit"?: string
 }
 
 export type MedicationUse = {
@@ -699,6 +703,8 @@ export type PrescriptionItem = {
   "instructions"?: string
   "catalogCode"?: string
   "catalogVersion"?: string
+  "sourcePrescriptionId"?: string
+  "sourceItemId"?: string
 }
 
 export type PrescriptionPreparation = {

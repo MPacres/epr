@@ -68,6 +68,8 @@ class ClinicalListsTests {
     ProblemData problemData(){return new ProblemData("Essential hypertension",new Code("urn:epr:synthetic:problem","hypertension","2026-10","Essential hypertension"),"CONFIRMED",null,"UNKNOWN",null,"UNKNOWN",null,"Clinician entered",null,OffsetDateTime.now(),null);}
 
     @Test void explicitAbsenceKnownValuesAndStalenessRemainDistinct(){
+        List<ReviewManifest> reviewManifests=run(c->lists.reviews(c,patient,null));
+        assertThat(reviewManifests).isEmpty();
         assertThat(run(c->lists.summary(c,patient)).allergies().state()).isEqualTo(ListState.NOT_REVIEWED);
         var none=run(c->lists.reviewAllergies(c,patient,UUID.randomUUID(),new ReviewCommand(UUID.randomUUID(),"REVIEWED_NONE_KNOWN","Reviewed synthetic history",false,OffsetDateTime.now())));
         assertThat(none.stale()).isFalse();assertThat(run(c->lists.summary(c,patient)).allergies().state()).isEqualTo(ListState.EMPTY_REVIEWED);

@@ -442,7 +442,7 @@ public class JdbcClinicalLists implements ClinicalLists {
         patients.requirePatient(c,patient);var allowed=authorization.capabilities(c.actorId(),c.practiceId(),c.siteId()).stream()
             .filter(ClinicalChartAuthorization.Capability::read).map(ClinicalChartAuthorization.Capability::sourceKind).collect(java.util.stream.Collectors.toSet());
         if(allowed.isEmpty())return List.of();
-        var ids=c.jdbc().sql("SELECT review_id FROM clinical_list_review WHERE practice_id=:p AND patient_id=:patient AND (:encounter IS NULL OR encounter_id=:encounter) ORDER BY reviewed_at DESC LIMIT 200")
+        var ids=c.jdbc().sql("SELECT review_id FROM clinical_list_review WHERE practice_id=:p AND patient_id=:patient AND (CAST(:encounter AS uuid) IS NULL OR encounter_id=:encounter) ORDER BY reviewed_at DESC LIMIT 200")
             .param("p",c.practiceId()).param("patient",patient).param("encounter",encounter,Types.OTHER).query(UUID.class).list();
         return ids.stream().map(id->manifest(c,patient,id)).filter(review->review.kinds().stream().allMatch(kind->allowed.contains(kind.sourceKind()))).toList();
     }

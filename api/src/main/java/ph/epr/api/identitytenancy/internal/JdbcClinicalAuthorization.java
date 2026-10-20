@@ -72,7 +72,7 @@ class JdbcClinicalAuthorization implements ClinicalAuthorization {
                 AND u.role IN ('CLINICIAN', 'PRACTICE_STAFF') AND m.enabled AND r.enabled AND r.practice_role = 'CLINICIAN'
                 AND g.enabled AND c.enabled AND c.synthetic_only AND p.provisioning_status = 'ACTIVE'
                 AND NOT EXISTS(SELECT 1 FROM clinical_schema_rollout rollout WHERE rollout.practice_id = p.practice_id AND rollout.state <> 'READY')
-                AND p.service_status = 'ENABLED' AND p.schema_version = '14'
+                AND p.service_status = 'ENABLED' AND p.schema_version = '15'
             ORDER BY p.display_name, g.site_id
             """).param("username", actor.username()).query((rs, n) -> new ScopeSummary(rs.getObject(1, UUID.class),
                 rs.getObject(2, UUID.class), rs.getString(3), rs.getString(4))).list();

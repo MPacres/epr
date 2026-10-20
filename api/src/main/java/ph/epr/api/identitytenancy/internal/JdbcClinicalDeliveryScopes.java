@@ -15,7 +15,7 @@ class JdbcClinicalDeliveryScopes implements ClinicalDeliveryScopes {
    JOIN practice_clinical_capability c ON c.practice_id=g.practice_id
    JOIN practice_tenant_registry t ON t.practice_id=g.practice_id
    WHERE g.enabled AND m.enabled AND u.enabled AND NOT u.password_reset_required AND c.enabled AND c.synthetic_only
-    AND t.service_status='ENABLED' AND t.provisioning_status='ACTIVE' AND t.schema_version='14'
+    AND t.service_status='ENABLED' AND t.provisioning_status='ACTIVE' AND t.schema_version='15'
     AND EXISTS(SELECT 1 FROM practice_role_assignment role WHERE role.practice_id=g.practice_id AND role.user_id=g.user_id AND role.enabled AND role.practice_role='CLINICIAN')
     AND NOT EXISTS(SELECT 1 FROM clinical_schema_rollout rollout WHERE rollout.practice_id=g.practice_id AND rollout.state<>'READY')
    ORDER BY g.practice_id,g.site_id,u.username LIMIT 1000

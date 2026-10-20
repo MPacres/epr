@@ -319,14 +319,14 @@ class ConnectedEncounterTests {
     @Test void migrationQuarantineFailsClosedAndHistoryCannotBeRewritten() {
         var operation = UUID.randomUUID();
         var version = control.sql("SELECT version FROM practice_tenant_registry WHERE practice_id = :practice").param("practice", practice).query(Long.class).single();
-        var claim = rollout.begin(practice, operation, version, clinician, "Synthetic canary", "14");
+        var claim = rollout.begin(practice, operation, version, clinician, "Synthetic canary", "15");
         assertThatThrownBy(() -> run(patients::list)).hasMessage("CLINICAL_ACCESS_DENIED");
-        rollout.finish(practice, operation, claim.attempt(), clinician, "14", false);
+        rollout.finish(practice, operation, claim.attempt(), clinician, "15", false);
         assertThatThrownBy(() -> run(patients::list)).hasMessage("CLINICAL_ACCESS_DENIED");
-        var retry = rollout.begin(practice, operation, version, clinician, "Synthetic canary", "14");
-        rollout.finish(practice, operation, retry.attempt(), clinician, "14", true);
+        var retry = rollout.begin(practice, operation, version, clinician, "Synthetic canary", "15");
+        rollout.finish(practice, operation, retry.attempt(), clinician, "15", true);
         assertThat(run(patients::list).getFirst().patientId()).isEqualTo(patient);
-        assertThatThrownBy(() -> rollout.begin(practice, operation, version, clinician, "Changed reason", "14")).hasMessage("IDEMPOTENCY_PAYLOAD_CONFLICT");
+        assertThatThrownBy(() -> rollout.begin(practice, operation, version, clinician, "Changed reason", "15")).hasMessage("IDEMPOTENCY_PAYLOAD_CONFLICT");
         assertThatThrownBy(() -> control.sql("DELETE FROM clinical_schema_rollout_event WHERE practice_id = :practice").param("practice", practice).update()).hasMessageContaining("DELETE FROM clinical_schema_rollout_event");
     }
     @Test void twoPracticesRacingReserveOnlyOneActiveEncounter() throws Exception {
@@ -409,7 +409,7 @@ class ConnectedEncounterTests {
     @Test void prescriptionRequiresReviewedSafetyAndKeepsStrengthSeparateFromDose() {
         var encounter=completeDraft();
         enableClinicalLists();
-        var item=new PrescriptionItem(UUID.randomUUID(),"Synthetic ingredient A","","100 synthetic units","Synthetic tablet",new java.math.BigDecimal("2"),"synthetic dose units","Synthetic route","Synthetic frequency","Synthetic duration",new java.math.BigDecimal("4"),"synthetic tablets",0,"Synthetic instructions","SYN-MED-A","synthetic-1");
+        var item=new PrescriptionItem(UUID.randomUUID(),"Synthetic ingredient A","","100 synthetic units","Synthetic tablet",new java.math.BigDecimal("2"),"synthetic dose units","Synthetic route","Synthetic frequency","Synthetic duration",new java.math.BigDecimal("4"),"synthetic tablets",0,"Synthetic instructions","SYN-MED-A","synthetic-1",null,null);
         var draft=run(c->prescribing.create(c,patient,UUID.randomUUID(),new PrescriptionCreate(UUID.randomUUID(),encounter.encounterId(),OffsetDateTime.now(),new PrescriptionData("Synthetic indication","",null,List.of(item)),null)));
         assertThatThrownBy(()->run(c->prescribing.prepare(c,patient,draft.id(),UUID.randomUUID(),new PrescriptionPrepare(UUID.randomUUID(),0)))).hasMessage("MEDICATION_SAFETY_REVIEW_REQUIRED");
         var allergy=run(c->clinicalLists.createAllergy(c,patient,UUID.randomUUID(),new ClinicalLists.CreateAllergy(UUID.randomUUID(),new ClinicalLists.AllergyData("Synthetic ingredient A",new ClinicalLists.Code("urn:epr:synthetic:medication","SYN-MED-A","synthetic-1","Synthetic ingredient A"),"MEDICATION","ALLERGY","CONFIRMED","HIGH",null,"UNKNOWN",null,"Synthetic patient report",null,null,OffsetDateTime.now(),encounter.encounterId(),List.of(new ClinicalLists.Reaction(UUID.randomUUID(),"Rash","MODERATE",null,null))))));
@@ -427,6 +427,19 @@ class ConnectedEncounterTests {
         var issued=run(c->prescribing.authorize(c,patient,draft.id(),UUID.randomUUID(),new PrescriptionAuthorize(ready.version(),preparation.preparationId(),preparation.artifactHash(),true,null,null)));
         assertThat(issued.data().items().getFirst().strength()).isEqualTo("100 synthetic units");assertThat(issued.data().items().getFirst().dose()).isEqualByComparingTo("2");
         assertThat(issued.state()).isEqualTo("ISSUED");assertThat(issued.deliveryState()).isEqualTo("NOT_SENT");
+        var catalog=run(prescribing::catalog);
+        assertThat(catalog).anySatisfy(entry->{assertThat(entry.code()).isEqualTo("SYN-MED-A");assertThat(entry.strength()).isEqualTo("100 synthetic units");assertThat(entry.formulation()).isEqualTo("Synthetic tablet");assertThat(entry.doseUnit()).isEqualTo("synthetic dose units");});
+        var refill=new PrescriptionItem(UUID.randomUUID(),item.ingredient(),item.brand(),item.strength(),item.formulation(),item.dose(),item.doseUnit(),item.route(),item.frequency(),item.duration(),item.quantity(),item.quantityUnit(),0,item.instructions(),item.catalogCode(),item.catalogVersion(),issued.id(),item.itemId());
+        var freeText=new PrescriptionItem(UUID.randomUUID(),"Synthetic custom medicine","","25 synthetic units","Synthetic capsule",new java.math.BigDecimal("1"),"synthetic dose units","Synthetic route","Synthetic frequency","Synthetic duration",new java.math.BigDecimal("3"),"synthetic capsules",0,"Synthetic instructions",null,null,null,null);
+        var combined=run(c->prescribing.create(c,patient,UUID.randomUUID(),new PrescriptionCreate(UUID.randomUUID(),encounter.encounterId(),OffsetDateTime.now(),new PrescriptionData("Synthetic combined indication","",review.reviewId(),List.of(refill,freeText)),null)));
+        assertThat(combined.data().items()).hasSize(2);
+        assertThat(combined.data().items()).anySatisfy(saved->{assertThat(saved.sourcePrescriptionId()).isEqualTo(issued.id());assertThat(saved.sourceItemId()).isEqualTo(item.itemId());});
+        var combinedPrep=run(c->prescribing.prepare(c,patient,combined.id(),UUID.randomUUID(),new PrescriptionPrepare(UUID.randomUUID(),combined.version())));
+        var combinedIssued=run(c->prescribing.authorize(c,patient,combined.id(),UUID.randomUUID(),new PrescriptionAuthorize(combined.version(),combinedPrep.preparationId(),combinedPrep.artifactHash(),true,null,"Intentional synthetic refill of the issued item")));
+        assertThat(combinedIssued.state()).isEqualTo("ISSUED");
+        assertThat(run(c->prescribing.get(c,patient,issued.id())).state()).isEqualTo("ISSUED");
+        var changedRefill=new PrescriptionItem(UUID.randomUUID(),"Different medicine","",refill.strength(),refill.formulation(),refill.dose(),refill.doseUnit(),refill.route(),refill.frequency(),refill.duration(),refill.quantity(),refill.quantityUnit(),0,refill.instructions(),refill.catalogCode(),refill.catalogVersion(),issued.id(),item.itemId());
+        assertThatThrownBy(()->run(c->prescribing.create(c,patient,UUID.randomUUID(),new PrescriptionCreate(UUID.randomUUID(),encounter.encounterId(),OffsetDateTime.now(),new PrescriptionData("Invalid refill","",review.reviewId(),List.of(changedRefill)),null)))).hasMessage("REFILL_MEDICINE_CHANGED");
     }
     @Test void clinicalListChangeInvalidatesPreparedNoteAndSignedBytesKeepExactReview() {
         var encounter=completeDraft();enableClinicalLists();var review=reconcile(encounter.encounterId());

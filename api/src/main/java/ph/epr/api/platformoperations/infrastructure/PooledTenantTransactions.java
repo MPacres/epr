@@ -31,7 +31,7 @@ class PooledTenantTransactions implements TenantTransactions, ph.epr.api.platfor
     @Override
     public <T> T execute(AuthenticatedActor actor, UUID practiceId, UUID siteId, boolean approval, Function<Context, T> work) {
         var scope = authorization.authorize(actor, practiceId, siteId, approval);
-        if (!Set.of("15").contains(scope.tenant().schemaVersion())) throw new ClinicalAccessException("TENANT_SCHEMA_UNAVAILABLE", 503);
+        if (!ClinicalReadiness.REQUIRED_SCHEMA_VERSION.equals(scope.tenant().schemaVersion())) throw new ClinicalAccessException("TENANT_SCHEMA_UNAVAILABLE", 503);
         var pool = acquire(scope.tenant());
         try {
             var transaction = new TransactionTemplate(new JdbcTransactionManager(pool.source));

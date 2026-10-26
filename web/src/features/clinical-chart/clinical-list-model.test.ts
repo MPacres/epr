@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { allergyDraftSchema, commandFor, draftFor, medicationDraftSchema, problemDraftSchema, type AllergyDraft } from './clinical-list-model'
-import type { Allergy, Problem } from './clinical-list-api'
+import type { Allergy, MedicationUse, Problem } from './clinical-list-api'
 
 describe('clinical list command mapping', () => {
   it('creates a coded allergy without inventing a reviewed absence', () => {
@@ -43,13 +43,22 @@ describe('clinical list command mapping', () => {
     expect(medicationDraftSchema.safeParse({ ...draft, doseUnit: 'mg' }).success).toBe(true)
   })
 
+  it('keeps medication provenance and clinical links during a correction', () => {
+    const record: MedicationUse = {
+      id: '1a0a5c84-2dfa-4f3e-bca1-34738628835f', patientId: '86b2579c-33de-4596-b1a5-6b55263ce03c', version: 3, status: 'ACTIVE', createdBy: 'e1251ba1-76f1-4e79-a332-047642dcfdfc', createdAt: '2026-10-08T01:00:00Z', revisions: [], duplicateCandidate: false,
+      data: { medicationDisplay: 'Losartan', code: null, brand: null, strength: '50 mg', formulation: null, dose: null, doseUnit: null, route: null, frequency: null, prn: false, effectiveStart: null, effectiveEnd: null, effectivePrecision: 'UNKNOWN', informationSource: 'Patient interview', prescriber: null, adherence: 'TAKING_AS_REPORTED', notes: null, indicationProblemId: 'f9859851-94a2-4239-916b-59348623f744', prescriptionId: '0bd4f896-7d58-4ebc-bab9-a0d97214d374', clinicalTime: '2026-10-08T01:00:00Z', encounterId: 'd9a19316-74e3-49da-8e56-9ba2e4131d24' },
+    }
+    const draft = medicationDraftSchema.parse({ ...draftFor('MEDICATION_USE', record), strength: '100 mg', correctionReason: 'Strength confirmed with patient' })
+    expect(commandFor('MEDICATION_USE', draft, record.id, record)).toMatchObject({ expectedVersion: 3, reason: 'Strength confirmed with patient', data: { strength: '100 mg', indicationProblemId: record.data.indicationProblemId, prescriptionId: record.data.prescriptionId, clinicalTime: record.data.clinicalTime, encounterId: record.data.encounterId } })
+  })
+
   it('uses the current version and correction reason for a problem revision', () => {
     const record: Problem = {
       id: '1a0a5c84-2dfa-4f3e-bca1-34738628835f', patientId: '86b2579c-33de-4596-b1a5-6b55263ce03c', version: 4, clinicalStatus: 'ACTIVE', priority: 2, createdBy: 'e1251ba1-76f1-4e79-a332-047642dcfdfc', createdAt: '2026-10-08T01:00:00Z', revisions: [], encounterIds: [], duplicateCandidate: false,
-      data: { problemDisplay: 'Asthma', code: null, verificationStatus: 'CONFIRMED', onset: null, onsetPrecision: 'UNKNOWN', abatement: null, abatementPrecision: 'UNKNOWN', severity: null, informationSource: 'Prior chart', notes: null, clinicalTime: null, encounterId: null },
+      data: { problemDisplay: 'Asthma', code: null, verificationStatus: 'CONFIRMED', onset: null, onsetPrecision: 'UNKNOWN', abatement: null, abatementPrecision: 'UNKNOWN', severity: null, informationSource: 'Prior chart', notes: null, clinicalTime: '2026-10-08T01:00:00Z', encounterId: 'd9a19316-74e3-49da-8e56-9ba2e4131d24' },
     }
     const draft = problemDraftSchema.parse({ ...draftFor('PROBLEM', record), severity: 'Moderate', correctionReason: 'Patient clarified severity' })
-    expect(commandFor('PROBLEM', draft, record.id, record)).toMatchObject({ expectedVersion: 4, reason: 'Patient clarified severity', priority: 2, data: { severity: 'Moderate' } })
+    expect(commandFor('PROBLEM', draft, record.id, record)).toMatchObject({ expectedVersion: 4, reason: 'Patient clarified severity', priority: 2, data: { severity: 'Moderate', clinicalTime: record.data.clinicalTime, encounterId: record.data.encounterId } })
   })
 
   it('retains an existing reaction identity while appending an allergy correction', () => {

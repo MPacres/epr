@@ -81,6 +81,22 @@ class ClinicalListsTests {
         assertThatThrownBy(()->run(c->{c.jdbc().sql("DELETE FROM allergy_revision WHERE practice_id=:p").param("p",practice).update();return null;})).hasMessageContaining("Clinical history is immutable");
     }
 
+    @Test void mistakenAllergyCanLeaveActiveListWithoutErasingHistory(){
+        var created=run(c->lists.createAllergy(c,patient,UUID.randomUUID(),new CreateAllergy(UUID.randomUUID(),allergyData("Mistaken synthetic entry",null))));
+        var originalGeneration=run(c->lists.summary(c,patient)).allergies().generation();
+        var key=UUID.randomUUID();var command=new Transition(created.version(),"ENTER_IN_ERROR","Mistaken allergy entry removed from active chart");
+        var removed=run(c->lists.transitionAllergy(c,patient,created.id(),key,command));
+        assertThat(removed.clinicalStatus()).isEqualTo("ENTERED_IN_ERROR");
+        assertThat(removed.revisions()).hasSize(2);
+        var replay=run(c->lists.transitionAllergy(c,patient,created.id(),key,command));
+        assertThat(replay).isEqualTo(removed);
+        assertThat(run(c->lists.allergies(c,patient,"active",0,20)).items()).isEmpty();
+        assertThat(run(c->lists.allergies(c,patient,"all",0,20)).items()).extracting(Allergy::id).containsExactly(created.id());
+        var summary=run(c->lists.summary(c,patient)).allergies();
+        assertThat(summary.activeCount()).isZero();
+        assertThat(summary.generation()).isGreaterThan(originalGeneration);
+    }
+
     @Test void reconciliationIsExactReplayableAndSupportsCanonicalSafety(){
         var allergy=run(c->lists.createAllergy(c,patient,UUID.randomUUID(),new CreateAllergy(UUID.randomUUID(),allergyData("Synthetic ingredient A",new Code("urn:epr:synthetic:medication","SYN-MED-A","synthetic-1","Synthetic ingredient A")))));
         var medication=run(c->lists.createMedicationUse(c,patient,UUID.randomUUID(),new CreateMedicationUse(UUID.randomUUID(),medicationData())));

@@ -44,7 +44,7 @@ class JdbcSyntheticClinicalCapability implements SyntheticClinicalCapability {
             return new Result(true, event.version(), true);
         }
         if (practice.version() != expectedVersion) throw new ClinicalAccessException("VERSION_CONFLICT", 409);
-        if (!practice.schemaVersion().equals("15") || !practice.provisioningStatus().equals("ACTIVE")
+        if (!practice.schemaVersion().equals(ClinicalReadiness.REQUIRED_SCHEMA_VERSION) || !practice.provisioningStatus().equals("ACTIVE")
             || !practice.serviceStatus().equals("ENABLED")
             || jdbc.sql("SELECT EXISTS(SELECT 1 FROM clinical_schema_rollout WHERE practice_id = :practice AND state <> 'READY')")
                 .param("practice", practiceId).query(Boolean.class).single())

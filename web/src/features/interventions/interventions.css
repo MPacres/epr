@@ -14,6 +14,15 @@
 .intervention-row-content p { margin: 6px 0; line-height: 1.6; }
 .intervention-row-status { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; font-size: 13px; margin: 8px 0; }
 .intervention-row-content small, .intervention-help { color: #65738b; }
+.intervention-row-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; flex-wrap: wrap; }
+.intervention-remove-trigger { color: #a52c3d; }
+.intervention-remove-trigger:hover { color: #8f2030; background: #fff1f2; }
+.intervention-remove-trigger svg { width: 17px; height: 17px; }
+.intervention-inline-remove { flex: 0 1 420px; min-width: min(100%, 280px); padding: 12px; border: 1px solid #e8c58e; border-radius: 8px; background: #fffaf0; }
+.intervention-inline-remove p { margin: 0 0 10px; line-height: 1.5; }
+.intervention-inline-remove [role=alert] { color: #a52c3d; }
+.intervention-inline-remove-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.intervention-inline-remove-actions button { min-height: 44px; }
 .intervention-empty { padding: 24px 0; color: #65738b; }
 .intervention-confirmed { color: #087953; }
 .sheet-content:has(.intervention-dialog) { width: min(760px, 100vw); max-width: 100vw; }
@@ -55,6 +64,15 @@
 .lab-selected li:last-child { border-bottom: 0; }
 .lab-selected li span { min-width: 0; overflow-wrap: anywhere; }
 .lab-selected li button { min-width: 44px; min-height: 44px; flex: none; }
+.lab-order-context { margin: 4px 0 20px; }
+.lab-order-context h3 { margin: 0; font-size: 16px; }
+.lab-order-context p { margin: 4px 0 10px; color: #65738b; font-size: 13px; }
+.lab-order-context ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.lab-order-context li { display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; padding: 10px 12px; border: 1px solid #e0e7f0; border-radius: 8px; }
+.lab-order-context li.is-selected { border-color: #245ce5; background: #edf4ff; box-shadow: inset 3px 0 #245ce5; }
+.lab-order-context li span { min-width: 0; overflow-wrap: anywhere; font-weight: 500; }
+.lab-order-context li strong { color: #184bc9; font-size: 12px; }
+.lab-order-context li small { color: #65738b; font-size: 12px; }
 .lab-order-flags { display: flex; flex-wrap: wrap; gap: 8px 24px; }
 .lab-order-flags .clinical-checkbox { margin: 0; }
 .lab-more-details summary { width: fit-content; color: #245ce5; cursor: pointer; }
@@ -80,8 +98,10 @@
  .encounter-interventions { padding: 16px; }
  .intervention-section-heading { align-items: stretch; flex-direction: column; gap: 12px; }
  .intervention-list li { flex-wrap: wrap; gap: 12px; }
- .intervention-list li > button { margin-left: 52px; min-height: 44px; }
+ .intervention-row-actions { margin-left: 52px; justify-content: flex-start; }
+ .intervention-row-actions button { min-height: 44px; }
  .intervention-row-content { flex-basis: calc(100% - 60px); }
+ .intervention-inline-remove { flex-basis: 100%; margin-left: 52px; }
  .intervention-field-grid { grid-template-columns: minmax(0,1fr); }
  .prescription-pair { grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
  .intervention-composer input,.intervention-composer select,.intervention-composer textarea { font-size: 16px; min-height: 44px; }

@@ -94,14 +94,17 @@ public class JdbcEncounterInterventionLinks implements EncounterInterventionLink
         if(page<0||size<1||size>100) throw new ClinicalAccessException("INVALID_PAGE",422);
         backfillFollowups(c,patient,encounter);
         var allowed=capabilities(c,patient,encounter).stream().map(InterventionAuthorization.Capability::kind).collect(java.util.stream.Collectors.toSet());
-        var items=all(c,patient,encounter).stream().filter(x->allowed.contains(x.summary().kind().name())).toList();
+        var items=all(c,patient,encounter).stream()
+            .filter(x->allowed.contains(x.summary().kind().name()) && !"ABANDONED".equals(x.summary().clinicalState())).toList();
         journal.audit(c,encounter,"INTERVENTIONS_READ",null);
         return new Page(version(c,patient,encounter),items.stream().skip((long)page*size).limit(size).toList(),items.size(),page,size);
     }
     public Manifest capture(Context c, UUID patient, UUID encounter, UUID id) {
         lock(c,patient,encounter);
         backfillFollowups(c,patient,encounter);
-        var items=all(c,patient,encounter);
+        // Abandoned drafts remain in source and summary history, but are no longer active note plans.
+        var items=all(c,patient,encounter).stream()
+            .filter(item->!"ABANDONED".equals(item.summary().clinicalState())).toList();
         for(var item:items) require(c,item.summary().kind(),InterventionAuthorization.Action.READ);
         var version=version(c,patient,encounter); var checksum=ClinicalJson.hash(Map.of("version",version,"items",items));
         c.jdbc().sql("INSERT INTO encounter_intervention_manifest(practice_id,patient_id,encounter_id,manifest_id,set_version,items,checksum,created_by) VALUES(:p,:patient,:e,:id,:v,CAST(:items AS jsonb),:hash,:a)")

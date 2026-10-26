@@ -145,7 +145,7 @@ Do not make the clinician select a different documentation template to perform a
 1. Select the intervention type or a permitted favorite.
 2. Show patient name plus identifier, encounter context and relevant alerts within the composer. Prefill context only; do not invent clinical content.
 3. Enter/select the required details. Use dedicated fields appropriate to the type. Preserve entered data on validation, network and authorization failure according to scope policy.
-4. **Save draft** persists preparation without prescribing, sending or assigning unsupported success states. **Save and add another** can return to the picker while preserving the completed draft's identity.
+4. For laboratory and imaging requests, **Add to note** records the planned request in one action. It remains internally unissued until separate authorization; the list and note candidate must say so plainly. Other intervention types retain **Save draft** preparation where applicable. **Save and add another** can return to the picker while preserving the completed record's identity.
 5. Review and perform the specific action: **Issue prescription**, **Authorize order**, **Release referral**, or **Create follow-up task**. These labels must describe the actual outcome. A task may be created in one deliberate step because it is not prescription issuance.
 6. Update the list only from server-confirmed outcomes. A timed-out mutation shows “Confirmation pending” and retries its original payload/key; it is not an invitation to create another record.
 

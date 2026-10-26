@@ -1,0 +1,204 @@
+{
+  "schemaVersion": "1.0",
+  "ruleVersion": "1",
+  "rendererVersion": "1",
+  "extractionVersion": "none",
+  "terminologyVersion": "uncoded-1",
+  "templateKey": "general.outpatient",
+  "title": "General outpatient",
+  "specialty": "GENERAL",
+  "encounterType": "OUTPATIENT",
+  "businessVersion": "1.1.0",
+  "requiresPregnancyEpisode": false,
+  "syntheticOnly": true,
+  "sections": [
+    {
+      "id": "31624f98-b956-512d-8b61-98e1258606f5",
+      "key": "reason-section",
+      "label": "Reason & history",
+      "fields": [
+        {
+          "id": "4a980d8f-8550-502d-ab2c-0c94c0c13be1",
+          "key": "visit.reason",
+          "concept": "visit.reason",
+          "label": "Reason for visit",
+          "type": "MULTILINE_TEXT",
+          "options": [],
+          "units": [],
+          "allowedMissingStates": [
+            "NOT_ASSESSED",
+            "UNKNOWN",
+            "DECLINED",
+            "NOT_APPLICABLE"
+          ],
+          "maxLength": 4000,
+          "maxItems": 0,
+          "precision": 2,
+          "requiredAtSign": true,
+          "sensitivity": "CLINICAL",
+          "visibleWhen": null,
+          "requiredWhen": null,
+          "fields": []
+        },
+        {
+          "id": "d9b61b46-38b1-502a-8774-1a6ca56e72b8",
+          "key": "visit.history",
+          "concept": "visit.history",
+          "label": "History reported today",
+          "type": "MULTILINE_TEXT",
+          "options": [],
+          "units": [],
+          "allowedMissingStates": [
+            "NOT_ASSESSED",
+            "UNKNOWN",
+            "DECLINED",
+            "NOT_APPLICABLE"
+          ],
+          "maxLength": 4000,
+          "maxItems": 0,
+          "precision": 2,
+          "requiredAtSign": false,
+          "sensitivity": "CLINICAL",
+          "visibleWhen": null,
+          "requiredWhen": null,
+          "fields": []
+        }
+      ]
+    },
+    {
+      "id": "aacc6bd5-8d27-5ab1-905a-0ed166717bee",
+      "key": "ros-section",
+      "label": "Review of systems",
+      "fields": [
+        {
+          "id": "219dda37-08df-5e4b-a1b8-888551a13fe0",
+          "key": "visit.ros",
+          "concept": "visit.ros",
+          "label": "Symptoms reviewed today",
+          "type": "MULTILINE_TEXT",
+          "options": [],
+          "units": [],
+          "allowedMissingStates": [
+            "NOT_ASSESSED",
+            "UNKNOWN",
+            "DECLINED",
+            "NOT_APPLICABLE"
+          ],
+          "maxLength": 4000,
+          "maxItems": 0,
+          "precision": 2,
+          "requiredAtSign": true,
+          "sensitivity": "CLINICAL",
+          "visibleWhen": null,
+          "requiredWhen": null,
+          "fields": []
+        }
+      ]
+    },
+    {
+      "id": "fa696eb8-c484-59c7-8e2a-609dac398461",
+      "key": "exam-section",
+      "label": "Physical examination",
+      "fields": [
+        {
+          "id": "61d95f2a-dc75-539c-b852-eb65b79f2a48",
+          "key": "visit.physical-examination",
+          "concept": "visit.physical-examination",
+          "label": "Findings assessed today",
+          "type": "MULTILINE_TEXT",
+          "options": [],
+          "units": [],
+          "allowedMissingStates": [
+            "NOT_ASSESSED",
+            "DECLINED",
+            "NOT_APPLICABLE"
+          ],
+          "maxLength": 4000,
+          "maxItems": 0,
+          "precision": 2,
+          "requiredAtSign": true,
+          "sensitivity": "CLINICAL",
+          "visibleWhen": null,
+          "requiredWhen": null,
+          "fields": []
+        }
+      ]
+    },
+    {
+      "id": "da71db2b-9099-5025-a744-8ce343b7f1c2",
+      "key": "assessment-section",
+      "label": "Assessment & plan",
+      "fields": [
+        {
+          "id": "86e3893f-752d-5354-9b50-022e4cbdcfb2",
+          "key": "visit.assessment",
+          "concept": "visit.assessment",
+          "label": "Clinical assessment",
+          "type": "MULTILINE_TEXT",
+          "options": [],
+          "units": [],
+          "allowedMissingStates": [
+            "NOT_ASSESSED",
+            "UNKNOWN",
+            "DECLINED",
+            "NOT_APPLICABLE"
+          ],
+          "maxLength": 4000,
+          "maxItems": 0,
+          "precision": 2,
+          "requiredAtSign": true,
+          "sensitivity": "CLINICAL",
+          "visibleWhen": null,
+          "requiredWhen": null,
+          "fields": []
+        },
+        {
+          "id": "1d600c98-ca61-5e19-acd0-4b25c31e87eb",
+          "key": "visit.plan",
+          "concept": "visit.plan",
+          "label": "Plan & counselling",
+          "type": "MULTILINE_TEXT",
+          "options": [],
+          "units": [],
+          "allowedMissingStates": [
+            "NOT_ASSESSED",
+            "UNKNOWN",
+            "DECLINED",
+            "NOT_APPLICABLE"
+          ],
+          "maxLength": 4000,
+          "maxItems": 0,
+          "precision": 2,
+          "requiredAtSign": true,
+          "sensitivity": "CLINICAL",
+          "visibleWhen": null,
+          "requiredWhen": null,
+          "fields": []
+        },
+        {
+          "id": "73fca15c-05d9-562e-9fa0-4c590b29f129",
+          "key": "visit.disposition",
+          "concept": "visit.disposition",
+          "label": "Disposition & follow-up",
+          "type": "MULTILINE_TEXT",
+          "options": [],
+          "units": [],
+          "allowedMissingStates": [
+            "NOT_ASSESSED",
+            "UNKNOWN",
+            "DECLINED",
+            "NOT_APPLICABLE"
+          ],
+          "maxLength": 4000,
+          "maxItems": 0,
+          "precision": 2,
+          "requiredAtSign": true,
+          "sensitivity": "CLINICAL",
+          "visibleWhen": null,
+          "requiredWhen": null,
+          "fields": []
+        }
+      ]
+    }
+  ]
+}

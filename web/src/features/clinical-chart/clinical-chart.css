@@ -10,6 +10,7 @@
   border-radius: 12px;
   scrollbar-width: thin;
 }
+.chart-navigation-tabs { display: flex; gap: 4px; min-width: 0; }
 
 .chart-navigation-item {
   display: flex;
@@ -33,6 +34,8 @@
 .chart-navigation-item:hover:not(:disabled) { color: var(--blue); background: #f3f7ff; }
 .chart-navigation-item:active:not(:disabled) { transform: scale(.96); }
 .chart-navigation-item.active { color: var(--blue); background: #eaf1ff; }
+.chart-navigation-item[aria-selected='true'] { color: var(--blue); background: #eaf1ff; }
+.chart-navigation-details { margin-left: auto; }
 .chart-navigation-item:disabled { color: #7f8b9e; cursor: not-allowed; }
 .chart-navigation-item svg { width: 16px; height: 16px; }
 .chart-navigation-item small { margin-left: 2px; padding: 3px 6px; border-radius: 5px; background: #f1f3f7; color: #68758a; font-size: 10px; font-weight: 500; }
@@ -79,6 +82,7 @@
 .clinical-summary-card { display: flex; flex-direction: column; min-width: 0; min-height: 210px; padding: 20px; background: #fff; border: 1px solid var(--border); border-radius: 12px; }
 .clinical-summary-card-body { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 .clinical-summary-card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.clinical-summary-card .clinical-summary-preview { margin-bottom: 16px; }
 .clinical-summary-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: auto; padding-top: 16px; border-top: 1px solid #e9edf4; color: var(--secondary); font-size: 12px; }
 .clinical-summary-card-footer strong { color: #33455f; font-weight: 500; }
 .clinical-summary-allergies .clinical-summary-card-footer { margin-top: 16px; border-color: #eadfca; }
@@ -166,8 +170,10 @@
 .clinical-list-form-actions { position: sticky; bottom: -24px; display: flex; justify-content: flex-end; gap: 10px; margin: 0 -24px -24px; padding: 14px 24px; background: #fff; border-top: 1px solid var(--border); z-index: 2; }
 
 @media (max-width: 700px) {
-  .chart-navigation { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-inline: -4px; overflow: visible; }
+  .chart-navigation { display: grid; grid-template-columns: 1fr; margin-inline: -4px; overflow: visible; }
+  .chart-navigation-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .chart-navigation-item { justify-content: flex-start; min-width: 0; padding-inline: 12px; }
+  .chart-navigation-details { justify-self: end; }
   .chart-navigation-item small { margin-left: auto; font-size: 9px; }
   .clinical-summary-heading { display: grid; gap: 10px; }
   .clinical-summary-state { justify-self: start; }

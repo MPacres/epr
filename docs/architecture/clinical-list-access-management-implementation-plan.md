@@ -62,7 +62,7 @@ No action other than `READ` may be granted without `READ`. The server validates 
 ## 4. Target authorization flow
 
 1. Provider Support verifies that the Practice is active and enabled.
-2. Provider Support upgrades the tenant database to schema 15 when required.
+2. Provider Support upgrades the tenant database to schema 16 when required.
 3. Provider Support enables the Practice clinical capability and all three clinical-list source capabilities.
 4. A Practice administrator assigns the member the `CLINICIAN` Practice role and one or more explicit clinical sites.
 5. The Practice administrator assigns a permission profile for each source at each selected site and records a reason.
@@ -160,7 +160,7 @@ Every grant command must require:
 
 - a current, enabled Practice administrator as the actor;
 - an active and enabled Practice route;
-- tenant schema 15 with no non-ready rollout state;
+- tenant schema 16 with no non-ready rollout state;
 - Practice clinical capability enabled;
 - the corresponding source capability enabled;
 - an enabled target account and Practice membership;
@@ -261,7 +261,7 @@ Add a **Clinical readiness** section to the existing Practice detail workspace s
 
 Expose the existing support-only operations as guarded actions:
 
-- **Upgrade to schema 15**; and
+- **Upgrade to schema 16**; and
 - **Enable synthetic clinical workflows**.
 
 Each command requires a reason, expected Practice version, and idempotency key. Version conflicts reload the latest Practice state. Migration-in-progress and quarantined states remain explicit and fail closed.
@@ -367,7 +367,7 @@ The browser run must inspect console errors, keyboard interaction, focus managem
 
 The initial grant-management slice is complete when:
 
-- a schema-15, clinically enabled synthetic Practice exposes source readiness correctly;
+- a schema-16, clinically enabled synthetic Practice exposes source readiness correctly;
 - a Practice administrator can grant a doctor explicit per-site clinical-list profiles without SQL;
 - the server records one atomic, versioned, idempotent, auditable access change;
 - the doctor receives the new chart capabilities after refresh without reauthentication;

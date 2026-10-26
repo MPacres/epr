@@ -164,6 +164,14 @@ export type Code = {
   "display"?: string | null
 }
 
+export type Correct = {
+  "expectedVersion"?: number
+  "measuredAt"?: string
+  "source"?: string
+  "values"?: Values
+  "reason"?: string
+}
+
 export type Create = {
   "encounterId"?: string
   "releaseId"?: string
@@ -318,6 +326,13 @@ export type Field = {
   "visibleWhen"?: Rule | null
   "requiredWhen"?: Rule | null
   "fields"?: Array<Field>
+  "quickFindings"?: Array<QuickGroup>
+}
+
+export type Finding = {
+  "systemKey"?: string
+  "phrases"?: Array<string>
+  "customText"?: string
 }
 
 export type FollowUp = {
@@ -421,12 +436,11 @@ export type Item = {
 export type JsonNode = {
   "number"?: boolean
   "container"?: boolean
-  "floatingPointNumber"?: boolean
-  "valueNode"?: boolean
-  "missingNode"?: boolean
   "nodeType"?: "ARRAY" | "BINARY" | "BOOLEAN" | "MISSING" | "NULL" | "NUMBER" | "OBJECT" | "POJO" | "STRING"
   "string"?: boolean
   "integralNumber"?: boolean
+  "missingNode"?: boolean
+  "valueNode"?: boolean
   "pojo"?: boolean
   "short"?: boolean
   "int"?: boolean
@@ -437,6 +451,7 @@ export type JsonNode = {
   "textual"?: boolean
   "boolean"?: boolean
   "binary"?: boolean
+  "floatingPointNumber"?: boolean
   "empty"?: boolean
   "array"?: boolean
   "null"?: boolean
@@ -848,6 +863,12 @@ export type QueueTransition = {
   "reason"?: string
 }
 
+export type QuickGroup = {
+  "key"?: string
+  "label"?: string
+  "phrases"?: Array<string>
+}
+
 export type Reaction = {
   "reactionId"?: string
   "manifestation"?: string
@@ -1039,6 +1060,16 @@ export type ReviseProblem = {
   "reason"?: string
   "priority"?: number
   "data"?: ProblemData
+}
+
+export type Revision = {
+  "version"?: number
+  "measuredAt"?: string
+  "source"?: string
+  "values"?: Values
+  "correctionReason"?: string
+  "recordedBy"?: string
+  "receivedAt"?: string
 }
 
 export type Rule = {
@@ -1416,4 +1447,22 @@ export type Value = {
   "referenceId"?: string | null
   "referenceVersion"?: number | null
   "items"?: Array<string>
+  "findings"?: Array<Finding>
+}
+
+export type Values = {
+  "systolicMmhg"?: number
+  "diastolicMmhg"?: number
+  "pulseBpm"?: number
+  "respiratoryRateBpm"?: number
+  "temperatureC"?: number
+  "oxygenSaturationPercent"?: number
+  "weightKg"?: number
+  "heightCm"?: number
+}
+
+export type VitalSet = {
+  "vitalSetId"?: string
+  "current"?: Revision
+  "history"?: Array<Revision>
 }

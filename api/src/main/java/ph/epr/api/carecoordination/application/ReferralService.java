@@ -89,7 +89,7 @@ public class ReferralService {
     }
     public byte[] candidateContent(Context c,UUID patient,UUID id,ReferralPrepare request) {
         var before=get(c,patient,id);links.require(c,kind(before.data()),InterventionAuthorization.Action.AUTHORIZE);
-        lockSource(c,patient,before);var current=get(c,patient,id);version(current,request.expectedVersion());draft(current);validate(current.data(),true);prerequisites(c,current);
+        var encounter=lockSource(c,patient,before);unsigned(encounter);var current=get(c,patient,id);version(current,request.expectedVersion());draft(current);validate(current.data(),true);prerequisites(c,current);
         return render(c,current);
     }
     public ReferralPreparation prepare(Context c,UUID patient,UUID id,UUID key,ReferralPrepare request) {
@@ -98,7 +98,7 @@ public class ReferralService {
     public ReferralPreparation prepare(Context c,UUID patient,UUID id,UUID key,ReferralPrepare request,PrivateClinicalArtifacts.Artifact staged) {
         var before=get(c,patient,id);links.require(c,kind(before.data()),InterventionAuthorization.Action.AUTHORIZE);
         return journal.execute(c,"prepare-referral/"+id,key,request,ReferralPreparation.class,()->{
-            lockSource(c,patient,before);var current=get(c,patient,id);version(current,request.expectedVersion());draft(current);validate(current.data(),true);prerequisites(c,current);
+            var encounter=lockSource(c,patient,before);unsigned(encounter);var current=get(c,patient,id);version(current,request.expectedVersion());draft(current);validate(current.data(),true);prerequisites(c,current);
             if(request.preparationId()==null) fail("PREPARATION_ID_REQUIRED");
             var artifact=staged==null?artifacts.stage(c,request.preparationId(),render(c,current)):staged;
             if(!artifact.artifactId().equals(request.preparationId()))fail("ARTIFACT_CONTEXT_MISMATCH");
@@ -114,9 +114,9 @@ public class ReferralService {
             var original=before.supersedesId()==null?null:get(c,patient,before.supersedesId());
             var boundaries=new java.util.TreeSet<UUID>();boundaries.add(before.encounterId());if(original!=null)boundaries.add(original.encounterId());
             for(var boundary:boundaries)links.lock(c,patient,boundary);
-            var encounter=links.context(c,patient,before.encounterId());var current=get(c,patient,id);version(current,request.expectedVersion());draft(current);
+            var encounter=links.context(c,patient,before.encounterId());unsigned(encounter);var current=get(c,patient,id);version(current,request.expectedVersion());draft(current);
             if(!request.confirmSyntheticReview()) fail("DELIBERATE_SYNTHETIC_REVIEW_REQUIRED");
-            if(!encounter.careState().equals("IN_PROGRESS")||encounter.noteState().equals("SIGNED")) required(request.lateActionReason(),"LATE_ACTION_REASON_REQUIRED");
+            if(!encounter.careState().equals("IN_PROGRESS")) required(request.lateActionReason(),"LATE_ACTION_REASON_REQUIRED");
             validate(current.data(),true);prerequisites(c,current);duplicates(c,current,request.duplicateReason());
             var prep=c.jdbc().sql("SELECT preparation_id,source_version,artifact_id,artifact_hash FROM referral_preparation WHERE practice_id=:p AND id=:id AND preparation_id=:candidate AND prepared_by=:a")
                 .param("p",c.practiceId()).param("id",id).param("candidate",request.preparationId()).param("a",c.actorId())
@@ -145,7 +145,7 @@ public class ReferralService {
     private ReferralRecord end(Context c,UUID patient,UUID id,UUID key,ReferralReason request,boolean abandon) {
         var before=get(c,patient,id);links.require(c,kind(before.data()),abandon?InterventionAuthorization.Action.PREPARE:InterventionAuthorization.Action.CONTINUE_EXISTING);required(request.reason(),"REASON_REQUIRED");
         return journal.execute(c,(abandon?"abandon-":"cancel-")+"referral/"+id,key,request,ReferralRecord.class,()->{
-            lockSource(c,patient,before);var current=get(c,patient,id);version(current,request.expectedVersion());
+            var encounter=lockSource(c,patient,before);if(abandon)unsigned(encounter);var current=get(c,patient,id);version(current,request.expectedVersion());
             if(abandon) draft(current);else if(!current.state().equals("RELEASED")) fail("AUTHORIZED_RECORD_REQUIRED");
             if(!abandon && current.fulfillmentState().equals("FULFILLED")) fail("PERFORMED_CARE_CANNOT_BE_CANCELLED");
             c.jdbc().sql("UPDATE referral SET state=:state,version=version+1 WHERE practice_id=:p AND id=:id")
@@ -197,6 +197,7 @@ public class ReferralService {
     private Kind kind(ReferralData data) { return Kind.REFERRAL; }
     private void bump(Context c,UUID id) { c.jdbc().sql("UPDATE referral SET version=version+1 WHERE practice_id=:p AND id=:id").param("p",c.practiceId()).param("id",id).update(); }
     private void newDecision(EncounterContext encounter) { if(!encounter.careState().equals("IN_PROGRESS")||encounter.noteState().equals("SIGNED")) throw new ClinicalAccessException("NEW_FOLLOW_UP_ENCOUNTER_REQUIRED",409); }
+    private void unsigned(EncounterContext encounter) { if("SIGNED".equals(encounter.noteState())) throw new ClinicalAccessException("SIGNED_NOTE_IMMUTABLE",409); }
     private void version(ReferralRecord r,long expected) { if(r.version()!=expected) throw new ClinicalAccessException("VERSION_CONFLICT",409); }
     private void draft(ReferralRecord r) { if(!r.state().equals("DRAFT")) throw new ClinicalAccessException("AUTHORIZED_RECORD_IMMUTABLE",409); }
     private static String text(String s) { return s==null?"":s; }

@@ -91,6 +91,17 @@ public final class TemplateCompiler {
             field.units().forEach(unit -> text(unit, 30));
             boolean choice = Set.of(Widget.SINGLE_CHOICE, Widget.MULTIPLE_CHOICE, Widget.ASSESSMENT_STATE).contains(field.type());
             require(choice == !field.options().isEmpty(), "CHOICE_OPTIONS");
+            require(field.quickFindings().isEmpty() || field.type() == Widget.MULTILINE_TEXT
+                && Set.of("visit.ros", "visit.physical-examination").contains(field.concept()), "QUICK_FINDING_FIELD");
+            require(field.quickFindings().size() <= 20, "QUICK_FINDING_LIMIT");
+            var quickKeys = new HashSet<String>();
+            for (var group : field.quickFindings()) {
+                text(group.key(), 60); text(group.label(), 80);
+                require(group.key().matches("[a-z][a-z0-9.-]*") && quickKeys.add(group.key())
+                    && !group.phrases().isEmpty() && group.phrases().size() <= 12
+                    && new HashSet<>(group.phrases()).size() == group.phrases().size(), "QUICK_FINDING_GROUP");
+                group.phrases().forEach(phrase -> text(phrase, 220));
+            }
             require((field.type() == Widget.QUANTITY) == !field.units().isEmpty(), "QUANTITY_UNITS");
             require((field.type() == Widget.GROUP) == !field.fields().isEmpty(), "GROUP_FIELDS");
             require(field.type() == Widget.GROUP ? field.maxItems() >= 1 && field.maxItems() <= 30 : field.maxItems() == 0, "GROUP_LIMIT");

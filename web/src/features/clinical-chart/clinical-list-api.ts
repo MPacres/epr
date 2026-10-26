@@ -53,14 +53,28 @@ export type ClinicalRecord = Allergy | MedicationUse | Problem
 const page = <T extends z.ZodType>(item: T) => z.object({ items: z.array(item), page: z.number(), pageSize: z.number(), total: z.number() })
 const kindPath = (kind: ClinicalListKind) => kind === 'ALLERGY' ? 'allergies' : kind === 'MEDICATION_USE' ? 'medication-use' : 'problems'
 const clinicalRecordSchema = z.union([allergySchema, medicationSchema, problemSchema])
+const proposalSchema = z.object({ proposalId: uuid, sourceKind: z.enum(clinicalListKinds), proposedAction: z.string(), informationSource: z.string(), decision: z.string().nullable() }).passthrough()
+export const reconciliationSchema = z.object({ reviewId: uuid, reviewType: z.string(), reviewedAt: z.string(), stale: z.boolean(), manifestHash: z.string(), kinds: z.array(z.object({ sourceKind: z.enum(clinicalListKinds), sourceGeneration: z.number(), assertion: z.string() })) }).passthrough()
+export type Reconciliation = z.infer<typeof reconciliationSchema>
 
 export const clinicalListKey = (scope: Scope, patientId: string) => ['clinical-lists', scope.practiceId, scope.siteId, patientId] as const
 
 export const clinicalListApi = {
   summary: (scope: Scope, patientId: string, signal?: AbortSignal) => request(atSite(scope, `/patients/${patientId}/clinical-summary`), clinicalSummarySchema, { signal }),
   list: (scope: Scope, patientId: string, kind: ClinicalListKind, signal?: AbortSignal) => request(atSite(scope, `/patients/${patientId}/${kindPath(kind)}`) + '&status=all&page=0&pageSize=50', page(clinicalRecordSchema), { signal }),
+  activePage: (scope: Scope, patientId: string, kind: ClinicalListKind, number: number, signal?: AbortSignal) => request(atSite(scope, `/patients/${patientId}/${kindPath(kind)}`) + `&status=active&page=${number}&pageSize=100`, page(clinicalRecordSchema), { signal }),
+  active: async (scope: Scope, patientId: string, kind: ClinicalListKind, signal?: AbortSignal) => {
+    const first = await clinicalListApi.activePage(scope, patientId, kind, 0, signal)
+    const pages = Math.ceil(first.total / first.pageSize)
+    const rest = await Promise.all(Array.from({ length: Math.max(0, pages - 1) }, (_, index) => clinicalListApi.activePage(scope, patientId, kind, index + 1, signal)))
+    return [first, ...rest].flatMap(result => result.items)
+  },
+  encounterReviews: (scope: Scope, patientId: string, encounterId: string, signal?: AbortSignal) => request(atSite(scope, `/patients/${patientId}/clinical-list-reviews`) + `&encounterId=${encounterId}`, z.array(reconciliationSchema), { signal }),
+  proposals: (scope: Scope, patientId: string, signal?: AbortSignal) => request(atSite(scope, `/patients/${patientId}/clinical-record-proposals`), z.array(proposalSchema), { signal }),
+  reconcile: (scope: Scope, patientId: string, body: Wire.Reconcile, key: string) => request(atSite(scope, `/patients/${patientId}/clinical-list-reconciliations`), reconciliationSchema, { method: 'POST', body, key }),
   terminology: (scope: Scope, patientId: string, kind: ClinicalListKind, signal?: AbortSignal) => request(atSite(scope, `/patients/${patientId}/clinical-terminology`) + `&kind=${kind}&q=`, z.array(codeSchema), { signal }),
   create: (scope: Scope, patientId: string, kind: ClinicalListKind, body: Wire.CreateAllergy | Wire.CreateMedicationUse | Wire.CreateProblem, key: string) => request(atSite(scope, `/patients/${patientId}/${kindPath(kind)}`), clinicalRecordSchema, { method: 'POST', body, key }),
   revise: (scope: Scope, patientId: string, kind: ClinicalListKind, recordId: string, body: Wire.ReviseAllergy | Wire.ReviseMedicationUse | Wire.ReviseProblem, key: string) => request(atSite(scope, `/patients/${patientId}/${kindPath(kind)}/${recordId}/revisions`), clinicalRecordSchema, { method: 'POST', body, key }),
+  transitionAllergy: (scope: Scope, patientId: string, allergyId: string, body: Wire.Transition, key: string) => request(atSite(scope, `/patients/${patientId}/allergies/${allergyId}/transitions`), allergySchema, { method: 'POST', body, key }),
   review: (scope: Scope, patientId: string, kind: ClinicalListKind, body: Wire.ReviewCommand, key: string) => request(atSite(scope, `/patients/${patientId}/${kind === 'ALLERGY' ? 'allergy' : kind === 'MEDICATION_USE' ? 'medication' : 'problem'}-list-reviews`), reviewSchema, { method: 'POST', body, key }),
 }

@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 import ph.epr.api.documentscommunication.PrivateClinicalArtifacts;
 import ph.epr.api.encountertemplates.domain.*;
 import ph.epr.api.identitytenancy.ClinicalAccessException;
+import ph.epr.api.identitytenancy.ClinicalDocumentIdentity;
+import ph.epr.api.identitytenancy.PracticeProvisioningRegistry;
 import ph.epr.api.platformoperations.*;
 import ph.epr.api.platformoperations.TenantTransactions.Context;
 
@@ -20,8 +22,12 @@ public class JdbcEncounterSignatures {
     private final TenantCommandJournal journal;
     private final ph.epr.api.encountertemplates.EncounterInterventionLinks links;
     private final ph.epr.api.clinicalchart.ClinicalLists clinicalLists;
-    public JdbcEncounterSignatures(JdbcEncounterService encounters, PrivateClinicalArtifacts artifacts, TenantCommandJournal journal, ph.epr.api.encountertemplates.EncounterInterventionLinks links,ph.epr.api.clinicalchart.ClinicalLists clinicalLists) {
+    private final ph.epr.api.clinicalchart.EncounterVitals vitals;
+    private final PracticeProvisioningRegistry practices;
+    private final ClinicalDocumentIdentity identities;
+    public JdbcEncounterSignatures(JdbcEncounterService encounters, PrivateClinicalArtifacts artifacts, TenantCommandJournal journal, ph.epr.api.encountertemplates.EncounterInterventionLinks links,ph.epr.api.clinicalchart.ClinicalLists clinicalLists, ph.epr.api.clinicalchart.EncounterVitals vitals, PracticeProvisioningRegistry practices, ClinicalDocumentIdentity identities) {
         this.encounters = encounters; this.artifacts = artifacts; this.journal = journal; this.links=links;this.clinicalLists=clinicalLists;
+        this.vitals = vitals; this.practices = practices; this.identities = identities;
     }
     public record Prepare(UUID preparationId, long expectedVersion) {}
     public record Preparation(UUID preparationId, long responseRevision, long encounterVersion, UUID artifactId, String artifactHash, String releaseChecksum, Long interventionSetVersion, UUID interventionManifestId,UUID clinicalReviewId,String clinicalReviewHash) {}
@@ -95,7 +101,9 @@ public class JdbcEncounterSignatures {
                 || preparation.interventionSetVersion()==null || preparation.interventionSetVersion()!=links.version(c,patient,encounter)
                 || !Objects.equals(preparation.clinicalReviewId(),clinicalReview==null?null:clinicalReview.reviewId())
                 || !Objects.equals(preparation.clinicalReviewHash(),clinicalReview==null?null:clinicalReview.manifestHash())) throw new ClinicalAccessException("SIGN_CANDIDATE_STALE", 409);
-            links.manifest(c,patient,encounter,preparation.interventionManifestId());
+            var manifest = links.manifest(c,patient,encounter,preparation.interventionManifestId());
+            if (!preparation.artifactHash().equals(PrivateClinicalArtifacts.sha256(render(c,current,manifest,clinicalReview))))
+                throw new ClinicalAccessException("SIGN_CANDIDATE_STALE", 409);
             artifacts.archive(c, preparation.artifactId(), preparation.artifactHash());
             var amendment = c.jdbc().sql("SELECT amendment_of_signature_id, amendment_reason FROM clinical_encounter WHERE practice_id = :practice AND patient_id = :patient AND encounter_id = :id")
                 .param("practice", c.practiceId()).param("patient", patient).param("id", encounter)
@@ -166,12 +174,28 @@ public class JdbcEncounterSignatures {
             .optional().orElseThrow(() -> new ClinicalAccessException("SIGN_PREPARATION_UNAVAILABLE", 404));
     }
     private byte[] render(Context c, JdbcEncounterService.Encounter encounter, ph.epr.api.encountertemplates.EncounterInterventionLinks.Manifest manifest,ph.epr.api.clinicalchart.ClinicalLists.ReviewManifest clinicalReview) {
+        var fields = new TemplateCompiler().validate(encounter.release().definition());
+        var hasCommonFindings = fields.values().stream().anyMatch(field -> "visit.ros".equals(field.concept()));
+        var practiceName = practices.findByPracticeId(c.practiceId())
+            .orElseThrow(() -> new ClinicalAccessException("PRACTICE_UNAVAILABLE", 503)).displayName();
+        var siteName = c.jdbc().sql("SELECT name FROM practice_site WHERE practice_id = :practice AND site_id = :site")
+            .param("practice", c.practiceId()).param("site", encounter.siteId()).query(String.class)
+            .optional().orElseThrow(() -> new ClinicalAccessException("SITE_UNAVAILABLE", 503));
+        var clinicianNames = new HashMap<UUID, String>();
         var html = new StringBuilder("<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><title>Synthetic encounter record</title><style>body{font:16px/1.6 sans-serif;max-width:800px;margin:32px auto;padding:24px;color:#192943}h1{font-size:24px}h2{font-size:20px;border-bottom:1px solid #ddd}h3{font-size:16px}p{white-space:pre-wrap;overflow-wrap:anywhere}small{color:#555}</style><body>");
         html.append("<h1>Synthetic encounter record</h1><p>Engineering validation only. Not approved for real-patient issuance.</p><p>")
-            .append("Practice: ").append(c.practiceId()).append("<br>Site: ").append(c.siteId()).append("</p><p>").append(escape(encounter.patient().displayName())).append(" · ").append(escape(encounter.patient().recordNumber())).append("</p><p>Care time: ")
+            .append("Practice: ").append(escape(practiceName)).append("<br>Site: ").append(escape(siteName)).append("</p><p>").append(escape(encounter.patient().displayName())).append(" · ").append(escape(encounter.patient().recordNumber())).append("</p><p>Care time: ")
             .append(escape(encounter.clinicalTime().toString())).append("<br>Release: ").append(escape(encounter.release().definition().title())).append(" · ")
             .append(escape(encounter.release().definition().businessVersion())).append("<br>Response revision: ").append(encounter.responseRevision()).append("</p>");
-        var fields = new TemplateCompiler().validate(encounter.release().definition());
+        if (hasCommonFindings) {
+            var revisionAuthor = c.jdbc().sql("""
+                SELECT actor_id FROM encounter_response_revision
+                WHERE practice_id = :practice AND patient_id = :patient AND encounter_id = :encounter AND revision = :revision
+                """).param("practice", c.practiceId()).param("patient", encounter.patientId())
+                .param("encounter", encounter.encounterId()).param("revision", encounter.responseRevision())
+                .query(UUID.class).single();
+            html.append("<p>Draft revision recorded by: ").append(escape(clinicianName(c, revisionAuthor, clinicianNames))).append("</p>");
+        }
         for (var section : encounter.release().definition().sections()) {
             html.append("<h2>").append(escape(section.label())).append("</h2>");
             for (var field : section.fields()) {
@@ -181,37 +205,83 @@ public class JdbcEncounterSignatures {
                     html.append("<h3>").append(escape(definition.label())).append("</h3>");
                     if (answer.hiddenResolution() == Answer.HiddenResolution.SUPERSEDED) html.append("<p>Superseded: ").append(escape(answer.resolutionReason())).append("</p>");
                     else {
-                        String value = answer.missingState() == null ? renderedValue(answer.value()) : answer.missingState().name().replace('_', ' ');
+                        String value = answer.missingState() == null ? renderedValue(definition, answer.value()) :
+                            answer.missingState() == TemplateDefinition.MissingState.DECLINED
+                                && Set.of("visit.ros", "visit.physical-examination").contains(definition.concept()) ? "Patient declined" :
+                            answer.missingState().name().replace('_', ' ');
                         html.append("<p>").append(escape(value)).append("</p>");
                         if (answer.hiddenResolution() != null) html.append("<p>Retained as relevant: ").append(escape(answer.resolutionReason())).append("</p>");
                     }
                     html.append("<small>Source: ").append(escape(answer.source().description())).append(" · ").append(escape(answer.review().name())).append("</small>");
-                    if (answer.groupItemId() != null) html.append("<small> · History item ").append(answer.groupItemId()).append("</small>");
                 }
             }
+        }
+        html.append("<h2>Vital signs measured for this encounter</h2>");
+        var vitalSets = vitals.list(c, encounter.patientId(), encounter.encounterId());
+        if (vitalSets.isEmpty()) html.append("<p>Not recorded.</p>");
+        for (var set : vitalSets) {
+            var observation = set.current();
+            var values = observation.values();
+            html.append("<h3>Measured ").append(escape(observation.measuredAt().toString())).append("</h3><p>");
+            appendVital(html, "Blood pressure", values.systolicMmhg() == null ? null : values.systolicMmhg() + "/" + values.diastolicMmhg(), "mmHg");
+            appendVital(html, "Pulse", values.pulseBpm(), "beats/min");
+            appendVital(html, "Respiratory rate", values.respiratoryRateBpm(), "breaths/min");
+            appendVital(html, "Temperature", values.temperatureC(), "°C");
+            appendVital(html, "Oxygen saturation", values.oxygenSaturationPercent(), "%");
+            appendVital(html, "Weight", values.weightKg(), "kg");
+            appendVital(html, "Height", values.heightCm(), "cm");
+            html.append("</p><small>Source: ").append(escape(observation.source()))
+                .append(" · recorded by: ").append(escape(clinicianName(c, observation.recordedBy(), clinicianNames)))
+                .append(" · received: ").append(escape(observation.receivedAt().toString()))
+                .append(" · record version: ").append(observation.version()).append("</small>");
+            if (set.history().size() > 1) html.append("<p>Corrected observation; earlier versions remain in the clinical record.</p>");
         }
         if (encounter.episodeSnapshot() != null) html.append("<h2>Pregnancy source at encounter start</h2><p>").append(escape(encounter.episodeSnapshot().episode().source()))
             .append("</p><p>Selected dating estimate: ").append(escape(encounter.episodeSnapshot().selectedDating() == null || encounter.episodeSnapshot().selectedDating().estimatedDate() == null ? "Not recorded" : encounter.episodeSnapshot().selectedDating().estimatedDate().toString())).append("</p>");
         html.append("<h2>Longitudinal clinical-list review</h2>");
         if(clinicalReview==null)html.append("<p>Clinical-list capability unavailable for this legacy synthetic scope.</p>");
-        else html.append("<p>Reconciliation ").append(clinicalReview.reviewId()).append(" · ").append(escape(clinicalReview.manifestHash())).append(" · reviewed ").append(clinicalReview.reviewedAt()).append("</p>");
-        html.append("<h2>Interventions at note review</h2><p>Snapshot version ").append(manifest.interventionSetVersion()).append(" · ").append(manifest.checksum()).append("</p>");
+        else html.append("<p>Reviewed ").append(escape(clinicalReview.reviewedAt().toString())).append("</p>");
+        html.append("<h2>Interventions at note review</h2>");
         if(manifest.items().isEmpty()) html.append("<p>No interventions recorded at this review.</p>");
         for(var item:manifest.items()) {
-            var summary=item.summary();html.append("<h3>").append(escape(summary.title())).append("</h3><p>")
-                .append(escape(summary.clinicalState())).append(" · source version ").append(summary.sourceVersion()).append(" · owner ").append(summary.ownerId()).append("</p>");
+            var summary=item.summary();
+            var plannedRequest=summary.clinicalState().equals("DRAFT") &&
+                (summary.kind()==ph.epr.api.encountertemplates.EncounterInterventionLinks.Kind.LAB_ORDER ||
+                    summary.kind()==ph.epr.api.encountertemplates.EncounterInterventionLinks.Kind.IMAGING_ORDER);
+            html.append("<h3>").append(escape(summary.title())).append("</h3><p>")
+                .append(plannedRequest ? "PLANNED REQUEST · NOT ISSUED" : escape(summary.clinicalState()))
+                .append(" · responsible clinician: ").append(escape(clinicianName(c, summary.ownerId(), clinicianNames))).append("</p>");
             for(var detail:summary.details()) html.append("<p>").append(escape(detail)).append("</p>");
-            if(summary.clinicalState().equals("DRAFT")) html.append("<p>Unissued draft plan; responsible clinician retains ownership. Note signature does not authorize this draft.</p>");
+            if(plannedRequest) html.append("<p>Planned request only. No requisition was issued; the responsible clinician retains ownership.</p>");
+            else if(summary.clinicalState().equals("DRAFT")) html.append("<p>Unissued draft plan; responsible clinician retains ownership. Note signature does not authorize this draft.</p>");
         }
-        html.append("<p>Responsible clinician identity: ").append(encounter.responsibleClinicianId()).append("</p><p>Clinical signing assurance remains unapproved. The local synthetic confirmation is bound separately to these exact archived bytes.</p></body></html>");
+        html.append("<p>Responsible clinician: ").append(escape(clinicianName(c, encounter.responsibleClinicianId(), clinicianNames))).append("</p><p>Clinical signing assurance remains unapproved. The local synthetic confirmation is bound separately to these exact archived bytes.</p></body></html>");
         return html.toString().getBytes(StandardCharsets.UTF_8);
     }
-    private String renderedValue(Answer.Value value) {
+    private void appendVital(StringBuilder html, String label, Object value, String unit) {
+        if (value != null) html.append(escape(label)).append(": ").append(escape(value.toString()))
+            .append(" ").append(escape(unit)).append("<br>");
+    }
+    private String renderedValue(TemplateDefinition.Field field, Answer.Value value) {
+        if (!value.findings().isEmpty()) {
+            var lines = new ArrayList<String>();
+            for (var group : field.quickFindings()) for (var finding : value.findings())
+                if (group.key().equals(finding.systemKey())) {
+                    var details = new ArrayList<>(finding.phrases());
+                    if (finding.customText() != null && !finding.customText().isBlank()) details.add(finding.customText());
+                    lines.add(group.label() + ": " + String.join(" ", details));
+                }
+            return String.join("\n", lines);
+        }
         if (value.text() != null) return value.text();
         if (value.number() != null) return value.number().toPlainString() + (value.unit() == null ? "" : " " + value.unit());
         if (!value.choices().isEmpty()) return String.join(", ", value.choices());
-        if (value.referenceId() != null) return "Record " + value.referenceId() + " · version " + value.referenceVersion();
+        if (value.referenceId() != null) return "Linked clinical record";
         return value.items().size() + " history items";
+    }
+    private String clinicianName(Context c, UUID userId, Map<UUID, String> cache) {
+        return cache.computeIfAbsent(userId, id -> identities.clinicianName(c.practiceId(), id)
+            .orElseThrow(() -> new ClinicalAccessException("CLINICIAN_IDENTITY_UNAVAILABLE", 503)));
     }
     private String escape(String value) { return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;").replace("'", "&#39;"); }
     private ph.epr.api.clinicalchart.ClinicalLists.ReviewManifest clinicalReview(Context c,UUID patient,UUID encounter){

@@ -16,6 +16,7 @@
 .directory-scope-alert { display: flex; gap: 8px; align-items: center; font-size: 12px; padding: 12px 14px; color: #325a9c; background: #edf4ff; border-radius: 8px; margin-bottom: 18px; line-height: 1.5; }
 .directory-scope-alert svg { width: 17px; }
 .directory-grid { display: grid; grid-template-columns: minmax(0, 1.85fr) minmax(310px, 1fr); gap: 20px; align-items: start; }
+.directory-grid.is-empty { grid-template-columns: minmax(0, 1fr); }
 .directory-list { padding: 20px 20px 0; min-width: 0; }
 .directory-search-row { display: flex; gap: 10px; }
 .directory-search-row > button { font-size: 12px; padding-inline: 12px; min-height: 44px; }

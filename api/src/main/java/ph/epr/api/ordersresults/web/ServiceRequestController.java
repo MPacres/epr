@@ -68,6 +68,9 @@ class ServiceRequestController {
  @PostMapping("/groups") ServiceRequestBatchResult batch(Authentication auth,@PathVariable UUID practice,@PathVariable UUID patient,@RequestParam UUID siteId,@RequestHeader("Idempotency-Key") UUID key,@RequestBody ServiceRequestBatch request) {
   return tenants.execute(new AuthenticatedActor(auth.getName()),practice,siteId,false,c->service.createBatch(c,patient,key,request));
  }
+ @GetMapping("/groups/{group}") List<ServiceRequestRecord> group(Authentication auth,@PathVariable UUID practice,@PathVariable UUID patient,@PathVariable UUID group,@RequestParam UUID siteId) {
+  return tenants.execute(new AuthenticatedActor(auth.getName()),practice,siteId,false,c->service.group(c,patient,group));
+ }
 
  @PostMapping("/{id}/supersession") ServiceRequestRecord supersession(Authentication auth,@PathVariable UUID practice,@PathVariable UUID patient,@PathVariable UUID id,@RequestParam UUID siteId,@RequestHeader("Idempotency-Key") UUID key,@RequestBody ServiceRequestCreate request) {
   return tenants.execute(new AuthenticatedActor(auth.getName()),practice,siteId,false,c->{service.get(c,patient,id);return service.create(c,patient,key,new ServiceRequestCreate(request.id(),request.encounterId(),request.occurredAt(),request.data(),id));});

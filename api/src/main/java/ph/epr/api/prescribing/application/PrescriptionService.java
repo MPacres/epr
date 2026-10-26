@@ -89,7 +89,7 @@ public class PrescriptionService {
     }
     public byte[] candidateContent(Context c,UUID patient,UUID id,PrescriptionPrepare request) {
         var before=get(c,patient,id);links.require(c,kind(before.data()),InterventionAuthorization.Action.AUTHORIZE);
-        links.lock(c,patient,before.encounterId());var current=get(c,patient,id);version(current,request.expectedVersion());draft(current);validate(current.data(),true);validateRefills(c,patient,current.data());var review=prerequisites(c,current);
+        var encounter=links.lock(c,patient,before.encounterId());unsigned(encounter);var current=get(c,patient,id);version(current,request.expectedVersion());draft(current);validate(current.data(),true);validateRefills(c,patient,current.data());var review=prerequisites(c,current);
         return render(c,current,review);
     }
     public PrescriptionPreparation prepare(Context c,UUID patient,UUID id,UUID key,PrescriptionPrepare request) {
@@ -98,7 +98,7 @@ public class PrescriptionService {
     public PrescriptionPreparation prepare(Context c,UUID patient,UUID id,UUID key,PrescriptionPrepare request,PrivateClinicalArtifacts.Artifact staged) {
         var before=get(c,patient,id);links.require(c,kind(before.data()),InterventionAuthorization.Action.AUTHORIZE);
         return journal.execute(c,"prepare-prescription/"+id,key,request,PrescriptionPreparation.class,()->{
-            links.lock(c,patient,before.encounterId());var current=get(c,patient,id);version(current,request.expectedVersion());draft(current);validate(current.data(),true);validateRefills(c,patient,current.data());var review=prerequisites(c,current);
+            var encounter=links.lock(c,patient,before.encounterId());unsigned(encounter);var current=get(c,patient,id);version(current,request.expectedVersion());draft(current);validate(current.data(),true);validateRefills(c,patient,current.data());var review=prerequisites(c,current);
             if(request.preparationId()==null) fail("PREPARATION_ID_REQUIRED");
             var artifact=staged==null?artifacts.stage(c,request.preparationId(),render(c,current,review)):staged;
             if(!artifact.artifactId().equals(request.preparationId()))fail("ARTIFACT_CONTEXT_MISMATCH");
@@ -115,9 +115,9 @@ public class PrescriptionService {
             var boundaries=new java.util.TreeSet<UUID>();boundaries.add(before.encounterId());if(original!=null)boundaries.add(original.encounterId());
             for(var item:before.data().items())if(item.sourcePrescriptionId()!=null)boundaries.add(get(c,patient,item.sourcePrescriptionId()).encounterId());
             for(var boundary:boundaries)links.lock(c,patient,boundary);
-            var encounter=links.context(c,patient,before.encounterId());var current=get(c,patient,id);version(current,request.expectedVersion());draft(current);
+            var encounter=links.context(c,patient,before.encounterId());unsigned(encounter);var current=get(c,patient,id);version(current,request.expectedVersion());draft(current);
             if(!request.confirmSyntheticReview()) fail("DELIBERATE_SYNTHETIC_REVIEW_REQUIRED");
-            if(!encounter.careState().equals("IN_PROGRESS")||encounter.noteState().equals("SIGNED")) required(request.lateActionReason(),"LATE_ACTION_REASON_REQUIRED");
+            if(!encounter.careState().equals("IN_PROGRESS")) required(request.lateActionReason(),"LATE_ACTION_REASON_REQUIRED");
             validate(current.data(),true);validateRefills(c,patient,current.data());var review=prerequisites(c,current);duplicates(c,current,request.duplicateReason());
             var prep=c.jdbc().sql("SELECT preparation_id,source_version,artifact_id,artifact_hash,clinical_review_id,clinical_review_hash FROM prescription_preparation WHERE practice_id=:p AND id=:id AND preparation_id=:candidate AND prepared_by=:a")
                 .param("p",c.practiceId()).param("id",id).param("candidate",request.preparationId()).param("a",c.actorId())
@@ -146,7 +146,7 @@ public class PrescriptionService {
     private PrescriptionRecord end(Context c,UUID patient,UUID id,UUID key,PrescriptionReason request,boolean abandon) {
         var before=get(c,patient,id);links.require(c,kind(before.data()),abandon?InterventionAuthorization.Action.PREPARE:InterventionAuthorization.Action.CONTINUE_EXISTING);required(request.reason(),"REASON_REQUIRED");
         return journal.execute(c,(abandon?"abandon-":"cancel-")+"prescription/"+id,key,request,PrescriptionRecord.class,()->{
-            links.lock(c,patient,before.encounterId());var current=get(c,patient,id);version(current,request.expectedVersion());
+            var encounter=links.lock(c,patient,before.encounterId());if(abandon)unsigned(encounter);var current=get(c,patient,id);version(current,request.expectedVersion());
             if(abandon) draft(current);else if(!current.state().equals("ISSUED")) fail("AUTHORIZED_RECORD_REQUIRED");
             if(!abandon && current.fulfillmentState().equals("FULFILLED")) fail("PERFORMED_CARE_CANNOT_BE_CANCELLED");
             c.jdbc().sql("UPDATE prescription SET state=:state,version=version+1 WHERE practice_id=:p AND id=:id")
@@ -198,6 +198,7 @@ public class PrescriptionService {
     private Kind kind(PrescriptionData data) { return Kind.PRESCRIPTION; }
     private void bump(Context c,UUID id) { c.jdbc().sql("UPDATE prescription SET version=version+1 WHERE practice_id=:p AND id=:id").param("p",c.practiceId()).param("id",id).update(); }
     private void newDecision(EncounterContext encounter) { if(!encounter.careState().equals("IN_PROGRESS")||encounter.noteState().equals("SIGNED")) throw new ClinicalAccessException("NEW_FOLLOW_UP_ENCOUNTER_REQUIRED",409); }
+    private void unsigned(EncounterContext encounter) { if("SIGNED".equals(encounter.noteState())) throw new ClinicalAccessException("SIGNED_NOTE_IMMUTABLE",409); }
     private void version(PrescriptionRecord r,long expected) { if(r.version()!=expected) throw new ClinicalAccessException("VERSION_CONFLICT",409); }
     private void draft(PrescriptionRecord r) { if(!r.state().equals("DRAFT")) throw new ClinicalAccessException("AUTHORIZED_RECORD_IMMUTABLE",409); }
     private static String text(String s) { return s==null?"":s; }

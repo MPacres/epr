@@ -48,8 +48,8 @@ class JdbcTenantDatabaseManagerTests {
 
 		assertThat(repeatedRoute).isEqualTo(firstRoute);
 		assertThat(firstRoute.databaseName()).isNotEqualTo(secondRoute.databaseName());
-		assertThat(firstRoute.schemaVersion()).isEqualTo("15");
-		assertThat(secondRoute.schemaVersion()).isEqualTo("15");
+		assertThat(firstRoute.schemaVersion()).isEqualTo("17");
+		assertThat(secondRoute.schemaVersion()).isEqualTo("17");
 
 		var firstRuntime = credentials.credential(first.practiceId(), TenantCredentialStore.CredentialPurpose.RUNTIME);
 		try (var connection = DriverManager.getConnection(

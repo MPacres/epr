@@ -34,5 +34,6 @@ export function displayAnswer(answer?: Answer) {
   if (!answer) return 'Not recorded'
   if (answer.missingState) return answer.missingState.replaceAll('_', ' ').toLowerCase()
   const v = answer.value!
+  if (v.findings?.length) return v.findings.map(finding => [...finding.phrases, finding.customText].filter(Boolean).join(' ')).join('; ')
   return v.text ?? (v.number !== null ? `${v.number} ${v.unit ?? ''}` : v.choices.length ? v.choices.join(', ') : v.referenceId ?? `${v.items.length} history items`)
 }

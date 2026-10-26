@@ -171,6 +171,7 @@ public class JdbcEncounterService {
             if (current.noteState().equals("SIGNED")) throw new ClinicalAccessException("SIGNED_NOTE_IMMUTABLE", 409);
             var answers = new LinkedHashMap<AnswerValidator.Address, Answer>();
             for (var answer : current.answers()) answers.put(new AnswerValidator.Address(answer.fieldId(), answer.groupItemId()), answer);
+            var definitions = new TemplateCompiler().validate(current.release().definition());
             var changed = new HashSet<AnswerValidator.Address>();
             for (var change : request.changes()) {
                 var address = new AnswerValidator.Address(change.fieldId(), change.groupItemId());
@@ -179,7 +180,8 @@ public class JdbcEncounterService {
                 else {
                     if (!Objects.equals(change.fieldId(), change.answer().fieldId()) || !Objects.equals(change.groupItemId(), change.answer().groupItemId()))
                         throw new ClinicalAccessException("ANSWER_ADDRESS_MISMATCH", 422);
-                    answers.put(address, change.answer());
+                    var previous = answers.get(address);
+                    answers.put(address, reviewedClinicianEntry(previous, change.answer()));
                 }
             }
             var changedValues = new HashSet<UUID>();
@@ -187,7 +189,6 @@ public class JdbcEncounterService {
                 var previous = current.answers().stream().filter(a -> Objects.equals(a.fieldId(), change.fieldId()) && Objects.equals(a.groupItemId(), change.groupItemId())).findFirst().orElse(null);
                 if (previous == null || change.answer() == null || !Objects.equals(previous.value(), change.answer().value()) || previous.missingState() != change.answer().missingState()) changedValues.add(change.fieldId());
             }
-            var definitions = new TemplateCompiler().validate(current.release().definition());
             answers.replaceAll((address, answer) -> definitions.containsKey(answer.fieldId()) && dependsOn(definitions.get(answer.fieldId()).visibleWhen(), changedValues)
                 ? new Answer(answer.fieldId(), answer.groupItemId(), answer.value(), answer.missingState(), answer.source(), answer.review(), null, null) : answer);
             var values = List.copyOf(answers.values());
@@ -273,6 +274,15 @@ public class JdbcEncounterService {
     }
     private boolean dependsOn(TemplateDefinition.Rule rule, Set<UUID> changed) {
         return rule != null && (changed.contains(rule.fieldId()) || rule.rules().stream().anyMatch(child -> dependsOn(child, changed)));
+    }
+    /** The saved revision supplies the authenticated author; imported and unchanged answers never inherit review. */
+    static Answer reviewedClinicianEntry(Answer previous, Answer submitted) {
+        if (submitted.source() == null || !"CLINICIAN_ENTERED".equals(submitted.source().kind())
+            || submitted.source().recordId() != null || submitted.source().version() != null
+            || previous != null && Objects.equals(previous.value(), submitted.value())
+                && previous.missingState() == submitted.missingState()) return submitted;
+        return new Answer(submitted.fieldId(), submitted.groupItemId(), submitted.value(), submitted.missingState(),
+            submitted.source(), Answer.Review.REVIEWED, submitted.hiddenResolution(), submitted.resolutionReason());
     }
     private void lockClinician(Context c) { c.jdbc().sql("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))")
         .param("key", c.actorId() + "/active-care").query((rs, n) -> true).single(); }

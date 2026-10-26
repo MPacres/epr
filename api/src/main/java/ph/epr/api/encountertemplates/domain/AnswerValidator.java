@@ -55,7 +55,10 @@ public final class AnswerValidator {
                     var path = field.id() + (item == null ? "" : "/" + item);
                     if (required && answer == null) errors.add(path + ":REQUIRED");
                     if (answer != null && !visible && answer.hiddenResolution() == null) errors.add(path + ":HIDDEN_ANSWER_REVIEW");
-                    if (answer != null && answer.review() != Answer.Review.REVIEWED) errors.add(path + ":SOURCE_REVIEW");
+                    // A group value only holds item identities; its child answers carry the clinical content to review.
+                    if (answer != null && (field.type() != Widget.GROUP || answer.missingState() != null)
+                        && answer.review() != Answer.Review.REVIEWED)
+                        errors.add(path + ":SOURCE_REVIEW");
                 }
             }
         }
@@ -63,9 +66,27 @@ public final class AnswerValidator {
     }
 
     private void validateValue(Field field, Answer.Value value) {
-        boolean text = false, number = false, unit = false, choices = false, reference = false, items = false;
+        boolean text = false, number = false, unit = false, choices = false, reference = false, items = false, findings = false;
         switch (field.type()) {
-            case TEXT, MULTILINE_TEXT -> { text(value.text(), field.maxLength()); text = true; }
+            case TEXT, MULTILINE_TEXT -> {
+                if (field.quickFindings().isEmpty() || value.findings().isEmpty()) text(value.text(), field.maxLength());
+                else {
+                    require(value.text() == null, "FINDINGS_OR_NARRATIVE");
+                    var groups = new HashMap<String, TemplateDefinition.QuickGroup>();
+                    field.quickFindings().forEach(group -> groups.put(group.key(), group));
+                    var seen = new HashSet<String>();
+                    for (var finding : value.findings()) {
+                        var group = groups.get(finding.systemKey());
+                        require(group != null && seen.add(finding.systemKey())
+                            && finding.phrases().size() <= 12 && new HashSet<>(finding.phrases()).size() == finding.phrases().size()
+                            && group.phrases().containsAll(finding.phrases()), "INVALID_FINDING");
+                        require(!finding.phrases().isEmpty() || finding.customText() != null && !finding.customText().isBlank(), "EMPTY_FINDING");
+                        if (finding.customText() != null) text(finding.customText(), field.maxLength());
+                    }
+                    findings = true;
+                }
+                text = true;
+            }
             case DATE -> { text(value.text(), 10); try { LocalDate.parse(value.text()); } catch (RuntimeException e) { throw new TemplateValidationException("INVALID_DATE"); } text = true; }
             case DATETIME -> { text(value.text(), 40); try { OffsetDateTime.parse(value.text()); } catch (RuntimeException e) { throw new TemplateValidationException("INVALID_DATETIME"); } text = true; }
             case INTEGER, DECIMAL, QUANTITY -> {
@@ -84,7 +105,7 @@ public final class AnswerValidator {
         }
         require((text || value.text() == null) && (number || value.number() == null) && (unit || value.unit() == null)
             && (choices || value.choices().isEmpty()) && (reference || value.referenceId() == null && value.referenceVersion() == null)
-            && (items || value.items().isEmpty()), "UNEXPECTED_VALUE_MEMBER");
+            && (items || value.items().isEmpty()) && (findings || value.findings().isEmpty()), "UNEXPECTED_VALUE_MEMBER");
     }
 
     public Truth evaluate(Rule rule, Map<Address, Answer> answers, UUID item) {

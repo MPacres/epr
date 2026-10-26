@@ -17,18 +17,25 @@ class LocalSyntheticClinicalPractice implements SyntheticClinicalPractice {
     private final PlatformUserDirectory users;
     private final SyntheticClinicalIdentity identities;
     private final String adminUsername;
+    private final String practiceName;
+    private final String siteName;
+    private final String clinicianName;
     private final TenantSchemaUpgradeService upgrades;
     LocalSyntheticClinicalPractice(TenantProvisioningService provisioning, PlatformUserDirectory users, SyntheticClinicalIdentity identities, TenantSchemaUpgradeService upgrades,
-        @Value("${epr.local-auth.superadmin.username:superadmin}") String adminUsername) {
+        @Value("${epr.local-auth.superadmin.username:superadmin}") String adminUsername,
+        @Value("${epr.clinical.demo-practice-name:Client Demo Practice}") String practiceName,
+        @Value("${epr.clinical.demo-site-name:Main Clinic}") String siteName,
+        @Value("${epr.clinical.demo-clinician-name:Dr. Isabel Reyes}") String clinicianName) {
         this.provisioning = provisioning; this.users = users; this.identities = identities; this.adminUsername = adminUsername; this.upgrades = upgrades;
+        this.practiceName = practiceName; this.siteName = siteName; this.clinicianName = clinicianName;
     }
     public void prepare(UUID clinician, UUID practice, UUID site, String username) {
         var admin = users.findByUsername(adminUsername).orElseThrow();
-        var result = provisioning.provision(admin, new TenantCreationRequest(practice, "synthetic-obgyn", "Synthetic Women's Health Practice",
-            "Dr. Isabel Reyes · synthetic", username, new InitialTenantSite(site, "Synthetic Makati Clinic", "", "", "PH", "1300000000", "1300000000", "1380300000"),
+        var result = provisioning.provision(admin, new TenantCreationRequest(practice, "synthetic-obgyn", practiceName,
+            clinicianName, username, new InitialTenantSite(site, siteName, "", "", "PH", "1300000000", "1300000000", "1380300000"),
             UUID.fromString("c6ac9aeb-3196-4a76-b9df-ff090eac77d1")));
         if (!result.tenant().isRoutable()) throw new IllegalStateException("Synthetic tenant provisioning is unavailable");
-        if (!"15".equals(result.tenant().schemaVersion())) upgrades.upgrade(admin, practice, UUID.nameUUIDFromBytes((practice + "/clinical-schema-15").getBytes(java.nio.charset.StandardCharsets.UTF_8)), result.tenant().version(), "Upgrade opt-in synthetic workspace to schema 15");
+        if (!ClinicalReadiness.REQUIRED_SCHEMA_VERSION.equals(result.tenant().schemaVersion())) upgrades.upgrade(admin, practice, UUID.nameUUIDFromBytes((practice + "/clinical-schema-17").getBytes(java.nio.charset.StandardCharsets.UTF_8)), result.tenant().version(), "Upgrade opt-in synthetic workspace to schema 17");
         identities.grant(clinician, practice, site, admin.id());
     }
 }

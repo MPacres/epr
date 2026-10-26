@@ -41,7 +41,7 @@ export function QueueWorkspace({ scope }: { scope: Scope }) {
     void execute(() => queueApi.entryCommand(scope, session.sessionId, `/${entry.queueEntryId}/transitions`, body, key), target)
   }
   return <main id="main-content" className="dashboard connected-clinical" tabIndex={-1}>
-    <div className="page-heading"><div><h1>Clinical queue</h1><p>{scope.practiceName} · {scope.siteName}</p></div><span className="badge blue">Synthetic data</span></div>
+    <div className="page-heading"><div><h1>Clinical queue</h1><p>{scope.practiceName} · {scope.siteName}</p></div><span className="badge blue">Demo only</span></div>
     <p className="clinical-notice">Previewing a session does not activate it. Active care, queue completion and note signing remain separate.</p>
     {sessions.error || entries.error || error ? <div role="alert" className="clinical-error"><p>{String((error ?? sessions.error ?? entries.error) instanceof Error ? ((error ?? sessions.error ?? entries.error) as Error).message : 'Action unavailable')}</p>{error instanceof ClinicalRequestError ? <small>{error.code}</small> : null}</div> : null}
     {pending ? <Button disabled={busy} onClick={() => void execute(pending.run, pending.title)}>{busy ? 'Waiting for server…' : `Retry original ${pending.title.toLowerCase()}`}</Button> : null}

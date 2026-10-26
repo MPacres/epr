@@ -5,10 +5,10 @@
   "extractionVersion": "none",
   "terminologyVersion": "uncoded-1",
   "templateKey": "obgyn.gynecology.initial",
-  "title": "Gynecology \u00b7 initial",
+  "title": "Gynecology · initial",
   "specialty": "OB_GYN",
   "encounterType": "GYNECOLOGY_INITIAL",
-  "businessVersion": "1.0.0",
+  "businessVersion": "1.2.0",
   "requiresPregnancyEpisode": false,
   "syntheticOnly": true,
   "sections": [
@@ -66,6 +66,131 @@
       ]
     },
     {
+      "id": "aacc6bd5-8d27-5ab1-905a-0ed166717bee",
+      "key": "ros-section",
+      "label": "Review of systems",
+      "fields": [
+        {
+          "id": "219dda37-08df-5e4b-a1b8-888551a13fe0",
+          "key": "visit.ros",
+          "concept": "visit.ros",
+          "label": "Symptoms reviewed today",
+          "type": "MULTILINE_TEXT",
+          "options": [],
+          "units": [],
+          "allowedMissingStates": [
+            "NOT_ASSESSED",
+            "UNKNOWN",
+            "DECLINED",
+            "NOT_APPLICABLE"
+          ],
+          "maxLength": 4000,
+          "maxItems": 0,
+          "precision": 2,
+          "requiredAtSign": true,
+          "sensitivity": "CLINICAL",
+          "visibleWhen": null,
+          "requiredWhen": null,
+          "fields": [],
+          "quickFindings": [
+            {
+              "key": "constitutional",
+              "label": "Constitutional",
+              "phrases": [
+                "Denies fever or chills.",
+                "Denies unintended weight change."
+              ]
+            },
+            {
+              "key": "eyes",
+              "label": "Eyes",
+              "phrases": [
+                "Denies vision change.",
+                "Denies eye pain or redness."
+              ]
+            },
+            {
+              "key": "ent",
+              "label": "Ears, nose & throat",
+              "phrases": [
+                "Denies ear pain or discharge.",
+                "Denies nasal congestion or sore throat."
+              ]
+            },
+            {
+              "key": "cardiovascular",
+              "label": "Cardiovascular",
+              "phrases": [
+                "Denies chest pain.",
+                "Denies palpitations or leg swelling."
+              ]
+            },
+            {
+              "key": "respiratory",
+              "label": "Respiratory",
+              "phrases": [
+                "Denies cough.",
+                "Denies shortness of breath or wheezing."
+              ]
+            },
+            {
+              "key": "gastrointestinal",
+              "label": "Gastrointestinal",
+              "phrases": [
+                "Denies abdominal pain.",
+                "Denies nausea, vomiting, or change in bowel habits."
+              ]
+            },
+            {
+              "key": "genitourinary",
+              "label": "Genitourinary",
+              "phrases": [
+                "Denies dysuria.",
+                "Denies hematuria."
+              ]
+            },
+            {
+              "key": "musculoskeletal",
+              "label": "Musculoskeletal",
+              "phrases": [
+                "Denies joint pain or swelling.",
+                "Denies focal limb weakness."
+              ]
+            },
+            {
+              "key": "skin",
+              "label": "Skin",
+              "phrases": [
+                "Denies rash or new skin lesion."
+              ]
+            },
+            {
+              "key": "neurologic",
+              "label": "Neurologic",
+              "phrases": [
+                "Denies headache.",
+                "Denies numbness or dizziness."
+              ]
+            },
+            {
+              "key": "psychiatric",
+              "label": "Psychiatric",
+              "phrases": [
+                "Denies anxiety or depressed mood."
+              ]
+            },
+            {
+              "key": "endocrine",
+              "label": "Endocrine",
+              "phrases": [
+                "Denies heat or cold intolerance."
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
       "id": "4f9f8c43-7f65-5190-8436-62ce08cf22ed",
       "key": "gynecology-section",
       "label": "Gynecology review",
@@ -92,12 +217,129 @@
           "visibleWhen": null,
           "requiredWhen": null,
           "fields": []
+        }
+      ]
+    },
+    {
+      "id": "fa696eb8-c484-59c7-8e2a-609dac398461",
+      "key": "exam-section",
+      "label": "Physical examination",
+      "fields": [
+        {
+          "id": "61d95f2a-dc75-539c-b852-eb65b79f2a48",
+          "key": "visit.physical-examination",
+          "concept": "visit.physical-examination",
+          "label": "Findings assessed today",
+          "type": "MULTILINE_TEXT",
+          "options": [],
+          "units": [],
+          "allowedMissingStates": [
+            "NOT_ASSESSED",
+            "DECLINED",
+            "NOT_APPLICABLE"
+          ],
+          "maxLength": 4000,
+          "maxItems": 0,
+          "precision": 2,
+          "requiredAtSign": true,
+          "sensitivity": "CLINICAL",
+          "visibleWhen": null,
+          "requiredWhen": null,
+          "fields": [],
+          "quickFindings": [
+            {
+              "key": "general",
+              "label": "General appearance",
+              "phrases": [
+                "Alert and conversant.",
+                "No acute distress observed."
+              ]
+            },
+            {
+              "key": "eyes",
+              "label": "Eyes",
+              "phrases": [
+                "Conjunctivae clear.",
+                "Pupils equal and reactive to light."
+              ]
+            },
+            {
+              "key": "ent",
+              "label": "Ears, nose & throat",
+              "phrases": [
+                "External ears without visible abnormality.",
+                "Oropharynx without visible lesions."
+              ]
+            },
+            {
+              "key": "neck",
+              "label": "Neck",
+              "phrases": [
+                "Neck supple.",
+                "No palpable cervical lymphadenopathy."
+              ]
+            },
+            {
+              "key": "respiratory",
+              "label": "Respiratory",
+              "phrases": [
+                "Normal work of breathing observed.",
+                "Breath sounds clear bilaterally."
+              ]
+            },
+            {
+              "key": "cardiovascular",
+              "label": "Cardiovascular",
+              "phrases": [
+                "Regular rhythm on auscultation.",
+                "No murmur appreciated."
+              ]
+            },
+            {
+              "key": "abdomen",
+              "label": "Abdomen",
+              "phrases": [
+                "Abdomen soft on palpation.",
+                "No abdominal tenderness elicited."
+              ]
+            },
+            {
+              "key": "musculoskeletal",
+              "label": "Musculoskeletal",
+              "phrases": [
+                "Moves all extremities spontaneously.",
+                "Gait steady when observed."
+              ]
+            },
+            {
+              "key": "skin",
+              "label": "Skin",
+              "phrases": [
+                "No visible rash on examined skin."
+              ]
+            },
+            {
+              "key": "neurologic",
+              "label": "Neurologic",
+              "phrases": [
+                "Alert and oriented during examination.",
+                "No focal weakness observed."
+              ]
+            },
+            {
+              "key": "psychiatric",
+              "label": "Psychiatric",
+              "phrases": [
+                "Affect appropriate during encounter."
+              ]
+            }
+          ]
         },
         {
           "id": "88bd4839-9662-5cca-a70e-860bc587b0c8",
           "key": "gynecology.examination",
           "concept": "gynecology.examination",
-          "label": "Findings assessed today",
+          "label": "Gynecologic examination findings",
           "type": "MULTILINE_TEXT",
           "options": [],
           "units": [],

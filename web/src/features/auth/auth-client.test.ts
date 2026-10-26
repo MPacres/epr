@@ -34,7 +34,7 @@ describe('role landing paths', () => {
   })
 
   it('keeps clinicians in the clinical workspace', () => {
-    expect(homePathFor({ username: 'doctor', displayName: 'Dr. Santos', roles: ['CLINICIAN'], passwordResetRequired: false })).toBe('/dashboard')
+    expect(homePathFor({ username: 'doctor', displayName: 'Dr. Santos', roles: ['CLINICIAN'], passwordResetRequired: false })).toBe('/patients')
   })
 
   it('routes tenant Practice staff to the clinical host and never provider support', () => {

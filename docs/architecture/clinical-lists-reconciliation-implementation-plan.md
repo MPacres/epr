@@ -2,6 +2,8 @@
 
 Status: backend implemented for the opt-in local synthetic slice on 2026-10-08. The existing frontend work is maintained separately; this implementation did not redesign it.
 
+Encounter UI update (2026-10-26): the connected encounter shows active allergy, reported-medication and problem entries in one compact review. The source defaults to Chart. Authorized addition to any list and row management reuse the longitudinal chart editor in a side panel without leaving the encounter; saved changes refresh the displayed source generations and can make an earlier encounter review stale. Selecting Review & sign saves the encounter-specific attestation, including the exact displayed list generations, selected source and visible interaction-checking limitation, before requesting note preparation. An uncertain review outcome retains the original payload and idempotency key for retry; a rejected or blocked review stops note preparation. Note preparation errors for a missing, stale or inaccessible reconciliation lead back to this step. Unresolved external proposals remain a blocker; an in-encounter proposal-decision editor remains unimplemented. This UI change does not approve real-patient care.
+
 Prepared: 2026-10-07.
 
 ## Backend implementation record
@@ -9,7 +11,7 @@ Prepared: 2026-10-07.
 The backend now provides the planned longitudinal source and reconciliation boundary:
 
 - control-plane V18 adds action-specific allergy, medication-use and problem capabilities; tenant V12 adds source heads, immutable revisions, generations, assertions, proposals and exact review manifests; tenant V13 makes reconciliation decisions immutable; tenant V14 adds patient-consistent encounter, problem and prescription provenance constraints;
-- current tenant routing and local synthetic enablement require schema 15 after the prescribing catalog/refill extension and continue to fail closed for disabled, migrating, mismatched or unauthorized Practice routes;
+- current tenant routing and local synthetic enablement require schema 17 after the encounter vital-set extension and continue to fail closed for disabled, migrating, mismatched or unauthorized Practice routes;
 - `clinicalchart` exposes practice/patient/site-authorized summaries, paginated active/history reads, revision and transition commands, explicit absence reviews, terminology fixtures, proposals, exact reconciliation and safety-manifest reads;
 - commands use client UUIDs, idempotency receipts, optimistic versions, immutable history and append-only clinical audit events; accepted reconciliation changes and their exact decisions share one tenant transaction;
 - new prescription preparation and issuance consume a current canonical allergy/medication manifest and bind its ID/hash into immutable issued bytes; creation of legacy flat safety reviews is disabled while historical reads remain available; and

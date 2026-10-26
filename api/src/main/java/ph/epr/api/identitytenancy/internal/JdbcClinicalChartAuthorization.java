@@ -45,7 +45,7 @@ class JdbcClinicalChartAuthorization implements ClinicalChartAuthorization {
               AND account.role IN ('CLINICIAN', 'PRACTICE_STAFF')
               AND clinical.enabled AND clinical.synthetic_only
               AND tenant.provisioning_status = 'ACTIVE' AND tenant.service_status = 'ENABLED'
-              AND tenant.schema_version = '15'
+              AND tenant.schema_version = '17'
               AND EXISTS (
                   SELECT 1 FROM practice_role_assignment role
                   WHERE role.practice_id = grant_row.practice_id

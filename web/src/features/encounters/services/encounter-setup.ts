@@ -8,6 +8,7 @@ export const encounterStartSchema = z.object({
   serviceDate: z.iso.date('Enter a valid date of service.'),
   serviceTime: z.iso.time({ precision: -1, error: 'Enter the time of service.' }),
 })
+export type EncounterStartValues = z.infer<typeof encounterStartSchema>
 
 export function serviceDateTime(now = new Date()) {
   const parts = new Intl.DateTimeFormat('en-CA', {

@@ -23,6 +23,10 @@ epr:
     enabled: ${EPR_CLINICAL_ENABLED:false}
     patient-encryption-key: ${EPR_PATIENT_ENCRYPTION_KEY:BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBA=}
     demo-seed: ${EPR_CLINICAL_DEMO_SEED:false}
+    demo-patient-seed: ${EPR_CLINICAL_DEMO_PATIENT_SEED:false}
+    demo-practice-name: ${EPR_CLINICAL_DEMO_PRACTICE_NAME:Client Demo Practice}
+    demo-site-name: ${EPR_CLINICAL_DEMO_SITE_NAME:Main Clinic}
+    demo-clinician-name: ${EPR_CLINICAL_DEMO_CLINICIAN_NAME:Dr. Isabel Reyes}
     demo-password: ${EPR_CLINICAL_DEMO_PASSWORD:ClinicalDemo123!}
   portal:
     clinical-hostname: ${EPR_CLINICAL_HOSTNAME:epr.test}

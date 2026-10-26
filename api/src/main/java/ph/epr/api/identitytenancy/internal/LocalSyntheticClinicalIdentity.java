@@ -15,14 +15,18 @@ import ph.epr.api.identitytenancy.SyntheticClinicalIdentity;
 class LocalSyntheticClinicalIdentity implements SyntheticClinicalIdentity {
     private final JdbcClient jdbc;
     private final PasswordEncoder passwords;
+    private final String clinicianName;
     @org.springframework.beans.factory.annotation.Value("${epr.interventions.enabled:false}") private boolean interventionsEnabled;
-    LocalSyntheticClinicalIdentity(JdbcClient jdbc, PasswordEncoder passwords) { this.jdbc = jdbc; this.passwords = passwords; }
+    LocalSyntheticClinicalIdentity(JdbcClient jdbc, PasswordEncoder passwords,
+        @org.springframework.beans.factory.annotation.Value("${epr.clinical.demo-clinician-name:Dr. Isabel Reyes}") String clinicianName) {
+        this.jdbc = jdbc; this.passwords = passwords; this.clinicianName = clinicianName;
+    }
     @Transactional public void prepare(UUID userId, String username, String password) {
         jdbc.sql("""
             INSERT INTO platform_user_account(id, username, display_name, password_hash, role, enabled, created_at, updated_at)
-            VALUES (:id, :username, 'Dr. Isabel Reyes · synthetic', :password, 'CLINICIAN', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            VALUES (:id, :username, :displayName, :password, 'CLINICIAN', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             ON CONFLICT (id) DO NOTHING
-            """).param("id", userId).param("username", username).param("password", passwords.encode(password)).update();
+            """).param("id", userId).param("username", username).param("displayName", clinicianName).param("password", passwords.encode(password)).update();
         if (!jdbc.sql("SELECT EXISTS(SELECT 1 FROM platform_user_account WHERE id = :id AND username = :username AND role = 'CLINICIAN')")
             .param("id", userId).param("username", username).query(Boolean.class).single()) throw new IllegalStateException("Synthetic identity collision");
     }

@@ -81,12 +81,12 @@ class LocalSyntheticTemplatePackTests {
             "OUTPATIENT","PRENATAL_INITIAL","PRENATAL_FOLLOWUP","GYNECOLOGY_INITIAL","GYNECOLOGY_FOLLOWUP","POSTPARTUM_FOLLOWUP");
         assertThat(first).allSatisfy(release -> {
             assertThat(release.definition().syntheticOnly()).isTrue();
-            assertThat(release.definition().businessVersion()).isEqualTo("1.0.0");
+            assertThat(release.definition().businessVersion()).isEqualTo("1.2.0");
             assertThat(release.approvalBasis()).startsWith("SYNTHETIC ONLY:");
         });
         var audits = count("clinical_audit_event");
         assertThat(pack.seed(actor,practice,site)).isEqualTo(first);
-        assertThat(count("encounter_template_release")).isEqualTo(6);
+        assertThat(count("encounter_template_release")).isEqualTo(18);
         assertThat(count("clinical_audit_event")).isEqualTo(audits);
     }
     @Test void concurrentRunsDoNotDuplicateThePack() throws Exception {
@@ -95,8 +95,8 @@ class LocalSyntheticTemplatePackTests {
             var b = executor.submit(() -> pack.seed(actor,practice,site));
             assertThat(a.get()).isEqualTo(b.get());
         }
-        assertThat(count("encounter_template_release")).isEqualTo(6);
-        assertThat(count("encounter_template_draft")).isEqualTo(6);
+        assertThat(count("encounter_template_release")).isEqualTo(18);
+        assertThat(count("encounter_template_draft")).isEqualTo(18);
     }
     @Test void secondSiteSharesReleasesAndDoesNotRestoreRetiredAvailability() {
         var first = pack.seed(actor,practice,site);
@@ -113,8 +113,8 @@ class LocalSyntheticTemplatePackTests {
         tenants.execute(actor,practice,otherSite,true,c -> templates.availability(c,release.releaseId(),UUID.randomUUID(),
             new JdbcTemplateRegistry.Availability(0,true,"Retirement must survive seeding")));
         assertThat(pack.seed(actor,practice,otherSite).getFirst().retired()).isTrue();
-        assertThat(count("encounter_template_release")).isEqualTo(6);
-        assertThat(count("encounter_template_availability")).isEqualTo(12);
+        assertThat(count("encounter_template_release")).isEqualTo(18);
+        assertThat(count("encounter_template_availability")).isEqualTo(36);
         List<JdbcTemplateRegistry.Release> originalCatalog = tenants.execute(actor,practice,site,true,c -> templates.catalog(c,null,null));
         List<JdbcTemplateRegistry.Release> otherCatalog = tenants.execute(actor,practice,otherSite,true,c -> templates.catalog(c,null,null));
         assertThat(originalCatalog).hasSize(6);

@@ -21,8 +21,55 @@ class TemplateEngineTests {
             assertThat(compiler.validate(definition)).isNotEmpty();
             assertThat(ClinicalJson.hash(ClinicalJson.read(ClinicalJson.write(definition), TemplateDefinition.class))).isEqualTo(ClinicalJson.hash(definition));
             assertThat(validator.validate(definition, List.of(), AnswerValidator.Stage.DRAFT)).isEmpty();
-            assertThat(validator.validate(definition, List.of(), AnswerValidator.Stage.SIGN)).hasSize(4);
+            assertThat(validator.validate(definition, List.of(), AnswerValidator.Stage.SIGN)).hasSize(6);
         }
+    }
+    @Test void oldSyntheticReleasesRemainValidAndNewSectionsRequireExplicitAnswers() throws Exception {
+        for (var key : List.of("general.outpatient", "obgyn.gynecology.initial", "obgyn.gynecology.followup",
+            "obgyn.prenatal.initial", "obgyn.prenatal.followup", "obgyn.postpartum.followup")) {
+            TemplateDefinition old;
+            try (var stream = getClass().getResourceAsStream("/encounter-templates/synthetic/v1/" + key + ".json")) {
+                old = ClinicalJson.read(new String(stream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8), TemplateDefinition.class);
+            }
+            assertThat(old.businessVersion()).isEqualTo("1.0.0");
+            assertThat(validator.validate(old, List.of(), AnswerValidator.Stage.SIGN)).hasSize(4);
+            var narrative = fixture("v1.1/" + key);
+            assertThat(narrative.businessVersion()).isEqualTo("1.1.0");
+            assertThat(compiler.validate(narrative)).isNotEmpty();
+            assertThat(ClinicalJson.hash(ClinicalJson.read(ClinicalJson.write(narrative), TemplateDefinition.class)))
+                .isEqualTo(ClinicalJson.hash(narrative));
+            var next = fixture(key);
+            for (var previous : compiler.validate(old).values())
+                compiler.requireCompatibleMeaning(previous, compiler.validate(next).get(previous.id()));
+            for (var previous : compiler.validate(narrative).values())
+                compiler.requireCompatibleMeaning(previous, compiler.validate(next).get(previous.id()));
+            var ros = compiler.validate(next).values().stream().filter(f -> f.concept().equals("visit.ros")).findFirst().orElseThrow();
+            var exam = compiler.validate(next).values().stream().filter(f -> f.concept().equals("visit.physical-examination")).findFirst().orElseThrow();
+            var declined = new Answer(exam.id(), null, null, MissingState.DECLINED, source(), Answer.Review.REVIEWED, null, null);
+            assertThat(validator.validate(next, List.of(declined), AnswerValidator.Stage.SIGN)).contains(ros.id() + ":REQUIRED");
+            assertThat(validator.validate(next, List.of(new Answer(ros.id(), null, null, MissingState.NOT_ASSESSED, source(), Answer.Review.REVIEWED, null, null), declined), AnswerValidator.Stage.SIGN))
+                .doesNotContain(ros.id() + ":REQUIRED", exam.id() + ":REQUIRED");
+        }
+    }
+    @Test void quickFindingsRequireClinicianSelectionFromThePinnedTemplate() throws Exception {
+        var definition = fixture("general.outpatient");
+        var ros = compiler.validate(definition).values().stream().filter(f -> f.concept().equals("visit.ros")).findFirst().orElseThrow();
+        assertThat(ros.quickFindings()).isNotEmpty();
+        assertThat(validator.validate(definition, List.of(), AnswerValidator.Stage.SIGN)).contains(ros.id() + ":REQUIRED");
+        var selected = new Answer.Finding("respiratory", List.of("Denies cough."), "Reports intermittent wheezing.");
+        var value = new Answer.Value(null, null, null, List.of(), null, null, List.of(), List.of(selected));
+        assertThat(validator.validate(definition, List.of(answer(ros.id(), null, value)), AnswerValidator.Stage.DRAFT)).isEmpty();
+        assertThatThrownBy(() -> validator.validate(definition, List.of(answer(ros.id(), null,
+            new Answer.Value(null, null, null, List.of(), null, null, List.of(),
+                List.of(new Answer.Finding("respiratory", List.of("All systems normal."), null))))), AnswerValidator.Stage.DRAFT))
+            .hasMessage("INVALID_FINDING");
+        assertThatThrownBy(() -> validator.validate(definition, List.of(answer(ros.id(), null,
+            new Answer.Value("Unreviewed narrative", null, null, List.of(), null, null, List.of(), List.of(selected)))), AnswerValidator.Stage.DRAFT))
+            .hasMessage("FINDINGS_OR_NARRATIVE");
+        assertThatThrownBy(() -> validator.validate(definition, List.of(answer(ros.id(), null,
+            new Answer.Value(null, null, null, List.of(), null, null, List.of(),
+                List.of(new Answer.Finding("respiratory", List.of(), null))))), AnswerValidator.Stage.DRAFT))
+            .hasMessage("EMPTY_FINDING");
     }
     @Test void duplicateFieldsAndUnresolvedModulesAreRejected() throws Exception {
         var definition = fixture("obgyn.prenatal.initial");
@@ -66,6 +113,22 @@ class TemplateEngineTests {
         assertThatThrownBy(() -> validator.validate(definition, List.of(child), AnswerValidator.Stage.DRAFT)).hasMessage("ORPHAN_GROUP_ITEM");
         var parent = answer(group.id(), null, new Answer.Value(null, null, null, List.of(), null, null, List.of(item)));
         assertThat(validator.validate(definition, List.of(child, parent), AnswerValidator.Stage.DRAFT)).isEmpty();
+    }
+    @Test void historyGroupContainerDoesNotNeedSeparateReviewButItsItemsDo() throws Exception {
+        var definition = fixture("obgyn.prenatal.initial");
+        var group = compiler.validate(definition).values().stream().filter(f -> f.type() == Widget.GROUP).findFirst().orElseThrow();
+        var item = UUID.randomUUID();
+        var parent = new Answer(group.id(), null, new Answer.Value(null, null, null, List.of(), null, null, List.of(item)),
+            null, source(), Answer.Review.NOT_REVIEWED, null, null);
+        var child = answer(group.fields().getFirst().id(), item, text("Outcome not known"));
+        var errors = validator.validate(definition, List.of(parent, child), AnswerValidator.Stage.SIGN);
+        assertThat(errors).doesNotContain(group.id() + ":SOURCE_REVIEW", child.fieldId() + "/" + item + ":SOURCE_REVIEW");
+        var unreviewedChild = new Answer(child.fieldId(), item, child.value(), null, child.source(), Answer.Review.NOT_REVIEWED, null, null);
+        assertThat(validator.validate(definition, List.of(parent, unreviewedChild), AnswerValidator.Stage.SIGN))
+            .contains(child.fieldId() + "/" + item + ":SOURCE_REVIEW");
+        var unknownGroup = new Answer(group.id(), null, null, MissingState.UNKNOWN, source(), Answer.Review.NOT_REVIEWED, null, null);
+        assertThat(validator.validate(definition, List.of(unknownGroup), AnswerValidator.Stage.SIGN))
+            .contains(group.id() + ":SOURCE_REVIEW");
     }
     private Answer.Source source() { return new Answer.Source("PATIENT_REPORTED", null, null, null, "Synthetic patient report"); }
     private Answer.Value text(String value) { return new Answer.Value(value, null, null, List.of(), null, null, List.of()); }

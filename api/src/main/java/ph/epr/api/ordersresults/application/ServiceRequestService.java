@@ -92,7 +92,7 @@ public class ServiceRequestService {
     }
     public byte[] candidateContent(Context c,UUID patient,UUID id,ServiceRequestPrepare request) {
         var before=get(c,patient,id);links.require(c,kind(before.data()),InterventionAuthorization.Action.AUTHORIZE);
-        lockSource(c,patient,before);var current=get(c,patient,id);version(current,request.expectedVersion());draft(current);validate(current.data(),true);prerequisites(c,current);
+        var encounter=lockSource(c,patient,before);unsigned(encounter);var current=get(c,patient,id);version(current,request.expectedVersion());draft(current);validate(current.data(),true);prerequisites(c,current);
         return render(c,current);
     }
     public ServiceRequestPreparation prepare(Context c,UUID patient,UUID id,UUID key,ServiceRequestPrepare request) {
@@ -101,7 +101,7 @@ public class ServiceRequestService {
     public ServiceRequestPreparation prepare(Context c,UUID patient,UUID id,UUID key,ServiceRequestPrepare request,PrivateClinicalArtifacts.Artifact staged) {
         var before=get(c,patient,id);links.require(c,kind(before.data()),InterventionAuthorization.Action.AUTHORIZE);
         return journal.execute(c,"prepare-service_request/"+id,key,request,ServiceRequestPreparation.class,()->{
-            lockSource(c,patient,before);var current=get(c,patient,id);version(current,request.expectedVersion());draft(current);validate(current.data(),true);prerequisites(c,current);
+            var encounter=lockSource(c,patient,before);unsigned(encounter);var current=get(c,patient,id);version(current,request.expectedVersion());draft(current);validate(current.data(),true);prerequisites(c,current);
             if(request.preparationId()==null) fail("PREPARATION_ID_REQUIRED");
             var artifact=staged==null?artifacts.stage(c,request.preparationId(),render(c,current)):staged;
             if(!artifact.artifactId().equals(request.preparationId()))fail("ARTIFACT_CONTEXT_MISMATCH");
@@ -117,9 +117,9 @@ public class ServiceRequestService {
             var original=before.supersedesId()==null?null:get(c,patient,before.supersedesId());
             var boundaries=new java.util.TreeSet<UUID>();boundaries.add(before.encounterId());if(original!=null)boundaries.add(original.encounterId());
             for(var boundary:boundaries)links.lock(c,patient,boundary);
-            var encounter=links.context(c,patient,before.encounterId());var current=get(c,patient,id);version(current,request.expectedVersion());draft(current);
+            var encounter=links.context(c,patient,before.encounterId());unsigned(encounter);var current=get(c,patient,id);version(current,request.expectedVersion());draft(current);
             if(!request.confirmSyntheticReview()) fail("DELIBERATE_SYNTHETIC_REVIEW_REQUIRED");
-            if(!encounter.careState().equals("IN_PROGRESS")||encounter.noteState().equals("SIGNED")) required(request.lateActionReason(),"LATE_ACTION_REASON_REQUIRED");
+            if(!encounter.careState().equals("IN_PROGRESS")) required(request.lateActionReason(),"LATE_ACTION_REASON_REQUIRED");
             validate(current.data(),true);prerequisites(c,current);duplicates(c,current,request.duplicateReason());
             var prep=c.jdbc().sql("SELECT preparation_id,source_version,artifact_id,artifact_hash FROM service_request_preparation WHERE practice_id=:p AND id=:id AND preparation_id=:candidate AND prepared_by=:a")
                 .param("p",c.practiceId()).param("id",id).param("candidate",request.preparationId()).param("a",c.actorId())
@@ -148,7 +148,7 @@ public class ServiceRequestService {
     private ServiceRequestRecord end(Context c,UUID patient,UUID id,UUID key,ServiceRequestReason request,boolean abandon) {
         var before=get(c,patient,id);links.require(c,kind(before.data()),abandon?InterventionAuthorization.Action.PREPARE:InterventionAuthorization.Action.CONTINUE_EXISTING);required(request.reason(),"REASON_REQUIRED");
         return journal.execute(c,(abandon?"abandon-":"cancel-")+"service_request/"+id,key,request,ServiceRequestRecord.class,()->{
-            lockSource(c,patient,before);var current=get(c,patient,id);version(current,request.expectedVersion());
+            var encounter=lockSource(c,patient,before);if(abandon)unsigned(encounter);var current=get(c,patient,id);version(current,request.expectedVersion());
             if(abandon) draft(current);else if(!current.state().equals("AUTHORIZED")) fail("AUTHORIZED_RECORD_REQUIRED");
             if(!abandon && current.fulfillmentState().equals("FULFILLED")) fail("PERFORMED_CARE_CANNOT_BE_CANCELLED");
             c.jdbc().sql("UPDATE service_request SET state=:state,version=version+1 WHERE practice_id=:p AND id=:id")
@@ -200,6 +200,7 @@ public class ServiceRequestService {
     private Kind kind(ServiceRequestData data) { return Kind.valueOf(data.kind()); }
     private void bump(Context c,UUID id) { c.jdbc().sql("UPDATE service_request SET version=version+1 WHERE practice_id=:p AND id=:id").param("p",c.practiceId()).param("id",id).update(); }
     private void newDecision(EncounterContext encounter) { if(!encounter.careState().equals("IN_PROGRESS")||encounter.noteState().equals("SIGNED")) throw new ClinicalAccessException("NEW_FOLLOW_UP_ENCOUNTER_REQUIRED",409); }
+    private void unsigned(EncounterContext encounter) { if("SIGNED".equals(encounter.noteState())) throw new ClinicalAccessException("SIGNED_NOTE_IMMUTABLE",409); }
     private void version(ServiceRequestRecord r,long expected) { if(r.version()!=expected) throw new ClinicalAccessException("VERSION_CONFLICT",409); }
     private void draft(ServiceRequestRecord r) { if(!r.state().equals("DRAFT")) throw new ClinicalAccessException("AUTHORIZED_RECORD_IMMUTABLE",409); }
     private static String text(String s) { return s==null?"":s; }
@@ -210,20 +211,21 @@ public class ServiceRequestService {
     private void obligation(Context c,ServiceRequestRecord record) {work.register(c,new ph.epr.api.carecoordination.OwnedClinicalWork.Obligation(record.id(),kind(record.data()).name(),record.patientId(),record.encounterId(),record.siteId(),record.ownerId(),record.version(),"Review outcome for "+record.data().serviceName(),record.data().requestedDate()));}
     private void prerequisites(Context c,ServiceRequestRecord record) {
         var data=record.data();
-        if(data.kind().equals("LAB_ORDER") && (data.catalogCode()==null||data.catalogCode().isBlank()))return;
-        if(catalog(c).stream().noneMatch(x->x.code().equals(data.catalogCode())&&x.version().equals(data.catalogVersion())&&x.kind().equals(data.kind())&&x.label().equals(data.serviceName())))fail("APPROVED_SYNTHETIC_SERVICE_REQUIRED");
+        if(data.catalogCode()==null||data.catalogCode().isBlank())return;
+        if(!c.jdbc().sql("SELECT EXISTS(SELECT 1 FROM service_request_catalog WHERE code=:code AND version=:version AND kind=:kind AND label=:label)")
+            .param("code",data.catalogCode()).param("version",data.catalogVersion()).param("kind",data.kind()).param("label",data.serviceName()).query(Boolean.class).single())fail("CATALOG_SERVICE_MISMATCH");
     }
 public record ServiceCatalogEntry(String code,String version,String kind,String label) {}
     public List<ServiceCatalogEntry> catalog(Context c){
         var kinds=java.util.stream.Stream.of(Kind.LAB_ORDER,Kind.IMAGING_ORDER).filter(k->{try{links.require(c,k,InterventionAuthorization.Action.READ);return true;}catch(ClinicalAccessException e){return false;}}).map(Enum::name).toList();
-        return c.jdbc().sql("SELECT code,version,kind,label FROM service_request_catalog WHERE NOT retired ORDER BY code").query((r,n)->new ServiceCatalogEntry(r.getString(1),r.getString(2),r.getString(3),r.getString(4))).list().stream().filter(x->kinds.contains(x.kind())).toList();
+        return c.jdbc().sql("SELECT code,version,kind,label FROM service_request_catalog WHERE NOT retired ORDER BY label").query((r,n)->new ServiceCatalogEntry(r.getString(1),r.getString(2),r.getString(3),r.getString(4))).list().stream().filter(x->kinds.contains(x.kind())).toList();
     }
     private void validate(ServiceRequestData data,boolean authorize){
         if(data==null||data.kind()==null||!Set.of("LAB_ORDER","IMAGING_ORDER").contains(data.kind()))fail("SUPPORTED_REQUEST_KIND_REQUIRED");
         required(data.serviceName(),"SERVICE_REQUIRED");
         boolean hasCode=data.catalogCode()!=null&&!data.catalogCode().isBlank(), hasVersion=data.catalogVersion()!=null&&!data.catalogVersion().isBlank();
         if(hasCode!=hasVersion)fail("CATALOG_REFERENCE_INCOMPLETE");
-        if(authorize){if(data.kind().equals("IMAGING_ORDER")){required(data.catalogCode(),"CATALOG_CODE_REQUIRED");required(data.catalogVersion(),"CATALOG_VERSION_REQUIRED");}required(data.indication(),"CLINICAL_QUESTION_REQUIRED");required(data.destination(),"DESTINATION_REQUIRED");required(data.priority(),"PRIORITY_REQUIRED");if(data.requestedDate()==null)fail("REQUESTED_DATE_REQUIRED");}
+        if(authorize){required(data.indication(),"CLINICAL_QUESTION_REQUIRED");required(data.destination(),"DESTINATION_REQUIRED");required(data.priority(),"PRIORITY_REQUIRED");if(data.requestedDate()==null)fail("REQUESTED_DATE_REQUIRED");}
     }
     private void duplicates(Context c,ServiceRequestRecord record,String reason){
         var data=record.data();
@@ -319,7 +321,7 @@ public record ServiceCatalogEntry(String code,String version,String kind,String 
     public record GroupMember(UUID sourceId,long version,String state,UUID artifactId,String artifactHash) {}
     public record GroupCapture(UUID documentId,UUID groupId,List<GroupMember> members,byte[] bytes) {}
     public record GroupDocument(UUID documentId,UUID groupId,List<GroupMember> members,UUID artifactId,String artifactHash) {}
-    private List<ServiceRequestRecord> group(Context c,UUID patient,UUID group){
+    public List<ServiceRequestRecord> group(Context c,UUID patient,UUID group){
         var ids=c.jdbc().sql("SELECT request_id FROM requisition_group_member WHERE practice_id=:p AND patient_id=:patient AND group_id=:g ORDER BY request_id").param("p",c.practiceId()).param("patient",patient).param("g",group).query(UUID.class).list();
         if(ids.isEmpty())throw new ClinicalAccessException("REQUISITION_GROUP_UNAVAILABLE",404);
         return ids.stream().map(id->get(c,patient,id)).toList();

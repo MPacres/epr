@@ -23,11 +23,13 @@ class LocalObgynSeeder {
     private final LocalSyntheticPregnancyFixtures pregnancyFixtures;
     private final ClinicalPatientRegistry patients;
     private final String password;
+    private final boolean seedPatient;
     LocalObgynSeeder(SyntheticClinicalIdentity identities, SyntheticClinicalPractice practices, TenantTransactions tenants,
         LocalSyntheticTemplatePack templatePack, LocalSyntheticPregnancyFixtures pregnancyFixtures,
-        ClinicalPatientRegistry patients, @Value("${epr.clinical.demo-password:ClinicalDemo123!}") String password) {
+        ClinicalPatientRegistry patients, @Value("${epr.clinical.demo-password:ClinicalDemo123!}") String password,
+        @Value("${epr.clinical.demo-patient-seed:false}") boolean seedPatient) {
         this.identities = identities; this.practices = practices; this.tenants = tenants; this.templatePack = templatePack;
-        this.pregnancyFixtures = pregnancyFixtures; this.patients = patients; this.password = password;
+        this.pregnancyFixtures = pregnancyFixtures; this.patients = patients; this.password = password; this.seedPatient = seedPatient;
     }
     @EventListener(ApplicationReadyEvent.class)
     public void seed() throws Exception {
@@ -37,6 +39,7 @@ class LocalObgynSeeder {
         practices.prepare(clinician, practice, site, username);
         var actor = new AuthenticatedActor(username);
         templatePack.seed(actor, practice, site);
+        if (!seedPatient) return;
         tenants.execute(actor, practice, site, false, c -> patients.register(c, id("patient/register"), new ClinicalPatientRegistry.Registration(
             id("patient"), "Sofia Dela Cruz · synthetic", LocalDate.of(1996, 3, 12), "REPORTED", true, false)));
         pregnancyFixtures.seed(actor, practice, site, id("patient"));

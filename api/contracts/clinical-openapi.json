@@ -4873,12 +4873,234 @@
         }
       }
     },
+    "/api/v1/practices/{practice}/patients/{patient}/encounters/{encounter}/vital-sets": {
+      "get": {
+        "tags": [
+          "encounter-vital-controller"
+        ],
+        "operationId": "list_6",
+        "parameters": [
+          {
+            "name": "practice",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "patient",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "encounter",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "siteId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/VitalSet"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "encounter-vital-controller"
+        ],
+        "operationId": "create_7",
+        "parameters": [
+          {
+            "name": "practice",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "patient",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "encounter",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "siteId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Create"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/VitalSet"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/practices/{practice}/patients/{patient}/encounters/{encounter}/vital-sets/{id}/corrections": {
+      "post": {
+        "tags": [
+          "encounter-vital-controller"
+        ],
+        "operationId": "correct",
+        "parameters": [
+          {
+            "name": "practice",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "patient",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "encounter",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "siteId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Correct"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/VitalSet"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/practices/{practice}/patients/{patient}/encounters/{encounter}/signatures": {
       "get": {
         "tags": [
           "signature-controller"
         ],
-        "operationId": "list_6",
+        "operationId": "list_7",
         "parameters": [
           {
             "name": "practice",
@@ -6340,7 +6562,7 @@
         "tags": [
           "template-controller"
         ],
-        "operationId": "create_7",
+        "operationId": "create_8",
         "parameters": [
           {
             "name": "practice",
@@ -6917,7 +7139,7 @@
         "tags": [
           "team-controller"
         ],
-        "operationId": "create_8",
+        "operationId": "create_9",
         "parameters": [
           {
             "name": "practice",
@@ -7240,7 +7462,7 @@
         "tags": [
           "matched-report-controller"
         ],
-        "operationId": "list_8",
+        "operationId": "list_9",
         "parameters": [
           {
             "name": "practice",
@@ -7418,6 +7640,67 @@
                 "schema": {
                   "type": "string",
                   "format": "byte"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/practices/{practice}/patients/{patient}/service-requests/groups/{group}": {
+      "get": {
+        "tags": [
+          "service-request-controller"
+        ],
+        "operationId": "group",
+        "parameters": [
+          {
+            "name": "practice",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "patient",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "group",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "siteId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ServiceRequestRecord"
+                  }
                 }
               }
             }
@@ -8326,7 +8609,7 @@
         "tags": [
           "intervention-controller"
         ],
-        "operationId": "list_9",
+        "operationId": "list_10",
         "parameters": [
           {
             "name": "practice",
@@ -8928,7 +9211,7 @@
         "tags": [
           "intervention-work-controller"
         ],
-        "operationId": "list_10",
+        "operationId": "list_11",
         "parameters": [
           {
             "name": "practice",
@@ -9179,7 +9462,7 @@
         "tags": [
           "clinical-worklist-controller"
         ],
-        "operationId": "list_11",
+        "operationId": "list_12",
         "parameters": [
           {
             "name": "practice",
@@ -10011,6 +10294,23 @@
           }
         }
       },
+      "Finding": {
+        "type": "object",
+        "properties": {
+          "systemKey": {
+            "type": "string"
+          },
+          "phrases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "customText": {
+            "type": "string"
+          }
+        }
+      },
       "Save": {
         "type": "object",
         "properties": {
@@ -10140,6 +10440,12 @@
             "items": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Finding"
             }
           }
         }
@@ -10472,6 +10778,12 @@
             "items": {
               "$ref": "#/components/schemas/Field"
             }
+          },
+          "quickFindings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuickGroup"
+            }
           }
         }
       },
@@ -10508,6 +10820,23 @@
           },
           "birthAccuracy": {
             "type": "string"
+          }
+        }
+      },
+      "QuickGroup": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "phrases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -11876,15 +12205,6 @@
           "container": {
             "type": "boolean"
           },
-          "floatingPointNumber": {
-            "type": "boolean"
-          },
-          "valueNode": {
-            "type": "boolean"
-          },
-          "missingNode": {
-            "type": "boolean"
-          },
           "nodeType": {
             "type": "string",
             "enum": [
@@ -11903,6 +12223,12 @@
             "type": "boolean"
           },
           "integralNumber": {
+            "type": "boolean"
+          },
+          "missingNode": {
+            "type": "boolean"
+          },
+          "valueNode": {
             "type": "boolean"
           },
           "pojo": {
@@ -11934,6 +12260,9 @@
             "type": "boolean"
           },
           "binary": {
+            "type": "boolean"
+          },
+          "floatingPointNumber": {
             "type": "boolean"
           },
           "empty": {
@@ -12756,6 +13085,105 @@
             "format": "uuid"
           },
           "deliveryState": {
+            "type": "string"
+          }
+        }
+      },
+      "Values": {
+        "type": "object",
+        "properties": {
+          "systolicMmhg": {
+            "type": "number"
+          },
+          "diastolicMmhg": {
+            "type": "number"
+          },
+          "pulseBpm": {
+            "type": "number"
+          },
+          "respiratoryRateBpm": {
+            "type": "number"
+          },
+          "temperatureC": {
+            "type": "number"
+          },
+          "oxygenSaturationPercent": {
+            "type": "number"
+          },
+          "weightKg": {
+            "type": "number"
+          },
+          "heightCm": {
+            "type": "number"
+          }
+        }
+      },
+      "Revision": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "measuredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "source": {
+            "type": "string"
+          },
+          "values": {
+            "$ref": "#/components/schemas/Values"
+          },
+          "correctionReason": {
+            "type": "string"
+          },
+          "recordedBy": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "VitalSet": {
+        "type": "object",
+        "properties": {
+          "vitalSetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "current": {
+            "$ref": "#/components/schemas/Revision"
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Revision"
+            }
+          }
+        }
+      },
+      "Correct": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "measuredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "source": {
+            "type": "string"
+          },
+          "values": {
+            "$ref": "#/components/schemas/Values"
+          },
+          "reason": {
             "type": "string"
           }
         }

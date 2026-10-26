@@ -98,7 +98,7 @@ describe('practice administration client', () => {
   it('uses guarded, versioned support commands for schema rollout and clinical enablement', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ headerName: 'X-XSRF-TOKEN', token: 'csrf' }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ state: 'READY', schemaVersion: '15', attempt: 1 }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ state: 'READY', schemaVersion: '17', attempt: 1 }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ headerName: 'X-XSRF-TOKEN', token: 'csrf' }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ enabled: true, version: 3, replayed: false }), { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
@@ -106,7 +106,7 @@ describe('practice administration client', () => {
     const schemaUpgrade = await upgradeClinicalSchema({ practiceId: practice.practiceId, reason: 'Approved synthetic rollout', version: 1, idempotencyKey: '383997dc-174b-47a4-8d61-242a0a46875a' })
     await enableSyntheticClinicalWorkflows({ practiceId: practice.practiceId, reason: 'Approved synthetic activation', version: 2, idempotencyKey: '28ccfe54-2890-42fd-a580-5021b75f6ebf' })
 
-    expect(schemaUpgrade).toEqual({ state: 'READY', schemaVersion: '15', attempt: 1 })
+    expect(schemaUpgrade).toEqual({ state: 'READY', schemaVersion: '17', attempt: 1 })
     expect(fetchMock.mock.calls[1][0]).toContain('/schema-upgrade')
     expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ expectedVersion: 1, reason: 'Approved synthetic rollout' })
     expect(fetchMock.mock.calls[3][0]).toContain('/synthetic-clinical-capability')

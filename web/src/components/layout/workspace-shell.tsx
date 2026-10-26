@@ -48,7 +48,7 @@ export function WorkspaceShell({ children, readyCount, inboxCount, onNavigate, o
     <aside className="sidebar">
       <Logo />
       <nav aria-label="Main navigation" className="desktop-nav">{navigation.map(item => navButton(item))}</nav>
-      <div className="sidebar-footer"><span className="workspace-label"><span className="demo-dot" />{context ? 'Connected demo · not for patient care' : 'Demo workspace'}</span>
+      <div className="sidebar-footer"><span className="workspace-label"><span className="demo-dot" />Training environment · Not for patient care</span>
         <button className="profile" onClick={() => onNavigate('profile')}><span className="avatar blue">{administration ? 'PA' : context ? 'MD' : 'AS'}</span><span className="profile-copy"><strong>{context?.clinicianName ?? 'Dr. Ana Santos'}</strong><small>{administration ? 'Practice administration' : context ? 'Clinical workspace' : 'Internal Medicine'}</small></span><ChevronRight aria-hidden="true" /></button>
       </div>
     </aside>
@@ -63,10 +63,11 @@ export function WorkspaceShell({ children, readyCount, inboxCount, onNavigate, o
           <Search aria-hidden="true" /><span>Search patients…</span><span className="search-shortcut" aria-hidden="true"><Keyboard /></span>
         </button> : null}
         <div className="topbar-actions">
-          <span className="header-demo"><span className="demo-dot" />{context ? 'Demo only' : 'Demo data'}</span>
+          <span className="header-demo"><span className="demo-dot" />Training</span>
           <Button variant="ghost" size="icon" className="notification-button" aria-label={`Open clinical inbox, ${inboxCount} items need attention`} onClick={() => onNavigate('inbox')}><Bell aria-hidden="true" />{inboxCount > 0 ? <span className="notification-dot" /> : null}</Button>
           <Button variant="ghost" className="topbar-sign-out" onClick={onSignOut} aria-label="Sign out"><LogOut aria-hidden="true" /><span>Sign out</span></Button>
         </div>
+        <span className="mobile-environment">Training environment · Not for patient care</span>
       </header>
       {children}
     </div>

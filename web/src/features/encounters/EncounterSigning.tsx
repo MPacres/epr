@@ -1,16 +1,18 @@
 import { useEffect, useImperativeHandle, useState, useRef, type Ref } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Printer } from 'lucide-react'
 import { z } from 'zod'
 import { Button } from '../../components/ui/button'
 import { Sheet } from '../../components/ui/sheet'
 import { createUuid } from '../../lib/create-uuid'
-import { atSite, request, clinicalApi, ClinicalRequestError, type Encounter, type Scope } from './services/encounter-api'
+import { atSite, request, clinicalApi, clinicalKey, ClinicalRequestError, type Encounter, type Scope } from './services/encounter-api'
 const preparationSchema = z.object({ preparationId: z.uuid(), responseRevision: z.number(), encounterVersion: z.number(), artifactId: z.uuid(), artifactHash: z.string(), releaseChecksum: z.string(), interventionSetVersion: z.number().nullable().optional() })
 const signatureSchema = z.object({ signatureId: z.uuid(), preparationId: z.uuid(), responseRevision: z.number(), artifactId: z.uuid(), artifactHash: z.string(), signerId: z.uuid(), signedAt: z.string(), assuranceMethod: z.string(), amendmentOf: z.uuid().nullable(), amendmentReason: z.string().nullable(), interventionSnapshotCaptured: z.boolean().default(false) })
 type Preparation = z.infer<typeof preparationSchema>
 type Signature = z.infer<typeof signatureSchema>
 export type EncounterSigningActions = { review: (trigger: HTMLButtonElement | null) => void; clearReconciliationError: () => void }
 export function EncounterSigning({ scope, record, disabled, onRecord, onBusy, onReviewRequired, ensureClinicalReview, interventionVersion, vitalVersion, actionRef }: { scope: Scope; record: Encounter; interventionVersion: number; vitalVersion: number; disabled: boolean; onRecord: (value: Encounter) => void; onBusy: (value: boolean) => void; onReviewRequired: () => void; ensureClinicalReview: () => Promise<boolean>; actionRef: Ref<EncounterSigningActions> }) {
+  const query = useQueryClient()
   const [signatures, setSignatures] = useState<Signature[]>([])
   const [candidate, setCandidate] = useState<Preparation | null>(null)
   const [archivedHtml, setArchivedHtml] = useState<string | null>(null)
@@ -21,6 +23,7 @@ export function EncounterSigning({ scope, record, disabled, onRecord, onBusy, on
   const [error, setError] = useState<unknown>(null)
   const [invalidFieldId, setInvalidFieldId] = useState<string | null>(null)
   const [reason, setReason] = useState('')
+  const [duplicateIntentReason, setDuplicateIntentReason] = useState('')
   const [pending, setPending] = useState<{ kind: 'prepare' | 'sign' | 'amend'; key: string; body: unknown } | null>(null)
   const [candidateVitalVersion, setCandidateVitalVersion] = useState(0)
   const restoreFocus = useRef<HTMLButtonElement>(null)
@@ -63,19 +66,20 @@ export function EncounterSigning({ scope, record, disabled, onRecord, onBusy, on
     try {
       if (kind === 'prepare' && pending?.kind !== 'prepare' && !(await ensureClinicalReview())) return
       const command = pending ?? { kind, key: createUuid(), body: kind === 'prepare' ? { preparationId: createUuid(), expectedVersion: record.version }
-        : kind === 'sign' ? { preparationId: candidate?.preparationId, expectedVersion: candidate?.encounterVersion, reviewedArtifactHash: candidate?.artifactHash, confirmSyntheticReview: confirmed }
+        : kind === 'sign' ? { preparationId: candidate?.preparationId, expectedVersion: candidate?.encounterVersion, reviewedArtifactHash: candidate?.artifactHash, confirmSyntheticReview: confirmed, duplicateIntentReason: duplicateIntentReason.trim() || undefined }
           : { expectedVersion: record.version, originalSignatureId: signatures.at(-1)?.signatureId, reason } }
       setPending(command)
       if (kind === 'prepare') {
         const result = await request(atSite(scope, `${path}/sign-preparations`), preparationSchema, { method: 'POST', key: command.key, body: command.body })
-        setCandidate(result); setCandidateVitalVersion(vitalVersion); setConfirmed(false); setOpen(true)
+        setCandidate(result); setCandidateVitalVersion(vitalVersion); setConfirmed(false); setDuplicateIntentReason(''); setOpen(true)
         onRecord(await clinicalApi.encounter(scope, record.patientId, record.encounterId))
         await readArtifact(`sign-preparations/${result.preparationId}`)
       } else if (kind === 'sign') {
         const result = await request(atSite(scope, `${path}/signatures`), signatureSchema, { method: 'POST', key: command.key, body: command.body })
         setSignatures(previous => [...previous.filter(s => s.signatureId !== result.signatureId), result])
         onRecord(await clinicalApi.encounter(scope, record.patientId, record.encounterId))
-        setCandidate(null); setOpen(false); setHtml(null)
+        await query.invalidateQueries({ queryKey: [...clinicalKey(scope, record.patientId), record.encounterId, 'interventions'] })
+        setCandidate(null); setOpen(false); setHtml(null); setDuplicateIntentReason('')
       } else {
         await request(atSite(scope, `${path}/amendments`), z.unknown(), { method: 'POST', key: command.key, body: command.body })
         onRecord(await clinicalApi.encounter(scope, record.patientId, record.encounterId)); setReason('')
@@ -87,7 +91,10 @@ export function EncounterSigning({ scope, record, disabled, onRecord, onBusy, on
         onReviewRequired()
         requestAnimationFrame(() => { const target = document.getElementById('encounter-reconciliation-title'); target?.scrollIntoView({ block: 'start' }); target?.focus({ preventScroll: true }) })
       }
-      if (e instanceof ClinicalRequestError && [403, 404, 409, 422].includes(e.status)) { setPending(null); setCandidate(null); setHtml(null) }
+      if (e instanceof ClinicalRequestError && [403, 404, 409, 422].includes(e.status)) {
+        setPending(null)
+        if (e.code !== 'DUPLICATE_INTENT_REASON_REQUIRED') { setCandidate(null); setHtml(null) }
+      }
       if (e instanceof ClinicalRequestError && e.code.startsWith('SIGN_REVIEW_REQUIRED:')) {
         setInvalidFieldId(e.code.split(':')[1]?.split('/')[0] ?? null)
       }
@@ -104,9 +111,8 @@ export function EncounterSigning({ scope, record, disabled, onRecord, onBusy, on
     try { await readArtifact(`signatures/${signature.signatureId}`) } catch (e) { setError(e) }
   }
   return <section className="surface signing-panel" aria-label="Note signing and history">
-    <h2>{record.noteState === 'SIGNED' ? 'Signed demo note' : 'Review and sign'}</h2>
-    <p>Development confirmation only. Clinical content and signing assurance have not been approved for real-patient issuance.</p>
-    {record.noteState === 'SIGNED' ? <p>This archived note preserves the exact content reviewed at signing, including clinical-list and intervention snapshots. Later chart corrections and work outcomes do not change it. A linked amendment keeps the original available.</p> : null}
+    <h2>{record.noteState === 'SIGNED' ? 'Signed note' : 'Review and sign'}</h2>
+    {record.noteState !== 'SIGNED' ? <p>Review the note and included requests. Signing issues their printable documents.</p> : null}
     {error ? <div role="alert" className="clinical-error">{error instanceof ClinicalRequestError && ['ENCOUNTER_RECONCILIATION_REQUIRED', 'CLINICAL_LIST_REVIEW_STALE', 'CLINICAL_LIST_RECONCILIATION_ACCESS_REQUIRED'].includes(error.code) ? <><p>{error.code === 'ENCOUNTER_RECONCILIATION_REQUIRED' ? 'Review all three clinical lists and the selected source, then choose Review & sign again.' : error.code === 'CLINICAL_LIST_REVIEW_STALE' ? 'The clinical lists changed after their encounter review. Review the current entries again.' : 'Your current site and role do not have the clinical list access needed to prepare this note.'}</p><Button variant="outline" onClick={() => { const target = document.getElementById('encounter-reconciliation-title'); target?.scrollIntoView({ block: 'start' }); target?.focus({ preventScroll: true }) }}>Go to clinical list review</Button></> : <><p>{error instanceof Error ? error.message : 'Signing could not be confirmed.'}</p>{error instanceof ClinicalRequestError ? <small>{error.code}</small> : null}</>}</div> : null}
     {record.noteState === 'SIGNED' ? archivedHtml ? <><Button variant="outline" onClick={() => signedFrame.current?.contentWindow?.print()}><Printer aria-hidden="true" />Print signed note</Button><iframe ref={signedFrame} className="signed-primary-artifact" title="Archived signed original" sandbox="allow-same-origin allow-modals" srcDoc={archivedHtml} /></> : <p role="status">{error ? 'The archived artifact is unavailable. It has not been reconstructed.' : 'Loading the archived signed bytes…'}</p> : null}
     {record.noteState !== 'SIGNED' ? <Button disabled={disabled || busy || pending?.kind === 'sign'} onClick={event => { restoreFocus.current = event.currentTarget; void perform('prepare') }}>{busy ? 'Preparing…' : pending?.kind === 'prepare' ? 'Retry original preparation' : 'Review & sign'}</Button> : null}
@@ -115,7 +121,7 @@ export function EncounterSigning({ scope, record, disabled, onRecord, onBusy, on
     <Sheet open={open} onClose={() => { if (!busy) { setOpen(false); setHtml(null) } }} onRestoreFocus={() => restoreFocus.current?.focus()} title={candidate ? 'Review exact candidate' : 'Archived signed note'} description={`${record.patient.displayName} · ${record.patient.recordNumber}`}>
       <div className="clinical-sign-review">{html ? <iframe ref={historyFrame} title="Exact server artifact" sandbox="allow-same-origin allow-modals" srcDoc={html} /> : <p role="status">{error ? 'Artifact unavailable. Signing is blocked.' : 'Loading verified artifact…'}</p>}
         {!candidate && html ? <Button variant="outline" onClick={() => historyFrame.current?.contentWindow?.print()}><Printer aria-hidden="true" />Print archived note</Button> : null}
-        {candidate && html ? <><p role={candidateStale ? 'alert' : undefined}>{candidateStale ? 'Interventions or vital signs changed after this review. Close this panel and prepare a fresh note. ' : ''}Revision {candidate.responseRevision} · checksum {candidate.artifactHash}</p><label className="clinical-checkbox"><input type="checkbox" checked={confirmed} disabled={busy} onChange={e => setConfirmed(e.target.checked)} />I reviewed this demo patient, content and exact candidate.</label><Button disabled={!confirmed || busy || disabled || candidateStale} onClick={() => void perform('sign')}>{busy ? 'Confirming…' : pending?.kind === 'sign' ? 'Retry original confirmation' : 'Confirm demo signature'}</Button></> : null}
+        {candidate && html ? <><p role={candidateStale ? 'alert' : undefined}>{candidateStale ? 'Requests or vital signs changed after this review. Close this panel and prepare the note again.' : `Note revision ${candidate.responseRevision}`}</p><p>Check every included request. Printing and delivery are recorded separately.</p>{error instanceof ClinicalRequestError && error.code === 'DUPLICATE_INTENT_REASON_REQUIRED' ? <div className="clinical-error" role="alert"><p>A similar current request exists. State why this request is being repeated before signing.</p><label className="clinical-field">Reason for repeated request<textarea value={duplicateIntentReason} maxLength={1000} onChange={event => setDuplicateIntentReason(event.target.value)} /></label></div> : null}<label className="clinical-checkbox"><input type="checkbox" checked={confirmed} disabled={busy} onChange={e => setConfirmed(e.target.checked)} />I reviewed the patient, note, and included requests.</label><Button disabled={!confirmed || busy || disabled || candidateStale || error instanceof ClinicalRequestError && error.code === 'DUPLICATE_INTENT_REASON_REQUIRED' && !duplicateIntentReason.trim()} onClick={() => void perform('sign')}>{busy ? 'Confirming…' : pending?.kind === 'sign' ? 'Retry original confirmation' : 'Sign note and issue requests'}</Button></> : null}
       </div>
     </Sheet>
   </section>

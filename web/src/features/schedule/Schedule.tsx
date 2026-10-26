@@ -110,16 +110,16 @@ function AppointmentDetails({ appointment, session, onNotice, onOpenChart }: {
       <Button variant="outline" onClick={() => onNotice('reschedule')}><CalendarClock aria-hidden="true" />Reschedule</Button>
       <Button variant="ghost" onClick={onOpenChart}>View patient chart<ArrowRight aria-hidden="true" /></Button>
     </div>
-    <div className="appointment-details-footer"><span>Times shown in Asia/Manila</span><span>Synthetic patient data</span></div>
+    <div className="appointment-details-footer"><span>Times shown in Asia/Manila</span></div>
   </aside>
 }
 
 function EmptyDate({ date, onToday }: { date: string; onToday: () => void }) {
   return <section className="surface schedule-empty" aria-labelledby="empty-date-heading">
     <CalendarDays aria-hidden="true" />
-    <h2 id="empty-date-heading">No demo appointments for this date</h2>
-    <p>{formatScheduleDate(date)} has no scheduling fixtures. No absence or availability is inferred.</p>
-    <Button variant="outline" onClick={onToday}>Return to demo date</Button>
+    <h2 id="empty-date-heading">No appointments shown for this date</h2>
+    <p>{formatScheduleDate(date)} has no appointments in this preview. Availability is not shown.</p>
+    <Button variant="outline" onClick={onToday}>Reset date</Button>
   </section>
 }
 
@@ -207,18 +207,18 @@ export function Schedule() {
         <Button variant="outline" size="icon" aria-label="Previous day" onClick={() => setDate(value => shiftScheduleDate(value, -1))}><ChevronLeft aria-hidden="true" /></Button>
         <Button variant="outline" size="icon" aria-label="Next day" onClick={() => setDate(value => shiftScheduleDate(value, 1))}><ChevronRight aria-hidden="true" /></Button>
         <span className="selected-date"><CalendarDays aria-hidden="true" /><time dateTime={date}>{formatScheduleDate(date)}</time></span>
-        <Button variant="outline" onClick={resetToDemoDate}>Today</Button>
+        <Button variant="outline" onClick={resetToDemoDate}>Reset date</Button>
       </div>
       <label className="schedule-practice-filter"><span className="sr-only">Practice schedule</span><select value={practice} onChange={event => switchPractice(event.target.value as SchedulePracticeFilter)}><option value="all">All authorized practices</option><option value="practice-a">Hospital A</option><option value="practice-b">Clinic B</option></select></label>
       <div className="schedule-view-toggle" aria-label="Calendar view"><button aria-pressed="true">Day</button><button disabled title="Week view is not included in this preview">Week</button><button disabled title="Month view is not included in this preview">Month</button></div>
     </section>
 
     <div id="schedule-tabpanel" role="tabpanel" aria-labelledby={`schedule-tab-${tabs.indexOf(tab)}`}>
-      {tab === 'Waitlist' ? <section className="surface schedule-empty schedule-secondary-state"><UserRoundPlus aria-hidden="true" /><h2>No patients are waiting for a slot</h2><p>This synthetic preview contains no waitlist entries. A connected scheduling service is required to add or offer appointments.</p></section> : null}
-      {tab === 'Availability & Leave' ? visibleSessions.length ? <section className="surface availability-view"><header><div><h2>Availability & leave</h2><p>Practice sessions for {formatScheduleDate(date)} · {practice === 'all' ? 'All authorized practices' : visibleSessions[0].site}.</p></div><span className="schedule-status neutral"><span className="status-dot" />Demo preview</span></header><div className="availability-list">{visibleSessions.map(session => <div key={session.id}><span className={`schedule-session-icon ${session.accent}`}><Building2 aria-hidden="true" /></span><span><strong>{session.site}</strong><small>{session.clinic} · {session.start}–{session.end}</small></span><span>{session.state === 'IN_PROGRESS' ? 'In progress' : 'Scheduled'}</span></div>)}</div><p className="availability-note"><Info aria-hidden="true" />No leave is recorded in the filtered demo fixtures. Availability editing is not connected.</p></section> : <EmptyDate date={date} onToday={resetToDemoDate} /> : null}
+      {tab === 'Waitlist' ? <section className="surface schedule-empty schedule-secondary-state"><UserRoundPlus aria-hidden="true" /><h2>No patients are waiting for a slot</h2><p>Waitlist entries are unavailable in this preview. Appointment offers cannot be made here.</p></section> : null}
+      {tab === 'Availability & Leave' ? visibleSessions.length ? <section className="surface availability-view"><header><div><h2>Availability & leave</h2><p>Practice sessions for {formatScheduleDate(date)} · {practice === 'all' ? 'All authorized practices' : visibleSessions[0].site}.</p></div></header><div className="availability-list">{visibleSessions.map(session => <div key={session.id}><span className={`schedule-session-icon ${session.accent}`}><Building2 aria-hidden="true" /></span><span><strong>{session.site}</strong><small>{session.clinic} · {session.start}–{session.end}</small></span><span>{session.state === 'IN_PROGRESS' ? 'In progress' : 'Scheduled'}</span></div>)}</div><p className="availability-note"><Info aria-hidden="true" />Leave information is unavailable. Availability cannot be edited here.</p></section> : <EmptyDate date={date} onToday={resetToDemoDate} /> : null}
       {tab === 'Calendar' || tab === 'Appointments' ? dateAppointments.length && selected && selectedSession ? <div className="schedule-layout">
         <section className="surface schedule-agenda" aria-labelledby="schedule-agenda-heading">
-          <header className="schedule-agenda-header"><div><h2 id="schedule-agenda-heading">{tab === 'Calendar' ? 'Today’s schedule' : 'Appointment list'}</h2><p>{appointmentTotal} appointments · {practiceCount} {practiceCount === 1 ? 'practice' : 'practices'}{pendingCount ? ` · ${pendingCount} pending confirmation` : ''}</p></div><span><ShieldCheck aria-hidden="true" />Authorized scope</span></header>
+          <header className="schedule-agenda-header"><div><h2 id="schedule-agenda-heading">{tab === 'Calendar' ? 'Day schedule' : 'Appointment list'}</h2><p>{appointmentTotal} appointments · {practiceCount} {practiceCount === 1 ? 'practice' : 'practices'}{pendingCount ? ` · ${pendingCount} pending confirmation` : ''}</p></div><span><ShieldCheck aria-hidden="true" />Authorized scope</span></header>
           {visibleSessions.map((session, index) => <div key={session.id}>
             {index > 0 && practice === 'all' ? <div className="schedule-break"><Clock3 aria-hidden="true" /><span>12:00–2:00 PM · Break & travel</span></div> : null}
             <SessionAgenda
@@ -236,10 +236,10 @@ export function Schedule() {
       </div> : <EmptyDate date={date} onToday={() => setDate(scheduleDemoDate)} /> : null}
     </div>
 
-    <footer className="dashboard-footer schedule-page-footer"><span><ShieldCheck aria-hidden="true" />Practice filters do not change your active session</span><span>Synthetic scheduling data · Preview only</span></footer>
+    <footer className="dashboard-footer schedule-page-footer"><span><ShieldCheck aria-hidden="true" />Practice filters do not change your active session</span></footer>
 
-    <Sheet open={notice !== null} onClose={() => setNotice(null)} title={notice === 'new' ? 'New appointment' : notice === 'reschedule' ? 'Reschedule appointment' : 'Appointment record'} description="Synthetic scheduling preview · No changes will be saved">
-      {notice === 'appointment' && selected && selectedSession ? <><div className="patient-overview"><span className="avatar blue">{selected.patient.initials}</span><div><h3>{selected.patient.name}</h3><p>{selected.patient.mrn} · {selectedSession.site}</p></div></div><dl className="detail-grid"><div><dt>Appointment</dt><dd>{formatScheduleDate(selectedSession.date)}</dd></div><div><dt>Time</dt><dd>{selected.start}–{selected.end}</dd></div><div><dt>Visit</dt><dd>{selected.visit}</dd></div><div><dt>Booking</dt><dd>{selected.booking === 'CONFIRMED' ? 'Confirmed' : 'Pending confirmation'}</dd></div></dl><p className="preview-note"><Info aria-hidden="true" />Appointment review does not start an encounter or alter the queue.</p><Button onClick={() => { setNotice(null); navigate(chartPath(selected.patient)) }}>Open patient chart<ArrowRight aria-hidden="true" /></Button></> : <div className="schedule-notice"><span className="icon-tile blue">{notice === 'new' ? <Plus aria-hidden="true" /> : <CalendarClock aria-hidden="true" />}</span><h3>{notice === 'new' ? 'Appointment creation is not connected' : 'Rescheduling is not connected'}</h3><p>{notice === 'new' ? 'A server-authorized scheduling workflow is required before an appointment can be created.' : 'The original appointment and its change history must be preserved when a new slot is confirmed.'}</p><p className="preview-note"><Info aria-hidden="true" />This preview will not change appointment, queue, or patient records.</p></div>}
+    <Sheet open={notice !== null} onClose={() => setNotice(null)} title={notice === 'new' ? 'New appointment' : notice === 'reschedule' ? 'Reschedule appointment' : 'Appointment record'} description="Schedule preview · No changes will be saved">
+      {notice === 'appointment' && selected && selectedSession ? <><div className="patient-overview"><span className="avatar blue">{selected.patient.initials}</span><div><h3>{selected.patient.name}</h3><p>{selected.patient.mrn} · {selectedSession.site}</p></div></div><dl className="detail-grid"><div><dt>Appointment</dt><dd>{formatScheduleDate(selectedSession.date)}</dd></div><div><dt>Time</dt><dd>{selected.start}–{selected.end}</dd></div><div><dt>Visit</dt><dd>{selected.visit}</dd></div><div><dt>Booking</dt><dd>{selected.booking === 'CONFIRMED' ? 'Confirmed' : 'Pending confirmation'}</dd></div></dl><p className="preview-note"><Info aria-hidden="true" />Appointment review does not start an encounter or alter the queue.</p><Button onClick={() => { setNotice(null); navigate(chartPath(selected.patient)) }}>Open patient chart<ArrowRight aria-hidden="true" /></Button></> : <div className="schedule-notice"><span className="icon-tile blue">{notice === 'new' ? <Plus aria-hidden="true" /> : <CalendarClock aria-hidden="true" />}</span><h3>{notice === 'new' ? 'Appointment creation unavailable' : 'Rescheduling unavailable'}</h3><p>{notice === 'new' ? 'Appointments cannot be created from this preview.' : 'The original appointment and its change history must be preserved when a new slot is confirmed.'}</p><p className="preview-note"><Info aria-hidden="true" />This preview will not change appointment, queue, or patient records.</p></div>}
     </Sheet>
   </main>
 }

@@ -215,6 +215,17 @@ export type DatingAssessment = {
   "receivedAt"?: string
 }
 
+export type DeleteDraft = {
+  "expectedVersion"?: number
+  "reason"?: string
+}
+
+export type DeletedDraft = {
+  "encounterId"?: string
+  "clinicianId"?: string
+  "fence"?: number
+}
+
 export type DirectoryItem = {
   "patient"?: Patient
   "birthAccuracy"?: string
@@ -436,11 +447,12 @@ export type Item = {
 export type JsonNode = {
   "number"?: boolean
   "container"?: boolean
-  "nodeType"?: "ARRAY" | "BINARY" | "BOOLEAN" | "MISSING" | "NULL" | "NUMBER" | "OBJECT" | "POJO" | "STRING"
-  "string"?: boolean
-  "integralNumber"?: boolean
-  "missingNode"?: boolean
+  "floatingPointNumber"?: boolean
   "valueNode"?: boolean
+  "missingNode"?: boolean
+  "nodeType"?: "ARRAY" | "BINARY" | "BOOLEAN" | "MISSING" | "NULL" | "NUMBER" | "OBJECT" | "POJO" | "STRING"
+  "integralNumber"?: boolean
+  "string"?: boolean
   "pojo"?: boolean
   "short"?: boolean
   "int"?: boolean
@@ -451,7 +463,6 @@ export type JsonNode = {
   "textual"?: boolean
   "boolean"?: boolean
   "binary"?: boolean
-  "floatingPointNumber"?: boolean
   "empty"?: boolean
   "array"?: boolean
   "null"?: boolean
@@ -877,6 +888,12 @@ export type Reaction = {
   "exposureRoute"?: string | null
 }
 
+export type Reading = {
+  "vitalSetId"?: string
+  "encounterId"?: string
+  "current"?: Revision
+}
+
 export type ReceiveReport = {
   "id"?: string
   "kind"?: string
@@ -996,6 +1013,15 @@ export type Release = {
   "publishedAt"?: string
   "retired"?: boolean
   "availabilityVersion"?: number
+}
+
+export type Removal = {
+  "vitalSetId"?: string
+  "removed"?: boolean
+}
+
+export type Remove = {
+  "expectedVersion"?: number
 }
 
 export type Resolve = {
@@ -1246,6 +1272,7 @@ export type Sign = {
   "expectedVersion"?: number
   "reviewedArtifactHash"?: string
   "confirmSyntheticReview"?: boolean
+  "duplicateIntentReason"?: string
 }
 
 export type Signature = {
@@ -1419,6 +1446,12 @@ export type TemplateDefinition = {
   "requiresPregnancyEpisode"?: boolean
   "syntheticOnly"?: boolean
   "sections"?: Array<Section>
+}
+
+export type TimelinePage = {
+  "items"?: Array<Reading>
+  "page"?: number
+  "hasMore"?: boolean
 }
 
 export type TransferFollowUp = {

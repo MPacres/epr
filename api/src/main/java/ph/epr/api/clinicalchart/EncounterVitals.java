@@ -17,7 +17,15 @@ public interface EncounterVitals {
     record Create(UUID vitalSetId, OffsetDateTime measuredAt, String source, Values values) {}
     record Correct(long expectedVersion, OffsetDateTime measuredAt, String source,
                    Values values, String reason) {}
+    record Reading(UUID vitalSetId, UUID encounterId, Revision current) {}
+    record TimelinePage(List<Reading> items, int page, boolean hasMore) {}
+    record Remove(long expectedVersion) {}
+    record Removal(UUID vitalSetId, boolean removed) {}
     List<VitalSet> list(Context context, UUID patientId, UUID encounterId);
+    TimelinePage timeline(Context context, UUID patientId, UUID encounterId, int page);
     VitalSet create(Context context, UUID patientId, UUID encounterId, UUID key, Create request);
     VitalSet correct(Context context, UUID patientId, UUID encounterId, UUID vitalSetId, UUID key, Correct request);
+    Removal remove(Context context, UUID patientId, UUID encounterId, UUID vitalSetId, UUID key, Remove request);
+    /** Includes measurements later marked entered in error. Caller already holds the encounter boundary. */
+    boolean hasHistory(Context context, UUID patientId, UUID encounterId);
 }

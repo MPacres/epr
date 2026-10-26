@@ -46,20 +46,20 @@ export function ProviderPortal() {
         <button className="provider-nav-item" disabled><Headphones aria-hidden="true" />Support cases</button>
         <button className="provider-nav-item" disabled><FileKey2 aria-hidden="true" />Access grants</button>
       </nav>
-      <div className="provider-profile"><span className="provider-avatar">{initials}</span><span><strong>{user?.displayName}</strong><small>Superadmin · Local development</small></span></div>
+      <div className="provider-profile"><span className="provider-avatar">{initials}</span><span><strong>{user?.displayName}</strong><small>Provider support</small></span></div>
     </aside>
     <div className="provider-main">
       <header className="provider-topbar">
         <span className="provider-scope"><ShieldCheck aria-hidden="true" />Global platform view</span>
         <button className="provider-search" type="button" onClick={openPracticeSearch}><Search aria-hidden="true" /><span>Search practices</span><strong>Open directory</strong></button>
-        <span className="provider-health"><CircleCheck aria-hidden="true" />Local session API connected</span>
+        <span className="provider-health"><CircleCheck aria-hidden="true" />Training environment</span>
         <Button variant="ghost" onClick={() => navigate('/logout')}><LogOut aria-hidden="true" />Sign out</Button>
       </header>
       <main id="main-content" className="provider-content" tabIndex={-1}>
         {creatingTenant ? <TenantCreation onBack={() => navigate('/provider/practices')} onCreated={practiceId => navigate(`/provider/practices/${practiceId}`)} />
           : practiceDetail?.params.practiceId ? <PracticeDetail practiceId={practiceDetail.params.practiceId} />
             : viewingPractices ? <PracticeDirectory onCreate={() => navigate('/provider/tenants/new')} /> : <>
-          <div className="provider-heading"><div><h1>Provider operations</h1><p>Secure access for platform administration and delegated tenant support.</p></div><span className="provider-session"><LockKeyhole aria-hidden="true" />Authenticated local session</span></div>
+          <div className="provider-heading"><div><h1>Provider operations</h1><p>Secure access for platform administration and delegated tenant support.</p></div><span className="provider-session"><LockKeyhole aria-hidden="true" />Signed in</span></div>
           <div className="provider-boundary" role="note"><ShieldCheck aria-hidden="true" /><p><strong>Global view contains no patient records.</strong><span>Practice access will require an active managed-administration grant and a recorded support reason.</span></p></div>
           <section className="provider-summary" aria-label="Provider feature connection status">
             {summary.map(({ label, value, icon: Icon, tone }) => <div className="provider-summary-item" key={label}><span className={`provider-icon ${tone}`}><Icon aria-hidden="true" /></span><span><small>{label}</small><strong>{value}</strong></span></div>)}

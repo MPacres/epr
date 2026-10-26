@@ -9,20 +9,19 @@ import { createUuid } from '../../lib/create-uuid'
 import { atSite, request, clinicalKey, type Scope } from '../encounters/services/encounter-api'
 import { Field, ComposerActions } from '../interventions/components/ComposerFields'
 import { combineLabInstructions, splitLabInstructions } from './lab-order-instructions'
+import { orderDraftSchema, type OrderDraftValues } from './order-draft-validation'
 
-const schema = z.object({ catalogCode: z.string().nullish(), indication: z.string().max(4000), destination: z.string().max(4000), priority: z.string(), requestedDate: z.string(), specimen: z.string(), bodySite: z.string(), laterality: z.string(), instructions: z.string().max(4000), fasting: z.boolean() })
-type Values = z.infer<typeof schema>
 type CatalogEntry = { code: string; version: string; kind: string; label: string }
 type LabTest = { id: string; label: string; code: string | null; version: string | null }
 const testIdentity = (test: Pick<LabTest, 'label' | 'code'>) => `${test.code ?? ''}\u0000${test.label.trim().toLocaleLowerCase()}`
 
 export function OrderComposer({ scope, patient, kind, initial, editing = false, busy, onDirty, onSave, onCancel }: { scope: Scope; patient: string; kind: 'LAB_ORDER' | 'IMAGING_ORDER'; initial?: Record<string, unknown>; editing?: boolean; busy: boolean; onDirty: (v: boolean) => void; onSave: (data: Record<string, unknown>) => void; onCancel: () => void }) {
   const isLab = kind === 'LAB_ORDER'
-  const initialText = (field: keyof Values) => typeof initial?.[field] === 'string' ? initial[field] as string : ''
+  const initialText = (field: keyof OrderDraftValues) => typeof initial?.[field] === 'string' ? initial[field] as string : ''
   const initialRequestedDate = initialText('requestedDate')
   const existingInstructions = typeof initial?.instructions === 'string' ? initial.instructions : ''
   const parsedInstructions = isLab ? splitLabInstructions(existingInstructions) : { instructions: existingInstructions, fasting: false }
-  const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { catalogCode: initialText('catalogCode'), indication: initialText('indication'), destination: initialText('destination'), priority: initialText('priority') || 'ROUTINE', requestedDate: initialRequestedDate || new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()), specimen: initialText('specimen'), bodySite: initialText('bodySite'), laterality: initialText('laterality'), ...parsedInstructions } })
+  const form = useForm<OrderDraftValues>({ resolver: zodResolver(orderDraftSchema(kind)), defaultValues: { catalogCode: initialText('catalogCode'), indication: initialText('indication'), destination: initialText('destination'), priority: initialText('priority') || 'ROUTINE', requestedDate: initialRequestedDate || (editing ? '' : new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())), specimen: initialText('specimen'), bodySite: initialText('bodySite'), laterality: initialText('laterality'), ...parsedInstructions } })
   const priority = useWatch({ control: form.control, name: 'priority' })
   const [tests, setTests] = useState<LabTest[]>(() => typeof initial?.serviceName === 'string' && initial.serviceName.trim() ? [{ id: createUuid(), label: initial.serviceName, code: typeof initial.catalogCode === 'string' ? initial.catalogCode : null, version: typeof initial.catalogVersion === 'string' ? initial.catalogVersion : null }] : [])
   const [search, setSearch] = useState('')
@@ -33,7 +32,7 @@ export function OrderComposer({ scope, patient, kind, initial, editing = false, 
   const services = catalog.data?.filter(entry => entry.kind === kind) ?? []
   const initialTestIdentity = typeof initial?.serviceName === 'string' && initial.serviceName.trim() ? testIdentity({ label: initial.serviceName, code: typeof initial.catalogCode === 'string' ? initial.catalogCode : null }) : ''
   const testsChanged = tests.map(testIdentity).join('|') !== initialTestIdentity
-  const changed = form.formState.isDirty || testsChanged || (editing && !initialRequestedDate)
+  const changed = form.formState.isDirty || testsChanged
   useEffect(() => { onDirty(changed) }, [onDirty, changed])
 
   const matching = !isLab && tests.length ? [] : tests.length >= 30 ? [] : services.filter(entry => entry.label.toLowerCase().includes(search.trim().toLowerCase()) && !tests.some(test => test.code === entry.code || test.label.trim().toLowerCase() === entry.label.trim().toLowerCase()))
@@ -51,7 +50,7 @@ export function OrderComposer({ scope, patient, kind, initial, editing = false, 
     setSearch(''); setShowSuggestions(false); setTestError('')
   }
 
-  function save(values: Values) {
+  function save(values: OrderDraftValues) {
     if (editing && !changed) return
     const { fasting, ...fields } = values
     if (isLab) {
@@ -69,7 +68,7 @@ export function OrderComposer({ scope, patient, kind, initial, editing = false, 
     {catalog.isPending ? <p role="status">Loading {isLab ? 'test' : 'imaging request'} suggestions…</p> : catalog.error ? <p role="alert">Suggestions are unavailable. You can still enter {isLab ? 'a test' : 'an imaging request'} by name.</p> : null}
     <fieldset disabled={busy}>
       {isLab ? <>
-        <Field label="Laboratory / location"><input {...form.register('destination')} maxLength={4000} autoComplete="off" /></Field>
+        <Field label="Laboratory / location (optional)" error={form.formState.errors.destination?.message}><input {...form.register('destination')} maxLength={4000} autoComplete="off" /></Field>
         <div className="lab-test-entry" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setShowSuggestions(false) }}>
           <label htmlFor={searchId}>Test name</label>
           <div className="lab-test-search"><Search aria-hidden="true" /><input id={searchId} type="search" autoComplete="off" maxLength={200} disabled={tests.length >= 30} placeholder="Search or enter a test" value={search} onChange={event => { setSearch(event.target.value); setShowSuggestions(true); setTestError('') }} onFocus={() => setShowSuggestions(true)} onKeyDown={event => { if (event.key === 'Escape') setShowSuggestions(false); if (event.key === 'ArrowDown' && matching.length) { event.preventDefault(); event.currentTarget.closest('.lab-test-entry')?.querySelector<HTMLButtonElement>('.lab-test-suggestions button')?.focus() } if (event.key === 'Enter' && typedName) { event.preventDefault(); addTest() } }} /><Button type="button" variant="outline" disabled={!typedName || alreadyAdded || tests.length >= 30} onClick={() => addTest()}><Plus aria-hidden="true" />Add</Button></div>
@@ -77,7 +76,7 @@ export function OrderComposer({ scope, patient, kind, initial, editing = false, 
           {tests.length >= 30 ? <p className="lab-test-search-note">Maximum 30 tests per order.</p> : showSuggestions && typedName && !matching.length && !alreadyAdded ? <p className="lab-test-search-note">No saved match. Use Add to enter this test.</p> : null}
         </div>
         <div className="lab-selected"><h3>{editing ? 'Test being edited' : 'Tests in this order'}</h3>{tests.length ? <ul>{tests.map(test => <li key={test.id}><span>{test.label}</span><Button type="button" variant="ghost" aria-label={`Remove ${test.label}`} onClick={() => setTests(current => current.filter(item => item.id !== test.id))}><X aria-hidden="true" /></Button></li>)}</ul> : <p>No tests added yet.</p>}{testError ? <p role="alert" className="intervention-field-error">{testError}</p> : null}</div>
-        <div className="intervention-field-grid"><Field label="Requested test date"><input type="date" {...form.register('requestedDate')} /></Field><Field label="Reason for test"><input {...form.register('indication')} maxLength={4000} /></Field></div>
+        <div className="intervention-field-grid"><Field label="Requested test date (required)" error={form.formState.errors.requestedDate?.message}><input type="date" {...form.register('requestedDate')} /></Field><Field label="Reason for test (required)" error={form.formState.errors.indication?.message}><input {...form.register('indication')} maxLength={4000} /></Field></div>
         <Field label="Instructions / alerts"><textarea {...form.register('instructions')} maxLength={3980} rows={3} /></Field>
         <div className="lab-order-flags"><label className="clinical-checkbox"><input type="checkbox" checked={priority === 'STAT' || priority === 'URGENT'} onChange={event => form.setValue('priority', event.target.checked ? 'STAT' : 'ROUTINE', { shouldDirty: true })} />STAT</label><label className="clinical-checkbox"><input type="checkbox" {...form.register('fasting')} />Fasting required</label></div>
         <details className="lab-more-details"><summary>Specimen details</summary><Field label="Specimen, if applicable"><input {...form.register('specimen')} /></Field></details>
@@ -89,10 +88,10 @@ export function OrderComposer({ scope, patient, kind, initial, editing = false, 
           {showSuggestions && typedName && !matching.length && !tests.length ? <p className="lab-test-search-note">No saved match. Use Add to enter this request.</p> : null}
         </div>
         <div className="lab-selected"><h3>Selected imaging request</h3>{tests.length ? <ul>{tests.map(test => <li key={test.id}><span>{test.label}</span><Button type="button" variant="ghost" aria-label={`Remove ${test.label}`} onClick={() => setTests([])}><X aria-hidden="true" /></Button></li>)}</ul> : <p>No imaging request added yet.</p>}{testError ? <p role="alert" className="intervention-field-error">{testError}</p> : null}</div>
-        <Field label="Clinical question / indication"><textarea {...form.register('indication')} maxLength={4000} /></Field>
-        <div className="intervention-field-grid"><Field label="Destination"><input {...form.register('destination')} /></Field><Field label="Requested date"><input type="date" {...form.register('requestedDate')} /></Field><Field label="Priority"><select {...form.register('priority')}><option value="ROUTINE">Routine</option><option value="URGENT">Urgent · clinician selected</option></select></Field><Field label="Body site"><input {...form.register('bodySite')} /></Field><Field label="Laterality, if applicable"><input {...form.register('laterality')} /></Field></div>
+        <Field label="Clinical question / indication (required)" error={form.formState.errors.indication?.message}><textarea {...form.register('indication')} maxLength={4000} /></Field>
+        <div className="intervention-field-grid"><Field label="Destination (required)" error={form.formState.errors.destination?.message}><input {...form.register('destination')} /></Field><Field label="Requested date (required)" error={form.formState.errors.requestedDate?.message}><input type="date" {...form.register('requestedDate')} /></Field><Field label="Priority"><select {...form.register('priority')}><option value="ROUTINE">Routine</option><option value="URGENT">Urgent · clinician selected</option></select></Field><Field label="Body site"><input {...form.register('bodySite')} /></Field><Field label="Laterality, if applicable"><input {...form.register('laterality')} /></Field></div>
         <Field label="Patient / service instructions"><textarea {...form.register('instructions')} maxLength={4000} /></Field>
       </>}
-    </fieldset><p className="intervention-help">{editing ? isLab ? 'Save the selected test plan. Other tests in this laboratory order remain unchanged.' : 'Save this imaging request plan.' : 'Add this plan to the encounter note. No requisition is issued until you authorize it separately.'} Follow up each result until it is reviewed or handed over.</p><ComposerActions busy={busy} saveDisabled={editing && !changed} onCancel={onCancel} label={editing ? 'Save changes' : 'Add to note'} addAnotherLabel="Add to note and add another" allowAddAnother={!isLab && !editing} />
+    </fieldset><p className="intervention-help">{editing ? isLab ? 'Save the selected test request. Other tests in this laboratory order remain unchanged.' : 'Save this imaging request.' : 'Add this request to the encounter. Review it with the note before signing; signing issues the printable request.'} Follow up each result until it is reviewed or handed over.</p><ComposerActions busy={busy} saveDisabled={editing && !changed} onCancel={onCancel} label={editing ? 'Save changes' : 'Add request'} addAnotherLabel="Add request and add another" allowAddAnother={!isLab && !editing} />
   </form>
 }

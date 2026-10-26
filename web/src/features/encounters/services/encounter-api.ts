@@ -47,6 +47,8 @@ export const clinicalApi = {
   create: (scope: Scope, patient: string, body: Wire.Create, key: string) => request(atSite(scope, `/patients/${patient}/encounters`), encounterSchema, { method: 'POST', body, key }),
   encounter: (scope: Scope, patient: string, id: string, signal?: AbortSignal) => request(atSite(scope, `/patients/${patient}/encounters/${id}`), encounterSchema, { signal }),
   save: (scope: Scope, patient: string, id: string, body: Wire.Save, key: string, signal?: AbortSignal) => request(atSite(scope, `/patients/${patient}/encounters/${id}/draft`), encounterSchema, { method: 'PUT', body, key, signal }),
+  deleteDraft: (scope: Scope, patient: string, id: string, body: Wire.DeleteDraft, key: string) =>
+    request(atSite(scope, `/patients/${patient}/encounters/${id}/delete-draft`), z.object({ encounterId: uuid, clinicianId: uuid, fence: z.number() }), { method: 'POST', body, key }),
   transition: (scope: Scope, patient: string, id: string, body: Wire.Transition, key: string) => request(atSite(scope, `/patients/${patient}/encounters/${id}/care-transitions`), encounterSchema, { method: 'POST', body, key }),
 }
 export const clinicalKey = (scope: Scope, patient?: string, encounter?: string) => ['clinical', scope.practiceId, scope.siteId, patient ?? '', encounter ?? ''] as const

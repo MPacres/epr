@@ -83,7 +83,8 @@
   .provider-main { margin-left: 0; }
   .provider-topbar { display: grid; grid-template-columns: 1fr auto; min-height: 0; gap: 10px; padding: 14px 18px; }
   .provider-scope { justify-self: start; }
-  .provider-health { display: none; }
+  .provider-health { display: inline-flex; grid-column: 1 / -1; grid-row: 3; margin-left: 0; color: var(--secondary); font-size: 11px; }
+  .provider-health svg { display: none; }
   .provider-search { grid-column: 1 / -1; grid-row: 2; width: 100%; }
   .provider-topbar .button { min-height: 40px; padding-inline: 10px; }
   .provider-content { padding: 25px 18px 108px; }

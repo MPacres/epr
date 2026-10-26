@@ -5,22 +5,27 @@ import java.util.*;
 import org.springframework.stereotype.Service;
 import org.springframework.context.annotation.Profile;
 import ph.epr.api.encountertemplates.EncounterInterventionLinks;
+import ph.epr.api.encountertemplates.EncounterSigningDocumentIssuer;
 import ph.epr.api.encountertemplates.EncounterInterventionLinks.*;
 import ph.epr.api.identitytenancy.*;
 import ph.epr.api.platformoperations.*;
 import ph.epr.api.platformoperations.TenantTransactions.Context;
 import ph.epr.api.documentscommunication.PrivateClinicalArtifacts;
+import ph.epr.api.documentscommunication.ClinicalHandoffDocuments;
+import ph.epr.api.documentscommunication.ClinicalHandoffDocuments.Field;
+import ph.epr.api.documentscommunication.ClinicalHandoffDocuments.Section;
 
 /** Prescription records and revisions belong exclusively to prescribing. */
 @Service
 @Profile("local")
-public class PrescriptionService {
+public class PrescriptionService implements EncounterSigningDocumentIssuer {
     private final EncounterInterventionLinks links;
     private final TenantCommandJournal journal;
     private final PrivateClinicalArtifacts artifacts;
+    private final ClinicalHandoffDocuments documents;
     private final ph.epr.api.clinicalchart.ClinicalLists clinicalLists;
-    public PrescriptionService(EncounterInterventionLinks links,TenantCommandJournal journal,PrivateClinicalArtifacts artifacts, ph.epr.api.clinicalchart.ClinicalLists clinicalLists) {
-        this.links=links;this.journal=journal;this.artifacts=artifacts;this.clinicalLists=clinicalLists;
+    public PrescriptionService(EncounterInterventionLinks links,TenantCommandJournal journal,PrivateClinicalArtifacts artifacts, ph.epr.api.clinicalchart.ClinicalLists clinicalLists, ClinicalHandoffDocuments documents) {
+        this.links=links;this.journal=journal;this.artifacts=artifacts;this.clinicalLists=clinicalLists;this.documents=documents;
     }
     public record PrescriptionData(String indication, String instructions, UUID reviewId, List<PrescriptionItem> items) {}
     public record PrescriptionRecord(UUID id,UUID patientId,UUID encounterId,UUID siteId,long version,String state,
@@ -33,6 +38,25 @@ public class PrescriptionService {
     public record PrescriptionAuthorize(long expectedVersion,UUID preparationId,String reviewedArtifactHash,boolean confirmSyntheticReview,String lateActionReason,String duplicateReason) {}
     public record PrescriptionReason(long expectedVersion,String reason) {}
     public record PrescriptionEvidence(long expectedVersion,String outcome,String evidence,OffsetDateTime occurredAt) {}
+    @Override public boolean supports(Kind kind) { return kind == Kind.PRESCRIPTION; }
+    @Override public void checkForSigning(Context c, UUID patient, UUID encounter, Item item) {
+        var source = get(c, patient, item.summary().sourceId());
+        if (item.summary().kind() != Kind.PRESCRIPTION || !source.encounterId().equals(encounter)
+            || !source.authorId().equals(c.actorId()) || !source.state().equals("DRAFT")
+            || source.version() != item.summary().sourceVersion()) throw new ClinicalAccessException("SIGN_CANDIDATE_STALE", 409);
+        candidateContent(c, patient, source.id(), new PrescriptionPrepare(UUID.randomUUID(), source.version()));
+    }
+    @Override public void issueWithSignature(Context c, UUID patient, UUID encounter, Item item, UUID signaturePreparationId, String duplicateIntentReason) {
+        checkForSigning(c, patient, encounter, item);
+        var source = get(c, patient, item.summary().sourceId());
+        var kind = item.summary().kind();
+        var preparationId = EncounterSigningDocumentIssuer.key(signaturePreparationId, kind, source.id(), "document");
+        var prepared = prepare(c, patient, source.id(), EncounterSigningDocumentIssuer.key(signaturePreparationId, kind, source.id(), "prepare"),
+            new PrescriptionPrepare(preparationId, source.version()));
+        var lateReason = links.context(c, patient, encounter).careState().equals("IN_PROGRESS") ? null : "Issued with the clinician's encounter signature after care was finished";
+        authorize(c, patient, source.id(), EncounterSigningDocumentIssuer.key(signaturePreparationId, kind, source.id(), "issue"),
+            new PrescriptionAuthorize(source.version(), prepared.preparationId(), prepared.artifactHash(), true, lateReason, duplicateIntentReason));
+    }
     public List<PrescriptionRecord> list(Context c,UUID patient,int page) {
         if(page<0)throw new ClinicalAccessException("INVALID_PAGE",422);
         var ids=c.jdbc().sql("SELECT id FROM prescription WHERE practice_id=:p AND patient_id=:patient AND site_id=:s AND author_id=:a ORDER BY received_at DESC,id LIMIT 30 OFFSET :offset")
@@ -118,7 +142,7 @@ public class PrescriptionService {
             var encounter=links.context(c,patient,before.encounterId());unsigned(encounter);var current=get(c,patient,id);version(current,request.expectedVersion());draft(current);
             if(!request.confirmSyntheticReview()) fail("DELIBERATE_SYNTHETIC_REVIEW_REQUIRED");
             if(!encounter.careState().equals("IN_PROGRESS")) required(request.lateActionReason(),"LATE_ACTION_REASON_REQUIRED");
-            validate(current.data(),true);validateRefills(c,patient,current.data());var review=prerequisites(c,current);duplicates(c,current,request.duplicateReason());
+            validate(current.data(),true);validateRefills(c,patient,current.data());var review=prerequisites(c,current);var repeated=duplicates(c,current,request.duplicateReason());
             var prep=c.jdbc().sql("SELECT preparation_id,source_version,artifact_id,artifact_hash,clinical_review_id,clinical_review_hash FROM prescription_preparation WHERE practice_id=:p AND id=:id AND preparation_id=:candidate AND prepared_by=:a")
                 .param("p",c.practiceId()).param("id",id).param("candidate",request.preparationId()).param("a",c.actorId())
                 .query((r,n)->new PrescriptionPreparation(r.getObject(1,UUID.class),r.getLong(2),r.getObject(3,UUID.class),r.getString(4),r.getObject(5,UUID.class),r.getString(6)))
@@ -127,7 +151,8 @@ public class PrescriptionService {
             artifacts.archive(c,prep.artifactId(),prep.artifactHash());
             c.jdbc().sql("UPDATE prescription SET state='ISSUED',version=version+1,authorized_at=CURRENT_TIMESTAMP,artifact_id=:artifact,artifact_hash=:hash,delivery_state='NOT_SENT' WHERE practice_id=:p AND id=:id")
                 .param("artifact",prep.artifactId()).param("hash",prep.artifactHash()).param("p",c.practiceId()).param("id",id).update();
-            revision(c,id,current.version()+1,current.data(),request.lateActionReason());
+            var recordedReason=request.lateActionReason()!=null?request.lateActionReason():repeated?request.duplicateReason():null;
+            revision(c,id,current.version()+1,current.data(),recordedReason);
             var result=get(c,patient,id);publish(c,result);obligation(c,result);
             if(original!=null) {
                 var previous=get(c,patient,original.id());
@@ -138,7 +163,7 @@ public class PrescriptionService {
                     revision(c,previous.id(),previous.version()+1,previous.data(),"Superseded by "+result.id());publish(c,get(c,patient,previous.id()));
                     journal.audit(c,previous.id(),"PRESCRIPTION_SUPERSEDED","Replacement "+result.id());
                 }
-            }journal.audit(c,id,"SYNTHETIC_ISSUED",request.lateActionReason());journal.event(c,id,"ISSUED/"+result.version(),result.ownerId());return result;
+            }journal.audit(c,id,"SYNTHETIC_ISSUED",recordedReason);journal.event(c,id,"ISSUED/"+result.version(),result.ownerId());return result;
         });
     }
     public PrescriptionRecord abandon(Context c,UUID patient,UUID id,UUID key,PrescriptionReason request) { return end(c,patient,id,key,request,true); }
@@ -181,19 +206,25 @@ public class PrescriptionService {
     }
     private void publish(Context c,PrescriptionRecord record) {
         var data=record.data();
-        links.append(c,record.patientId(),record.encounterId(),new Summary(kind(data),record.id(),record.version(),"Prescription · " + data.items().size() + " medicine(s)",data.items().stream().map(i->i.ingredient()+" · brand "+text(i.brand())+" · formulation "+text(i.formulation())+" · product strength "+i.strength()+" · dose "+i.dose()+" "+i.doseUnit()+" · "+i.route()+" · "+i.frequency()+" · "+i.duration()+" · quantity "+i.quantity()+" "+i.quantityUnit()+" · "+i.instructions()).toList(),
+        var details=new ArrayList<String>();
+        details.add("Indication: "+text(data.indication()));details.add("Directions: "+text(data.instructions()));
+        details.addAll(data.items().stream().map(i->(i.sourceItemId()==null?"New medicine: ":"Refill: ")+i.ingredient()+" · brand "+text(i.brand())+" · formulation "+text(i.formulation())+" · product strength "+i.strength()+" · dose "+i.dose()+" "+i.doseUnit()+" · "+i.route()+" · "+i.frequency()+" · "+i.duration()+" · quantity "+i.quantity()+" "+i.quantityUnit()+" · "+i.instructions()).toList());
+        links.append(c,record.patientId(),record.encounterId(),new Summary(kind(data),record.id(),record.version(),"Prescription · " + data.items().size() + " medicine(s)",details,
             record.state(),record.deliveryState(),record.fulfillmentState(),record.reviewState(),record.ownerId(),null,record.authorizedAt()==null?record.occurredAt():record.authorizedAt(),record.artifactId(),record.artifactHash()));
     }
     private byte[] render(Context c,PrescriptionRecord record,ph.epr.api.clinicalchart.ClinicalLists.SafetyManifest review) {
         var encounter=links.context(c,record.patientId(),record.encounterId());var data=record.data();
-        var lines=new ArrayList<String>();lines.add("Synthetic Prescription · reviewed source version "+record.version());
-        lines.add("Engineering validation only. Not valid for real-patient issuance.");lines.add(encounter.patientName()+" · "+encounter.recordNumber());
-        lines.add("Practice "+c.practiceId()+" · site "+c.siteId());lines.add("Responsible clinician "+record.ownerId());
-        lines.add("Clinical-list reconciliation "+review.reviewId()+" · "+review.manifestHash());
-        lines.add("Prescription · " + data.items().size() + " medicine(s)");lines.addAll(data.items().stream().map(i->i.ingredient()+" · brand "+text(i.brand())+" · formulation "+text(i.formulation())+" · product strength "+i.strength()+" · dose "+i.dose()+" "+i.doseUnit()+" · "+i.route()+" · "+i.frequency()+" · "+i.duration()+" · quantity "+i.quantity()+" "+i.quantityUnit()+" · "+i.instructions()).toList());lines.add("Indication: "+text(data.indication()));lines.add("Prescription instructions: "+text(data.instructions()));lines.add("Clinical time "+record.occurredAt());
-        lines.add("Authorization is separate from dispensing, performance, receipt and review.");
-        return ("<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><title>Synthetic Prescription</title><style>body{font:16px/1.6 sans-serif;color:#192943;max-width:760px;margin:32px auto;padding:24px}p{white-space:pre-wrap;overflow-wrap:anywhere}</style><body>"+
-            lines.stream().map(s->"<p>"+escape(s)+"</p>").collect(java.util.stream.Collectors.joining())+"</body></html>").getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        var sections=new ArrayList<Section>();
+        for(var item:data.items()) sections.add(new Section(item.ingredient()+(item.sourceItemId()==null?" · new":" · refill"),List.of(
+            new Field("Brand",item.brand()),new Field("Strength / form",text(item.strength())+" "+text(item.formulation())),
+            new Field("Dose",item.dose()+" "+text(item.doseUnit())),new Field("Route",item.route()),
+            new Field("Frequency",item.frequency()),new Field("Duration",item.duration()),
+            new Field("Quantity",item.quantity()+" "+text(item.quantityUnit())),new Field("Patient instructions",item.instructions()))));
+        sections.add(new Section("Additional directions",List.of(new Field("Indication",data.indication()),new Field("Instructions",data.instructions()),
+            new Field("Prescription recorded",ClinicalHandoffDocuments.clinicalTime(record.occurredAt())))));
+        sections.add(new Section("Clinical review reference",List.of(new Field("Review ID",review.reviewId().toString()),
+            new Field("Review checksum",review.manifestHash()))));
+        return documents.render(c,record.authorId(),"Medication prescription",encounter.patientName(),encounter.recordNumber(),record.id(),sections);
     }
     private Kind kind(PrescriptionData data) { return Kind.PRESCRIPTION; }
     private void bump(Context c,UUID id) { c.jdbc().sql("UPDATE prescription SET version=version+1 WHERE practice_id=:p AND id=:id").param("p",c.practiceId()).param("id",id).update(); }
@@ -256,12 +287,16 @@ public class PrescriptionService {
         }
         return review;
     }
-    private void duplicates(Context c,PrescriptionRecord record,String reason){
+    private boolean duplicates(Context c,PrescriptionRecord record,String reason){
+        var repeated=false;
         for(var i:record.data().items()){
-            var duplicate=c.jdbc().sql("SELECT EXISTS(SELECT 1 FROM prescription p JOIN prescription_item_revision i ON i.practice_id=p.practice_id AND i.prescription_id=p.id AND i.version=p.version WHERE p.practice_id=:p AND p.patient_id=:patient AND p.id<>:id AND p.state='ISSUED' AND lower(i.ingredient)=lower(:ingredient))")
-                .param("p",c.practiceId()).param("patient",record.patientId()).param("id",record.id()).param("ingredient",i.ingredient()).query(Boolean.class).single();
-            if(duplicate)required(reason,"DUPLICATE_INTENT_REASON_REQUIRED");
+            var duplicate=c.jdbc().sql("SELECT EXISTS(SELECT 1 FROM prescription p JOIN prescription_item_revision i ON i.practice_id=p.practice_id AND i.prescription_id=p.id AND i.version=p.version WHERE p.practice_id=:p AND p.patient_id=:patient AND p.id<>:id AND p.id<>:refillSource AND p.state='ISSUED' AND lower(i.ingredient)=lower(:ingredient))")
+                .param("p",c.practiceId()).param("patient",record.patientId()).param("id",record.id())
+                .param("refillSource",i.sourcePrescriptionId()==null?record.id():i.sourcePrescriptionId())
+                .param("ingredient",i.ingredient()).query(Boolean.class).single();
+            if(duplicate){required(reason,"DUPLICATE_INTENT_REASON_REQUIRED");repeated=true;}
         }
+        return repeated;
     }
     private void obligation(Context c,PrescriptionRecord record) { /* Dispensing and medication use are not inferred. */ }
 

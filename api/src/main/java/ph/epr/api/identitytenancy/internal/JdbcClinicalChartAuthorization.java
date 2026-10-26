@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 import ph.epr.api.identitytenancy.ClinicalChartAuthorization;
 import ph.epr.api.identitytenancy.ClinicalChartAuthorization.Action;
 import ph.epr.api.identitytenancy.ClinicalChartAuthorization.SourceKind;
+import ph.epr.api.identitytenancy.ClinicalReadiness;
 
 @Service
 class JdbcClinicalChartAuthorization implements ClinicalChartAuthorization {
@@ -45,7 +46,7 @@ class JdbcClinicalChartAuthorization implements ClinicalChartAuthorization {
               AND account.role IN ('CLINICIAN', 'PRACTICE_STAFF')
               AND clinical.enabled AND clinical.synthetic_only
               AND tenant.provisioning_status = 'ACTIVE' AND tenant.service_status = 'ENABLED'
-              AND tenant.schema_version = '17'
+              AND tenant.schema_version = :schema
               AND EXISTS (
                   SELECT 1 FROM practice_role_assignment role
                   WHERE role.practice_id = grant_row.practice_id
@@ -58,6 +59,7 @@ class JdbcClinicalChartAuthorization implements ClinicalChartAuthorization {
               )
             ORDER BY grant_row.source_kind
             """).param("practice", practice).param("actor", actor).param("site", site)
+            .param("schema", ClinicalReadiness.REQUIRED_SCHEMA_VERSION)
             .query((row, number) -> new Capability(SourceKind.valueOf(row.getString(1)),
                 row.getBoolean(2), row.getBoolean(3), row.getBoolean(4), row.getBoolean(5))).list();
     }

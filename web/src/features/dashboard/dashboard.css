@@ -49,6 +49,7 @@
 .search-submit { width: 24px; height: 30px; display: grid; place-items: center; color: #8290a6; }
 .search-submit svg { width: 16px; }
 .header-demo { white-space: nowrap; color: var(--secondary); display: flex; gap: 7px; align-items: center; font-size: 11px; }
+.mobile-environment { display: none; }
 .topbar-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; min-width: 0; }
 .topbar-sign-out { min-height: 40px; padding-inline: 10px; }
 .topbar-sign-out svg { width: 17px; height: 17px; }
@@ -305,6 +306,7 @@ h3 { font-size: 13px; }
   .notification-button { display: none; }
   .topbar-sign-out { font-size: 12px; }
   .global-search { grid-column: 1 / -1; grid-row: 2; width: 100%; min-height: 43px; gap: 9px; }
+  .mobile-environment { display: block; grid-column: 1 / -1; grid-row: 3; color: var(--secondary); font-size: 11px; line-height: 1.2; }
   .global-search input { font-size: 14px; height: 41px; }
   .search-submit { width: 30px; min-height: 40px; }
   .dashboard { padding: 25px 18px 100px; }

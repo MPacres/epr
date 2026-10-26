@@ -27,6 +27,18 @@ public class JdbcClinicalLists implements ClinicalLists {
         this.patients = patients; this.authorization = authorization; this.journal = journal;
     }
 
+    @Override public boolean hasEncounterEvidence(Context c, UUID patient, UUID encounter) {
+        return c.jdbc().sql("""
+            SELECT EXISTS (
+                SELECT 1 FROM allergy_revision WHERE practice_id=:p AND patient_id=:patient AND encounter_id=:encounter
+                UNION ALL SELECT 1 FROM medication_use_revision WHERE practice_id=:p AND patient_id=:patient AND encounter_id=:encounter
+                UNION ALL SELECT 1 FROM problem_revision WHERE practice_id=:p AND patient_id=:patient AND encounter_id=:encounter
+                UNION ALL SELECT 1 FROM problem_encounter_link WHERE practice_id=:p AND patient_id=:patient AND encounter_id=:encounter
+                UNION ALL SELECT 1 FROM clinical_list_review WHERE practice_id=:p AND patient_id=:patient AND encounter_id=:encounter
+            )
+            """).param("p", c.practiceId()).param("patient", patient).param("encounter", encounter).query(Boolean.class).single();
+    }
+
     @Override
     public ClinicalSummary summary(Context c, UUID patient) {
         patients.requirePatient(c, patient);

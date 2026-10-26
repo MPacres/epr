@@ -22,8 +22,6 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import ph.epr.api.clinicalchart.PregnancyRecords;
 import ph.epr.api.encountertemplates.domain.*;
 import ph.epr.api.encountertemplates.infrastructure.*;
@@ -35,10 +33,10 @@ import ph.epr.api.platformoperations.domain.*;
 
 @SpringBootTest(properties = {"epr.clinical.enabled=true", "epr.interventions.enabled=true", "epr.interventions.worker-enabled=false", "spring.session.jdbc.cleanup-cron=-", "logging.level.root=WARN"})
 @ActiveProfiles("local")
-@Testcontainers
 class ConnectedEncounterTests {
     @org.junit.jupiter.api.io.TempDir static java.nio.file.Path ARTIFACTS;
-    @Container static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17.11-alpine3.24");
+    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17.11-alpine3.24");
+    static { POSTGRES.start(); }
     @DynamicPropertySource static void properties(DynamicPropertyRegistry r) {
         r.add("epr.clinical.artifact-directory", () -> ARTIFACTS.toString());
         r.add("spring.datasource.url", POSTGRES::getJdbcUrl);
@@ -142,6 +140,54 @@ class ConnectedEncounterTests {
         return run(c -> pregnancies.create(c, patient, UUID.randomUUID(), new PregnancyRecords.CreateEpisode(UUID.randomUUID(), "UNCERTAIN", "Synthetic external account; dates unknown", null)));
     }
     JdbcEncounterService.Create creation(UUID release, UUID episode) { return new JdbcEncounterService.Create(UUID.randomUUID(), release, episode, "IN_PERSON", OffsetDateTime.parse("2026-09-19T01:00:00Z")); }
+
+    @Test void deletingStandaloneDraftRetainsEvidenceAndReleasesActiveCare() {
+        var release = publish(definition());
+        var episodeId = episode().episodeId();
+        var draft = run(c -> encounters.create(c, patient, UUID.randomUUID(), creation(release.releaseId(), episodeId)));
+        var saved = run(c -> encounters.save(c, patient, draft.encounterId(), UUID.randomUUID(),
+            new JdbcEncounterService.Save(draft.version(), OffsetDateTime.now(), List.of())));
+        var openedTasks = run(worklist::reconcile);
+        assertThat(openedTasks).anyMatch(item -> item.kind().equals("UNSIGNED_NOTE") && item.state().equals("OPEN"));
+        var key = UUID.randomUUID();
+        var request = new JdbcEncounterService.DeleteDraft(saved.version(), "Duplicate draft started in error");
+        var deleted = run(c -> encounters.deleteDraft(c, patient, saved.encounterId(), key, request));
+        encounters.releaseDeletedReservation(practice, deleted);
+        JdbcEncounterService.DeletedDraft replay = run(c -> encounters.deleteDraft(c, patient, saved.encounterId(), key, request));
+        List<JdbcEncounterService.Encounter> visible = run(c -> encounters.list(c, patient));
+        assertThat(replay).isEqualTo(deleted);
+        assertThat(visible).isEmpty();
+        assertThatThrownBy(() -> run(c -> encounters.get(c, patient, saved.encounterId(), false))).hasMessage("ENCOUNTER_UNAVAILABLE");
+        boolean retained = run(c -> c.jdbc().sql("SELECT deleted_at IS NOT NULL AND deleted_by=:actor AND deletion_reason=:reason FROM clinical_encounter WHERE practice_id=:p AND patient_id=:patient AND encounter_id=:id")
+            .param("actor", clinician).param("reason", request.reason()).param("p", practice).param("patient", patient).param("id", saved.encounterId()).query(Boolean.class).single());
+        long revisions = run(c -> c.jdbc().sql("SELECT count(*) FROM encounter_response_revision WHERE practice_id=:p AND patient_id=:patient AND encounter_id=:id")
+            .param("p", practice).param("patient", patient).param("id", saved.encounterId()).query(Long.class).single());
+        var tasks = run(worklist::list);
+        assertThat(retained).isTrue();
+        assertThat(revisions).isEqualTo(1L);
+        assertThat(tasks).anyMatch(item -> item.kind().equals("UNSIGNED_NOTE") && item.state().equals("RESOLVED"));
+        var reconciledTasks = run(worklist::reconcile);
+        assertThat(reconciledTasks).noneMatch(item -> item.state().equals("OPEN"));
+        var next = run(c -> encounters.create(c, patient, UUID.randomUUID(), creation(release.releaseId(), episodeId)));
+        assertThat(next.encounterId()).isNotEqualTo(saved.encounterId());
+    }
+
+    @Test void draftDeletionRejectsStaleVersionsAndLinkedMeasurements() {
+        var release = publish(definition());
+        var draft = run(c -> encounters.create(c, patient, UUID.randomUUID(), creation(release.releaseId(), episode().episodeId())));
+        assertThatThrownBy(() -> run(c -> encounters.deleteDraft(c, patient, draft.encounterId(), UUID.randomUUID(),
+            new JdbcEncounterService.DeleteDraft(draft.version() + 1, "Started in error")))).hasMessage("VERSION_CONFLICT");
+        var values = new EncounterVitals.Values(new java.math.BigDecimal("120"), new java.math.BigDecimal("80"), null, null, null, null, null, null);
+        run(c -> vitals.create(c, patient, draft.encounterId(), UUID.randomUUID(),
+            new EncounterVitals.Create(UUID.randomUUID(), OffsetDateTime.now(), "Clinic manual cuff", values)));
+        assertThatThrownBy(() -> run(c -> encounters.deleteDraft(c, patient, draft.encounterId(), UUID.randomUUID(),
+            new JdbcEncounterService.DeleteDraft(draft.version(), "Started in error")))).hasMessage("DRAFT_HAS_LINKED_CLINICAL_WORK");
+        assertThat(run(c -> encounters.get(c, patient, draft.encounterId(), false)).encounterId()).isEqualTo(draft.encounterId());
+        var finished = run(c -> encounters.transition(c, patient, draft.encounterId(), UUID.randomUUID(),
+            new JdbcEncounterService.Transition(draft.version(), "FINISHED", "Care performed")));
+        assertThatThrownBy(() -> run(c -> encounters.deleteDraft(c, patient, draft.encounterId(), UUID.randomUUID(),
+            new JdbcEncounterService.DeleteDraft(finished.version(), "Started in error")))).hasMessage("DRAFT_DELETION_NOT_ALLOWED");
+    }
 
     @Test void twoVisitsReuseAnEpisodeAndKeepDatingSnapshotAndPinnedRelease() {
         var episode = episode();
@@ -404,8 +450,68 @@ class ConnectedEncounterTests {
         assertThat(new String(archived, java.nio.charset.StandardCharsets.UTF_8)).contains("Blood pressure: 118.0/78.0 mmHg");
         run(c -> vitals.correct(c, patient, draft.encounterId(), id, UUID.randomUUID(),
             new EncounterVitals.Correct(2, measured.plusMinutes(5), "Clinic manual cuff", first.values(), "Documented later correction")));
+        assertThatThrownBy(() -> run(c -> vitals.remove(c, patient, draft.encounterId(), id, UUID.randomUUID(),
+            new EncounterVitals.Remove(3)))).hasMessage("SIGNED_NOTE_IMMUTABLE");
         assertThat((byte[]) run(c -> signatures.signedBytes(c, patient, draft.encounterId(), signed.signatureId())))
             .isEqualTo(archived);
+    }
+    @Test void vitalTimelineContainsSeparateMeasurementDatesAcrossVisits() {
+        var first = completeDraft();
+        var june = UUID.randomUUID();
+        var yesterday = UUID.randomUUID();
+        var today = UUID.randomUUID();
+        var values = new EncounterVitals.Values(new java.math.BigDecimal("120"), new java.math.BigDecimal("80"),
+            null, null, null, null, null, null);
+        run(c -> vitals.create(c, patient, first.encounterId(), UUID.randomUUID(),
+            new EncounterVitals.Create(june, OffsetDateTime.parse("2026-06-12T10:00:00+08:00"), "Clinic (manual)", values)));
+        run(c -> vitals.create(c, patient, first.encounterId(), UUID.randomUUID(),
+            new EncounterVitals.Create(yesterday, OffsetDateTime.parse("2026-10-25T10:00:00+08:00"), "Clinic (manual)", values)));
+        run(c -> vitals.correct(c, patient, first.encounterId(), june, UUID.randomUUID(),
+            new EncounterVitals.Correct(1, OffsetDateTime.parse("2026-06-12T10:00:00+08:00"), "Clinic (manual)",
+                values, "Corrected entry")));
+        var finished = run(c -> encounters.transition(c, patient, first.encounterId(), UUID.randomUUID(),
+            new JdbcEncounterService.Transition(first.version(), "FINISHED", "First visit finished")));
+        encounters.releaseFinishedReservation(practice, finished);
+        var second = run(c -> encounters.create(c, patient, UUID.randomUUID(),
+            creation(first.release().releaseId(), first.episodeSnapshot().episode().episodeId())));
+        run(c -> vitals.create(c, patient, second.encounterId(), UUID.randomUUID(),
+            new EncounterVitals.Create(today, OffsetDateTime.parse("2026-10-26T10:00:00+08:00"), "Clinic (manual)", values)));
+        var timeline = run(c -> vitals.timeline(c, patient, second.encounterId(), 0));
+        assertThatThrownBy(() -> run(c -> vitals.timeline(c, UUID.randomUUID(), second.encounterId(), 0)))
+            .hasMessage("ENCOUNTER_UNAVAILABLE");
+        assertThat(timeline.items()).extracting(EncounterVitals.Reading::vitalSetId)
+            .containsExactly(today, yesterday, june);
+        assertThat(timeline.items()).extracting(EncounterVitals.Reading::encounterId)
+            .containsExactly(second.encounterId(), first.encounterId(), first.encounterId());
+        assertThat(timeline.hasMore()).isFalse();
+    }
+    @Test void mistakenVitalCanBeRemovedBeforeSigningWithoutErasingAuditEvidence() {
+        var draft = completeDraft();
+        var id = UUID.randomUUID();
+        var values = new EncounterVitals.Values(new java.math.BigDecimal("120"), new java.math.BigDecimal("80"),
+            null, null, null, null, null, null);
+        run(c -> vitals.create(c, patient, draft.encounterId(), UUID.randomUUID(),
+            new EncounterVitals.Create(id, OffsetDateTime.parse("2026-10-26T10:00:00+08:00"), "Clinic (manual)", values)));
+        var ready = run(c -> signatures.prepare(c, patient, draft.encounterId(), UUID.randomUUID(),
+            new JdbcEncounterSignatures.Prepare(UUID.randomUUID(), draft.version())));
+        var key = UUID.randomUUID();
+        var request = new EncounterVitals.Remove(1);
+        var removed = run(c -> vitals.remove(c, patient, draft.encounterId(), id, key, request));
+        assertThat(removed.removed()).isTrue();
+        assertThat((Object) run(c -> vitals.remove(c, patient, draft.encounterId(), id, key, request))).isEqualTo(removed);
+        var active = run(c -> vitals.list(c, patient, draft.encounterId()));
+        var timeline = run(c -> vitals.timeline(c, patient, draft.encounterId(), 0));
+        assertThat(active).isEmpty();
+        assertThat(timeline.items()).isEmpty();
+        assertThatThrownBy(() -> run(c -> signatures.sign(c, patient, draft.encounterId(), UUID.randomUUID(),
+            new JdbcEncounterSignatures.Sign(ready.preparationId(), ready.encounterVersion(), ready.artifactHash(), true))))
+            .hasMessage("SIGN_CANDIDATE_STALE");
+        String removalReason = run(c -> c.jdbc().sql("SELECT removal_reason FROM encounter_vital_set WHERE practice_id=:p AND vital_set_id=:id")
+            .param("p", practice).param("id", id).query(String.class).single());
+        Long revisions = run(c -> c.jdbc().sql("SELECT count(*) FROM encounter_vital_revision WHERE practice_id=:p AND vital_set_id=:id")
+            .param("p", practice).param("id", id).query(Long.class).single());
+        assertThat(removalReason).isEqualTo("Entered in error");
+        assertThat(revisions).isEqualTo(1);
     }
     @Test void editedCandidateCannotSignAndMissingStorageNeverMarksSigned() throws Exception {
         var draft = completeDraft();
@@ -461,14 +567,14 @@ class ConnectedEncounterTests {
     @Test void migrationQuarantineFailsClosedAndHistoryCannotBeRewritten() {
         var operation = UUID.randomUUID();
         var version = control.sql("SELECT version FROM practice_tenant_registry WHERE practice_id = :practice").param("practice", practice).query(Long.class).single();
-        var claim = rollout.begin(practice, operation, version, clinician, "Synthetic canary", "17");
+        var claim = rollout.begin(practice, operation, version, clinician, "Synthetic canary", "19");
         assertThatThrownBy(() -> run(patients::list)).hasMessage("CLINICAL_ACCESS_DENIED");
-        rollout.finish(practice, operation, claim.attempt(), clinician, "17", false);
+        rollout.finish(practice, operation, claim.attempt(), clinician, "19", false);
         assertThatThrownBy(() -> run(patients::list)).hasMessage("CLINICAL_ACCESS_DENIED");
-        var retry = rollout.begin(practice, operation, version, clinician, "Synthetic canary", "17");
-        rollout.finish(practice, operation, retry.attempt(), clinician, "17", true);
+        var retry = rollout.begin(practice, operation, version, clinician, "Synthetic canary", "19");
+        rollout.finish(practice, operation, retry.attempt(), clinician, "19", true);
         assertThat(run(patients::list).getFirst().patientId()).isEqualTo(patient);
-        assertThatThrownBy(() -> rollout.begin(practice, operation, version, clinician, "Changed reason", "17")).hasMessage("IDEMPOTENCY_PAYLOAD_CONFLICT");
+        assertThatThrownBy(() -> rollout.begin(practice, operation, version, clinician, "Changed reason", "19")).hasMessage("IDEMPOTENCY_PAYLOAD_CONFLICT");
         assertThatThrownBy(() -> control.sql("DELETE FROM clinical_schema_rollout_event WHERE practice_id = :practice").param("practice", practice).update()).hasMessageContaining("DELETE FROM clinical_schema_rollout_event");
     }
     @Test void twoPracticesRacingReserveOnlyOneActiveEncounter() throws Exception {
@@ -492,6 +598,27 @@ class ConnectedEncounterTests {
 
     ServiceRequestData lab(String instruction) { return new ServiceRequestData("LAB_ORDER",null,"SYN-LAB-A","synthetic-1","Synthetic laboratory service A","Synthetic clinical question","ROUTINE","Synthetic external facility","","","",instruction,LocalDate.now().plusDays(3)); }
     ServiceRequestRecord labDraft(UUID encounter) {return run(c->orders.create(c,patient,UUID.randomUUID(),new ServiceRequestCreate(UUID.randomUUID(),encounter,OffsetDateTime.now(),lab("Synthetic instructions"),null)));}
+    @Test void labAndImagingDraftSavesRequireIssuanceDetails() {
+        var encounter=completeDraft();
+        for(var kind:List.of("LAB_ORDER","IMAGING_ORDER")) {
+            var service=kind.equals("LAB_ORDER")?"Synthetic laboratory test":"Synthetic imaging examination";
+            for(var field:kind.equals("LAB_ORDER")?List.of("indication","date"):List.of("indication","destination","date")) {
+                var data=new ServiceRequestData(kind,null,null,null,service,
+                    field.equals("indication")?"  ":"Assess the reported concern","ROUTINE",
+                    field.equals("destination")?"  ":"Synthetic receiving facility","","","","",
+                    field.equals("date")?null:LocalDate.now().plusDays(1));
+                var code=switch(field) { case "indication" -> "CLINICAL_QUESTION_REQUIRED"; case "destination" -> "DESTINATION_REQUIRED"; default -> "REQUESTED_DATE_REQUIRED"; };
+                assertThatThrownBy(()->run(c->orders.create(c,patient,UUID.randomUUID(),new ServiceRequestCreate(UUID.randomUUID(),encounter.encounterId(),OffsetDateTime.now(),data,null)))).hasMessage(code);
+            }
+        }
+        var locationOptional=new ServiceRequestData("LAB_ORDER",null,null,null,"Synthetic laboratory test without a location","Assess the reported concern","ROUTINE","","","","","",LocalDate.now().plusDays(1));
+        var locationOptionalDraft=run(c->orders.create(c,patient,UUID.randomUUID(),new ServiceRequestCreate(UUID.randomUUID(),encounter.encounterId(),OffsetDateTime.now(),locationOptional,null)));
+        assertThat(authorizeLab(locationOptionalDraft).data().destination()).isBlank();
+        var saved=labDraft(encounter.encounterId());
+        var incomplete=new ServiceRequestData("LAB_ORDER",null,"SYN-LAB-A","synthetic-1","Synthetic laboratory service A","  ","ROUTINE","Synthetic external facility","","","","",LocalDate.now().plusDays(3));
+        assertThatThrownBy(()->run(c->orders.update(c,patient,saved.id(),UUID.randomUUID(),new ServiceRequestUpdate(saved.version(),incomplete)))).hasMessage("CLINICAL_QUESTION_REQUIRED");
+        assertThat(run(c->orders.get(c,patient,saved.id())).version()).isEqualTo(saved.version());
+    }
     ServiceRequestRecord authorizeLab(ServiceRequestRecord draft) {
         var candidate=run(c->orders.prepare(c,patient,draft.id(),UUID.randomUUID(),new ServiceRequestPrepare(UUID.randomUUID(),draft.version())));
         return run(c->orders.authorize(c,patient,draft.id(),UUID.randomUUID(),new ServiceRequestAuthorize(draft.version(),candidate.preparationId(),candidate.artifactHash(),true,null,"Reviewed repeat synthetic intent")));
@@ -502,7 +629,8 @@ class ConnectedEncounterTests {
         var draft=run(c->orders.create(c,patient,UUID.randomUUID(),new ServiceRequestCreate(UUID.randomUUID(),encounter.encounterId(),time,test,null)));
         var authorized=authorizeLab(draft);
         assertThat(authorized.data().catalogCode()).isNull();
-        assertThat(new String(run(c->orders.artifact(c,patient,draft.id(),null)),java.nio.charset.StandardCharsets.UTF_8)).contains("Synthetic unlisted test 71","Fasting required.");
+        assertThat(new String(run(c->orders.artifact(c,patient,draft.id(),null)),java.nio.charset.StandardCharsets.UTF_8))
+            .contains("Laboratory requisition","Synthetic unlisted test 71","Fasting required.","Synthetic external lab","Patient record number","Requesting clinician:");
         var repeated=new ServiceRequestData("LAB_ORDER",null,null,null,"  synthetic UNLISTED test 71  ","Assess the reported concern","ROUTINE","Synthetic external lab","","","","",LocalDate.now().plusDays(2));
         var second=run(c->orders.create(c,patient,UUID.randomUUID(),new ServiceRequestCreate(UUID.randomUUID(),encounter.encounterId(),time,repeated,null)));
         var candidate=run(c->orders.prepare(c,patient,second.id(),UUID.randomUUID(),new ServiceRequestPrepare(UUID.randomUUID(),second.version())));
@@ -521,7 +649,8 @@ class ConnectedEncounterTests {
         var candidate=run(c->orders.prepare(c,patient,draft.id(),UUID.randomUUID(),new ServiceRequestPrepare(UUID.randomUUID(),draft.version())));
         var authorized=run(c->orders.authorize(c,patient,draft.id(),UUID.randomUUID(),new ServiceRequestAuthorize(draft.version(),candidate.preparationId(),candidate.artifactHash(),true,null,null)));
         assertThat(authorized.data().catalogCode()).isNull();
-        assertThat(new String(run(c->orders.artifact(c,patient,draft.id(),null)),java.nio.charset.StandardCharsets.UTF_8)).contains("Ultrasound thyroid");
+        assertThat(new String(run(c->orders.artifact(c,patient,draft.id(),null)),java.nio.charset.StandardCharsets.UTF_8))
+            .contains("Imaging request","Ultrasound thyroid","Synthetic external imaging facility","Clinical question / indication");
         var mismatched=new ServiceRequestData("IMAGING_ORDER",null,suggestions.getFirst().code(),suggestions.getFirst().version(),"Different imaging name","Question","ROUTINE","Synthetic external imaging facility","","","","",LocalDate.now().plusDays(3));
         var wrong=run(c->orders.create(c,patient,UUID.randomUUID(),new ServiceRequestCreate(UUID.randomUUID(),encounter.encounterId(),OffsetDateTime.now(),mismatched,null)));
         assertThatThrownBy(()->run(c->orders.prepare(c,patient,wrong.id(),UUID.randomUUID(),new ServiceRequestPrepare(UUID.randomUUID(),wrong.version())))).hasMessage("CATALOG_SERVICE_MISMATCH");
@@ -567,17 +696,91 @@ class ConnectedEncounterTests {
         assertThat(run(c->links.manifest(c,patient,encounter.encounterId(),fresh.interventionManifestId())).items().getFirst().summary().clinicalState()).isEqualTo("AUTHORIZED");
         assertThat(run(c->links.list(c,patient,encounter.encounterId(),0,30)).items().getFirst().summary().clinicalState()).isEqualTo("CANCELLED");
     }
-    @Test void plannedLaboratoryRequestAppearsInNoteWithoutIssuingRequisition() {
+    @Test void laboratoryRequestIsReviewedInNoteAndIssuedByTheSameSignature() {
         var encounter=completeDraft();
         var request=labDraft(encounter.encounterId());
         var candidate=run(c->signatures.prepare(c,patient,encounter.encounterId(),UUID.randomUUID(),
             new JdbcEncounterSignatures.Prepare(UUID.randomUUID(),encounter.version())));
         var html=new String(run(c->signatures.candidateBytes(c,patient,encounter.encounterId(),candidate.preparationId())),java.nio.charset.StandardCharsets.UTF_8);
-        assertThat(html).contains("Synthetic laboratory service A", "PLANNED REQUEST · NOT ISSUED", "No requisition was issued",
+        assertThat(html).contains("Synthetic laboratory service A", "REQUEST INCLUDED IN THIS SIGNATURE", "This document is issued with successful confirmation",
             "responsible clinician: Synthetic Clinician");
         assertThat(html).doesNotContain(clinician.toString(), request.id().toString());
         assertThat(html).doesNotMatch("(?s).*\\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\b.*");
         assertThat(run(c->orders.get(c,patient,request.id())).state()).isEqualTo("DRAFT");
+        var signed=run(c->signatures.sign(c,patient,encounter.encounterId(),UUID.randomUUID(),
+            new JdbcEncounterSignatures.Sign(candidate.preparationId(),candidate.encounterVersion(),candidate.artifactHash(),true)));
+        var issued=run(c->orders.get(c,patient,request.id()));
+        assertThat(issued.state()).isEqualTo("AUTHORIZED");
+        assertThat(issued.artifactId()).isNotNull();
+        assertThat((byte[])run(c->orders.artifact(c,patient,request.id(),null))).isNotEmpty();
+        assertThat((byte[])run(c->signatures.signedBytes(c,patient,encounter.encounterId(),signed.signatureId())))
+            .isEqualTo(html.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+    @Test void oneConflictingRequestRollsBackTheWholeEncounterSignature() {
+        var encounter=completeDraft();
+        var first=labDraft(encounter.encounterId());
+        var duplicate=labDraft(encounter.encounterId());
+        var candidate=run(c->signatures.prepare(c,patient,encounter.encounterId(),UUID.randomUUID(),
+            new JdbcEncounterSignatures.Prepare(UUID.randomUUID(),encounter.version())));
+        assertThatThrownBy(()->run(c->signatures.sign(c,patient,encounter.encounterId(),UUID.randomUUID(),
+            new JdbcEncounterSignatures.Sign(candidate.preparationId(),candidate.encounterVersion(),candidate.artifactHash(),true))))
+            .hasMessage("DUPLICATE_INTENT_REASON_REQUIRED");
+        assertThat(run(c->orders.get(c,patient,first.id())).state()).isEqualTo("DRAFT");
+        assertThat(run(c->orders.get(c,patient,duplicate.id())).state()).isEqualTo("DRAFT");
+        assertThat((java.util.List<?>)run(c->signatures.signatures(c,patient,encounter.encounterId()))).isEmpty();
+        run(c->signatures.sign(c,patient,encounter.encounterId(),UUID.randomUUID(),
+            new JdbcEncounterSignatures.Sign(candidate.preparationId(),candidate.encounterVersion(),candidate.artifactHash(),true,
+                "Clinician deliberately repeated this test for the synthetic encounter")));
+        assertThat(run(c->orders.get(c,patient,first.id())).state()).isEqualTo("AUTHORIZED");
+        assertThat(run(c->orders.get(c,patient,duplicate.id())).state()).isEqualTo("AUTHORIZED");
+    }
+    @Test void oneEncounterSignatureIssuesAllFourPrintableDocumentKinds() {
+        var encounter=completeDraft();
+        enableClinicalLists();
+        var review=reconcile(encounter.encounterId());
+        var lab=labDraft(encounter.encounterId());
+        var imaging=run(c->orders.create(c,patient,UUID.randomUUID(),new ServiceRequestCreate(UUID.randomUUID(),encounter.encounterId(),OffsetDateTime.now(),
+            new ServiceRequestData("IMAGING_ORDER",null,null,null,"Synthetic ultrasound","Synthetic clinical question","ROUTINE","Synthetic imaging center",null,"Pelvis",null,"Synthetic instructions",LocalDate.now().plusDays(2)),null)));
+        var medicineItem=new PrescriptionItem(UUID.randomUUID(),"Synthetic medicine B",null,"25 synthetic units","Synthetic tablet",new java.math.BigDecimal("1"),"synthetic dose units","Synthetic route","Daily","Seven days",new java.math.BigDecimal("7"),"synthetic tablets",0,"Synthetic patient directions",null,null,null,null);
+        var medicine=run(c->prescribing.create(c,patient,UUID.randomUUID(),new PrescriptionCreate(UUID.randomUUID(),encounter.encounterId(),OffsetDateTime.now(),
+            new PrescriptionData("Synthetic indication","",review.reviewId(),List.of(medicineItem)),null)));
+        var referral=run(c->referrals.create(c,patient,UUID.randomUUID(),new ReferralCreate(UUID.randomUUID(),encounter.encounterId(),OffsetDateTime.now(),
+            new ReferralData("Synthetic receiving clinician","Synthetic referral question","Selected synthetic summary","ROUTINE",LocalDate.now().plusDays(3),"Clinician reviewed the selected disclosure"),null)));
+        var candidate=run(c->signatures.prepare(c,patient,encounter.encounterId(),UUID.randomUUID(),
+            new JdbcEncounterSignatures.Prepare(UUID.randomUUID(),encounter.version())));
+        var reviewedBytes=run(c->signatures.candidateBytes(c,patient,encounter.encounterId(),candidate.preparationId()));
+        var signKey=UUID.randomUUID();
+        var signCommand=new JdbcEncounterSignatures.Sign(candidate.preparationId(),candidate.encounterVersion(),candidate.artifactHash(),true);
+        var signed=run(c->signatures.sign(c,patient,encounter.encounterId(),signKey,signCommand));
+        assertThat((Object)run(c->signatures.sign(c,patient,encounter.encounterId(),signKey,signCommand))).isEqualTo(signed);
+        assertThat(run(c->orders.get(c,patient,lab.id())).state()).isEqualTo("AUTHORIZED");
+        assertThat(run(c->orders.get(c,patient,imaging.id())).state()).isEqualTo("AUTHORIZED");
+        assertThat(run(c->prescribing.get(c,patient,medicine.id())).state()).isEqualTo("ISSUED");
+        assertThat(run(c->referrals.get(c,patient,referral.id())).state()).isEqualTo("RELEASED");
+        assertThat((byte[])run(c->orders.artifact(c,patient,lab.id(),null))).isNotEmpty();
+        assertThat((byte[])run(c->orders.artifact(c,patient,imaging.id(),null))).isNotEmpty();
+        assertThat((byte[])run(c->prescribing.artifact(c,patient,medicine.id(),null))).isNotEmpty();
+        assertThat((byte[])run(c->referrals.artifact(c,patient,referral.id(),null))).isNotEmpty();
+        assertThat((byte[])run(c->signatures.signedBytes(c,patient,encounter.encounterId(),signed.signatureId())))
+            .isEqualTo(reviewedBytes);
+    }
+    @Test void explicitlySelectedRefillIssuesWithTheEncounterSignature() {
+        var encounter=completeDraft();enableClinicalLists();var review=reconcile(encounter.encounterId());
+        var item=new PrescriptionItem(UUID.randomUUID(),"Synthetic ingredient C",null,"10 synthetic units","Synthetic tablet",
+            new java.math.BigDecimal("1"),"synthetic dose units","Synthetic route","Daily","Seven days",new java.math.BigDecimal("7"),
+            "synthetic tablets",0,"Synthetic directions",null,null,null,null);
+        var original=run(c->prescribing.create(c,patient,UUID.randomUUID(),new PrescriptionCreate(UUID.randomUUID(),encounter.encounterId(),OffsetDateTime.now(),
+            new PrescriptionData("Synthetic indication","",review.reviewId(),List.of(item)),null)));
+        var originalPrep=run(c->prescribing.prepare(c,patient,original.id(),UUID.randomUUID(),new PrescriptionPrepare(UUID.randomUUID(),original.version())));
+        run(c->prescribing.authorize(c,patient,original.id(),UUID.randomUUID(),new PrescriptionAuthorize(original.version(),originalPrep.preparationId(),originalPrep.artifactHash(),true,null,null)));
+        var refillItem=new PrescriptionItem(UUID.randomUUID(),item.ingredient(),item.brand(),item.strength(),item.formulation(),item.dose(),item.doseUnit(),item.route(),item.frequency(),item.duration(),item.quantity(),item.quantityUnit(),0,item.instructions(),item.catalogCode(),item.catalogVersion(),original.id(),item.itemId());
+        var refill=run(c->prescribing.create(c,patient,UUID.randomUUID(),new PrescriptionCreate(UUID.randomUUID(),encounter.encounterId(),OffsetDateTime.now(),
+            new PrescriptionData("Synthetic refill indication","",review.reviewId(),List.of(refillItem)),null)));
+        var candidate=run(c->signatures.prepare(c,patient,encounter.encounterId(),UUID.randomUUID(),
+            new JdbcEncounterSignatures.Prepare(UUID.randomUUID(),encounter.version())));
+        run(c->signatures.sign(c,patient,encounter.encounterId(),UUID.randomUUID(),
+            new JdbcEncounterSignatures.Sign(candidate.preparationId(),candidate.encounterVersion(),candidate.artifactHash(),true)));
+        assertThat(run(c->prescribing.get(c,patient,refill.id())).state()).isEqualTo("ISSUED");
     }
     @Test void signedNoteLocksPlannedInterventionContentAndPreservesOriginalBytes() {
         var encounter=completeDraft();
@@ -594,7 +797,7 @@ class ConnectedEncounterTests {
             new ServiceRequestAuthorize(draft.version(),prepared.preparationId(),prepared.artifactHash(),true,"Late action",null)))).hasMessage("SIGNED_NOTE_IMMUTABLE");
         assertThatThrownBy(()->run(c->orders.abandon(c,patient,draft.id(),UUID.randomUUID(),
             new ServiceRequestReason(draft.version(),"Remove plan")))).hasMessage("SIGNED_NOTE_IMMUTABLE");
-        assertThat(run(c->orders.get(c,patient,draft.id())).state()).isEqualTo("DRAFT");
+        assertThat(run(c->orders.get(c,patient,draft.id())).state()).isEqualTo("AUTHORIZED");
         assertThat((byte[])run(c->signatures.signedBytes(c,patient,encounter.encounterId(),signature.signatureId()))).isEqualTo(original);
     }
     @Test void signedNoteAlsoLocksMedicationAndReferralDrafts() {
@@ -603,10 +806,17 @@ class ConnectedEncounterTests {
         var medicine=run(c->prescribing.create(c,patient,UUID.randomUUID(),new PrescriptionCreate(UUID.randomUUID(),encounter.encounterId(),OffsetDateTime.now(),new PrescriptionData("Synthetic indication","",null,List.of(item)),null)));
         var referral=run(c->referrals.create(c,patient,UUID.randomUUID(),new ReferralCreate(UUID.randomUUID(),encounter.encounterId(),OffsetDateTime.now(),
             new ReferralData("Synthetic receiving service","Synthetic referral question","Synthetic summary","ROUTINE",LocalDate.now().plusDays(3),"Selected disclosure"),null)));
+        assertThatThrownBy(()->run(c->signatures.prepare(c,patient,encounter.encounterId(),UUID.randomUUID(),
+            new JdbcEncounterSignatures.Prepare(UUID.randomUUID(),encounter.version())))).hasMessage("MEDICATION_SAFETY_REVIEW_REQUIRED");
+        assertThat(run(c->prescribing.get(c,patient,medicine.id())).state()).isEqualTo("DRAFT");
+        assertThat(run(c->referrals.get(c,patient,referral.id())).state()).isEqualTo("DRAFT");
+        assertThat((java.util.List<?>)run(c->signatures.signatures(c,patient,encounter.encounterId()))).isEmpty();
+        run(c->prescribing.abandon(c,patient,medicine.id(),UUID.randomUUID(),new PrescriptionReason(medicine.version(),"Unreviewed medicine removed")));
         var candidate=run(c->signatures.prepare(c,patient,encounter.encounterId(),UUID.randomUUID(),
             new JdbcEncounterSignatures.Prepare(UUID.randomUUID(),encounter.version())));
         run(c->signatures.sign(c,patient,encounter.encounterId(),UUID.randomUUID(),
             new JdbcEncounterSignatures.Sign(candidate.preparationId(),candidate.encounterVersion(),candidate.artifactHash(),true)));
+        assertThat(run(c->referrals.get(c,patient,referral.id())).state()).isEqualTo("RELEASED");
         assertThatThrownBy(()->run(c->prescribing.prepare(c,patient,medicine.id(),UUID.randomUUID(),new PrescriptionPrepare(UUID.randomUUID(),medicine.version())))).hasMessage("SIGNED_NOTE_IMMUTABLE");
         assertThatThrownBy(()->run(c->prescribing.abandon(c,patient,medicine.id(),UUID.randomUUID(),new PrescriptionReason(medicine.version(),"Remove draft")))).hasMessage("SIGNED_NOTE_IMMUTABLE");
         assertThatThrownBy(()->run(c->referrals.prepare(c,patient,referral.id(),UUID.randomUUID(),new ReferralPrepare(UUID.randomUUID(),referral.version())))).hasMessage("SIGNED_NOTE_IMMUTABLE");
@@ -653,6 +863,8 @@ class ConnectedEncounterTests {
         var issued=run(c->prescribing.authorize(c,patient,draft.id(),UUID.randomUUID(),new PrescriptionAuthorize(ready.version(),preparation.preparationId(),preparation.artifactHash(),true,null,null)));
         assertThat(issued.data().items().getFirst().strength()).isEqualTo("100 synthetic units");assertThat(issued.data().items().getFirst().dose()).isEqualByComparingTo("2");
         assertThat(issued.state()).isEqualTo("ISSUED");assertThat(issued.deliveryState()).isEqualTo("NOT_SENT");
+        assertThat(new String(run(c->prescribing.artifact(c,patient,issued.id(),null)),java.nio.charset.StandardCharsets.UTF_8))
+            .contains("Medication prescription","Synthetic ingredient A","100 synthetic units","Clinical review reference",review.manifestHash());
         var catalog=run(prescribing::catalog);
         assertThat(catalog).anySatisfy(entry->{assertThat(entry.code()).isEqualTo("SYN-MED-A");assertThat(entry.strength()).isEqualTo("100 synthetic units");assertThat(entry.formulation()).isEqualTo("Synthetic tablet");assertThat(entry.doseUnit()).isEqualTo("synthetic dose units");});
         var refill=new PrescriptionItem(UUID.randomUUID(),item.ingredient(),item.brand(),item.strength(),item.formulation(),item.dose(),item.doseUnit(),item.route(),item.frequency(),item.duration(),item.quantity(),item.quantityUnit(),0,item.instructions(),item.catalogCode(),item.catalogVersion(),issued.id(),item.itemId());
@@ -663,6 +875,8 @@ class ConnectedEncounterTests {
         var combinedPrep=run(c->prescribing.prepare(c,patient,combined.id(),UUID.randomUUID(),new PrescriptionPrepare(UUID.randomUUID(),combined.version())));
         var combinedIssued=run(c->prescribing.authorize(c,patient,combined.id(),UUID.randomUUID(),new PrescriptionAuthorize(combined.version(),combinedPrep.preparationId(),combinedPrep.artifactHash(),true,null,"Intentional synthetic refill of the issued item")));
         assertThat(combinedIssued.state()).isEqualTo("ISSUED");
+        assertThat(new String(run(c->prescribing.artifact(c,patient,combinedIssued.id(),null)),java.nio.charset.StandardCharsets.UTF_8))
+            .contains("refill","Synthetic custom medicine");
         assertThat(run(c->prescribing.get(c,patient,issued.id())).state()).isEqualTo("ISSUED");
         var changedRefill=new PrescriptionItem(UUID.randomUUID(),"Different medicine","",refill.strength(),refill.formulation(),refill.dose(),refill.doseUnit(),refill.route(),refill.frequency(),refill.duration(),refill.quantity(),refill.quantityUnit(),0,refill.instructions(),refill.catalogCode(),refill.catalogVersion(),issued.id(),item.itemId());
         assertThatThrownBy(()->run(c->prescribing.create(c,patient,UUID.randomUUID(),new PrescriptionCreate(UUID.randomUUID(),encounter.encounterId(),OffsetDateTime.now(),new PrescriptionData("Invalid refill","",review.reviewId(),List.of(changedRefill)),null)))).hasMessage("REFILL_MEDICINE_CHANGED");
@@ -715,11 +929,17 @@ class ConnectedEncounterTests {
         assertThatThrownBy(()->run(c->orders.captureGroup(c,patient,group,UUID.randomUUID(),new GroupPrint(UUID.randomUUID())))).hasMessage("GROUP_HAS_UNAUTHORIZED_REQUESTS");
         var first=authorizeLab(batch.requests().get(0));var second=authorizeLab(batch.requests().get(1));
         var capture=run(c->orders.captureGroup(c,patient,group,UUID.randomUUID(),new GroupPrint(UUID.randomUUID())));
+        assertThat(new String(capture.bytes(),java.nio.charset.StandardCharsets.UTF_8))
+            .contains("Lab Order Form","Synthetic laboratory service A","Synthetic laboratory service B","Request reference")
+            .contains("Synthetic laboratory service A: Question A", "Synthetic laboratory service B: Question B")
+            .doesNotContain("Grouped laboratory requisition","SYNTHETIC DEMO");
         var staged=artifacts.stageDetached(practice,capture.documentId(),capture.bytes());
         var document=run(c->orders.finalizeGroup(c,patient,UUID.randomUUID(),capture,staged));
         run(c->orders.cancel(c,patient,first.id(),UUID.randomUUID(),new ServiceRequestReason(first.version(),"Only this service cancelled")));
         assertThat(run(c->orders.get(c,patient,second.id())).state()).isEqualTo("AUTHORIZED");
         assertThat((byte[])run(c->orders.groupArtifact(c,patient,group,document.documentId()))).isEqualTo(capture.bytes());
+        assertThatThrownBy(()->run(c->orders.captureGroup(c,patient,group,UUID.randomUUID(),new GroupPrint(UUID.randomUUID()))))
+            .hasMessage("GROUP_HAS_NONCURRENT_REQUESTS");
         assertThatThrownBy(()->run(c->orders.finalizeGroup(c,patient,UUID.randomUUID(),capture,staged))).hasMessage("GROUP_DOCUMENT_STALE");
     }
     @Test void signingRacingAnInterventionEditHasASerialOutcome() throws Exception {
@@ -825,6 +1045,9 @@ class ConnectedEncounterTests {
         var candidate=run(c->referrals.prepare(c,patient,draft.id(),UUID.randomUUID(),new ReferralPrepare(UUID.randomUUID(),0)));
         var released=run(c->referrals.authorize(c,patient,draft.id(),UUID.randomUUID(),new ReferralAuthorize(0,candidate.preparationId(),candidate.artifactHash(),true,null,null)));
         assertThat(released.deliveryState()).isEqualTo("NOT_SENT");var bytes=run(c->referrals.artifact(c,patient,draft.id(),null));
+        assertThat(new String(bytes,java.nio.charset.StandardCharsets.UTF_8))
+            .contains("Referral letter","Synthetic receiving service","Clinician-selected synthetic summary","Requesting clinician:")
+            .doesNotContain("Only this selected summary is authorized for disclosure");
         var refused=run(c->referrals.outcome(c,patient,draft.id(),UUID.randomUUID(),new ReferralEvidence(released.version(),"PATIENT_REFUSED","Patient declined synthetic referral; alternatives remain owned",OffsetDateTime.now())));
         var cancelled=run(c->referrals.cancel(c,patient,draft.id(),UUID.randomUUID(),new ReferralReason(refused.version(),"Arrange an alternative and confirm cancellation notice")));
         assertThat(cancelled.state()).isEqualTo("CANCELLED");assertThat(run(owned::list).getFirst().state()).isEqualTo("OPEN");

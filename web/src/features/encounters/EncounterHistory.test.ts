@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { groupEncounterHistory } from './encounter-history-model'
+import { canDeleteDraft, groupEncounterHistory } from './encounter-history-model'
 
 describe('encounter history groups', () => {
   it('keeps both draft states separate from signed notes and orders each group by service time', () => {
@@ -13,5 +13,16 @@ describe('encounter history groups', () => {
     expect(groups.drafts.map(item => item.id)).toEqual(['draft-new', 'ready'])
     expect(groups.signed.map(item => item.id)).toEqual(['signed-new', 'signed-old'])
     expect(encounters[0].id).toBe('signed-old')
+  })
+})
+
+describe('draft deletion eligibility', () => {
+  it('shows deletion only for active standalone drafts', () => {
+    expect(canDeleteDraft({ noteState: 'DRAFT', careState: 'IN_PROGRESS', queueEntryId: null })).toBe(true)
+    expect(canDeleteDraft({ noteState: 'DRAFT', careState: 'PAUSED', queueEntryId: null })).toBe(true)
+    expect(canDeleteDraft({ noteState: 'SIGNED', careState: 'FINISHED', queueEntryId: null })).toBe(false)
+    expect(canDeleteDraft({ noteState: 'READY_TO_SIGN', careState: 'IN_PROGRESS', queueEntryId: null })).toBe(false)
+    expect(canDeleteDraft({ noteState: 'DRAFT', careState: 'FINISHED', queueEntryId: null })).toBe(false)
+    expect(canDeleteDraft({ noteState: 'DRAFT', careState: 'IN_PROGRESS', queueEntryId: 'queued' })).toBe(false)
   })
 })

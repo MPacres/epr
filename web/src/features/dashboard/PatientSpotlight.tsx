@@ -40,7 +40,7 @@ export function PatientSpotlight({ patients, clinics, onClose, onSelect }: {
       <Dialog.Overlay className="spotlight-overlay" />
       <Dialog.Content className="patient-spotlight" onOpenAutoFocus={event => { event.preventDefault(); inputRef.current?.focus() }} onCloseAutoFocus={event => event.preventDefault()}>
         <Dialog.Title className="sr-only">Search patients</Dialog.Title>
-        <Dialog.Description className="sr-only">Search synthetic patients by name or record number across your clinics. Use arrow keys to browse and Enter to open a patient overview.</Dialog.Description>
+        <Dialog.Description className="sr-only">Search patients by name or record number across your clinics. Use arrow keys to browse and Enter to open a patient overview.</Dialog.Description>
         <div className="spotlight-searchbar">
           <Search aria-hidden="true" />
           <input ref={inputRef} role="combobox" aria-label="Search patients across your clinics" aria-autocomplete="list" aria-expanded={hasQuery} aria-controls={listId} aria-activedescendant={activePatient ? optionId(activePatient) : undefined}
@@ -48,7 +48,7 @@ export function PatientSpotlight({ patients, clinics, onClose, onSelect }: {
           {query ? <button className="spotlight-clear" aria-label="Clear patient search" onClick={() => { updateQuery(''); inputRef.current?.focus() }}><X aria-hidden="true" /></button> : null}
           <Dialog.Close className="spotlight-close" aria-label="Close patient search"><span className="spotlight-escape">esc</span><span className="spotlight-close-label">Cancel</span></Dialog.Close>
         </div>
-        <div className="spotlight-scope"><span><Building2 aria-hidden="true" />All your clinics</span><span>Synthetic patient data</span></div>
+        <div className="spotlight-scope"><span><Building2 aria-hidden="true" />All your clinics</span></div>
         <div className="spotlight-results-area">
           <p className="spotlight-results-label" role="status">{hasQuery ? `${results.length} ${results.length === 1 ? 'patient' : 'patients'} found` : 'Patient search'}</p>
           <div ref={listRef} className="spotlight-results" id={listId} role="listbox" aria-label="Matching patients" hidden={!results.length}>

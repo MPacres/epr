@@ -5,6 +5,8 @@ import java.time.OffsetDateTime;
 import java.util.*;
 import org.springframework.stereotype.Service;
 import ph.epr.api.clinicalchart.PregnancyRecords;
+import ph.epr.api.clinicalchart.ClinicalLists;
+import ph.epr.api.clinicalchart.EncounterVitals;
 import ph.epr.api.encountertemplates.domain.*;
 import ph.epr.api.encountertemplates.EncounterQueueBridge;
 import ph.epr.api.identitytenancy.*;
@@ -20,9 +22,13 @@ public class JdbcEncounterService {
     private final TenantCommandJournal journal;
     private final ActiveCareReservations reservations;
     private final ph.epr.api.encountertemplates.EncounterInterventionLinks interventions;
+    private final ClinicalLists clinicalLists;
+    private final EncounterVitals vitals;
     public JdbcEncounterService(ClinicalPatientRegistry patients, PregnancyRecords pregnancies, JdbcTemplateRegistry templates,
-                                TenantCommandJournal journal, ActiveCareReservations reservations, ph.epr.api.encountertemplates.EncounterInterventionLinks interventions) {
+                                TenantCommandJournal journal, ActiveCareReservations reservations, ph.epr.api.encountertemplates.EncounterInterventionLinks interventions,
+                                ClinicalLists clinicalLists, EncounterVitals vitals) {
         this.patients = patients; this.pregnancies = pregnancies; this.templates = templates; this.journal = journal; this.reservations = reservations; this.interventions=interventions;
+        this.clinicalLists = clinicalLists; this.vitals = vitals;
     }
     public record Create(UUID encounterId, UUID releaseId, UUID episodeId, String careMode, OffsetDateTime clinicalTime) {}
     public record Change(UUID fieldId, UUID groupItemId, Answer answer) {}
@@ -34,6 +40,8 @@ public class JdbcEncounterService {
     public record Transition(long expectedVersion, String target, String reason) {}
     public record CancelStart(UUID encounterId, String reason) {}
     public record Cancelled(UUID encounterId, long fence) {}
+    public record DeleteDraft(long expectedVersion, String reason) {}
+    public record DeletedDraft(UUID encounterId, UUID clinicianId, long fence) {}
     public record Encounter(UUID encounterId, UUID patientId, UUID siteId, UUID responsibleClinicianId,
                             ClinicalPatientRegistry.Patient patient, JdbcTemplateRegistry.Release release,
                             PregnancyRecords.Snapshot episodeSnapshot, String careMode, String careState, String noteState,
@@ -112,7 +120,7 @@ public class JdbcEncounterService {
     }
     public Encounter get(Context c, UUID patient, UUID id, boolean audit) {
         var patientRecord = patients.requirePatient(c, patient);
-        var row = c.jdbc().sql("SELECT * FROM clinical_encounter WHERE practice_id = :practice AND patient_id = :patient AND encounter_id = :id")
+        var row = c.jdbc().sql("SELECT * FROM clinical_encounter WHERE practice_id = :practice AND patient_id = :patient AND encounter_id = :id AND deleted_at IS NULL")
             .param("practice", c.practiceId()).param("patient", patient).param("id", id).query((rs, n) -> new Row(
                 rs.getObject("site_id", UUID.class), rs.getObject("responsible_clinician_id", UUID.class), rs.getObject("release_id", UUID.class),
                 rs.getString("episode_snapshot"), rs.getString("care_mode"), rs.getString("care_state"), rs.getString("note_state"),
@@ -135,7 +143,7 @@ public class JdbcEncounterService {
     /** Rebuild a complete authorized projection; bounded overflow fails closed, never implies no visits. */
     public void refreshPatientVisits(Context c) {
         lockClinician(c);
-        var rows=c.jdbc().sql("SELECT patient_id,encounter_id,version,clinical_time,release_id FROM clinical_encounter WHERE practice_id=:practice AND site_id=:site AND responsible_clinician_id=:actor ORDER BY encounter_id LIMIT 10001")
+        var rows=c.jdbc().sql("SELECT patient_id,encounter_id,version,clinical_time,release_id FROM clinical_encounter WHERE practice_id=:practice AND site_id=:site AND responsible_clinician_id=:actor AND deleted_at IS NULL ORDER BY encounter_id LIMIT 10001")
             .param("practice",c.practiceId()).param("site",c.siteId()).param("actor",c.actorId())
             .query((rs,n)->new VisitSource(rs.getObject(1,UUID.class),rs.getObject(2,UUID.class),rs.getLong(3),rs.getObject(4,OffsetDateTime.class),rs.getObject(5,UUID.class))).list();
         if(rows.size()>10000) throw new ClinicalAccessException("VISIT_PROJECTION_CAPACITY",503);
@@ -157,7 +165,7 @@ public class JdbcEncounterService {
         journal.audit(c, patient, "ENCOUNTER_HISTORY_READ", null);
         return c.jdbc().sql("""
             SELECT encounter_id FROM clinical_encounter WHERE practice_id = :practice AND patient_id = :patient
-                AND site_id = :site AND responsible_clinician_id = :actor ORDER BY clinical_time DESC LIMIT 100
+                AND site_id = :site AND responsible_clinician_id = :actor AND deleted_at IS NULL ORDER BY clinical_time DESC LIMIT 100
             """).param("practice", c.practiceId()).param("patient", patient).param("site", c.siteId()).param("actor", c.actorId())
             .query(UUID.class).list().stream().map(id -> get(c, patient, id, false)).toList();
     }
@@ -262,6 +270,41 @@ public class JdbcEncounterService {
             patients.visitsChanged(c);
             return get(c, patient, id, false);
         });
+    }
+    public DeletedDraft deleteDraft(Context c, UUID patient, UUID id, UUID key, DeleteDraft request) {
+        patients.requirePatient(c, patient);
+        if (request == null || request.reason() == null || request.reason().isBlank() || request.reason().length() > 500)
+            throw new ClinicalAccessException("DELETION_REASON_REQUIRED", 422);
+        // Authorize a receipt replay without reopening a withdrawn draft.
+        var owner = c.jdbc().sql("SELECT site_id, responsible_clinician_id FROM clinical_encounter WHERE practice_id=:p AND patient_id=:patient AND encounter_id=:id")
+            .param("p", c.practiceId()).param("patient", patient).param("id", id)
+            .query((r, n) -> new UUID[]{r.getObject(1, UUID.class), r.getObject(2, UUID.class)})
+            .optional().orElseThrow(() -> new ClinicalAccessException("ENCOUNTER_UNAVAILABLE", 404));
+        if (!owner[0].equals(c.siteId()) || !owner[1].equals(c.actorId())) throw new ClinicalAccessException("ENCOUNTER_UNAVAILABLE", 404);
+        lockClinician(c);
+        return journal.execute(c, "delete-draft/" + id, key, request, DeletedDraft.class, () -> {
+            lockEncounter(c, patient, id);
+            var current = get(c, patient, id, false);
+            version(current, request.expectedVersion());
+            if (!"DRAFT".equals(current.noteState()) || "FINISHED".equals(current.careState())
+                || current.queueEntryId() != null || current.sessionId() != null)
+                throw new ClinicalAccessException("DRAFT_DELETION_NOT_ALLOWED", 409);
+            if (vitals.hasHistory(c, patient, id) || clinicalLists.hasEncounterEvidence(c, patient, id)
+                || interventions.hasHistory(c, patient, id)
+                || c.jdbc().sql("SELECT EXISTS(SELECT 1 FROM encounter_followup_intent WHERE practice_id=:p AND patient_id=:patient AND encounter_id=:id UNION ALL SELECT 1 FROM encounter_sign_preparation WHERE practice_id=:p AND patient_id=:patient AND encounter_id=:id)")
+                    .param("p", c.practiceId()).param("patient", patient).param("id", id).query(Boolean.class).single())
+                throw new ClinicalAccessException("DRAFT_HAS_LINKED_CLINICAL_WORK", 409);
+            c.jdbc().sql("UPDATE clinical_encounter SET deleted_at=CURRENT_TIMESTAMP, deleted_by=:actor, deletion_reason=:reason, version=version+1 WHERE practice_id=:p AND patient_id=:patient AND encounter_id=:id AND deleted_at IS NULL")
+                .param("actor", c.actorId()).param("reason", request.reason().strip()).param("p", c.practiceId()).param("patient", patient).param("id", id).update();
+            journal.audit(c, id, "DRAFT_ENCOUNTER_DELETED", request.reason().strip());
+            journal.event(c, id, "DRAFT_ENCOUNTER_DELETED", c.actorId());
+            patients.visitsChanged(c);
+            return new DeletedDraft(id, current.responsibleClinicianId(), current.reservationFence());
+        });
+    }
+    /** Release after the tenant commit; fenced replay is safe after an uncertain response. */
+    public void releaseDeletedReservation(UUID practice, DeletedDraft confirmed) {
+        reservations.release(confirmed.clinicianId(), practice, confirmed.encounterId(), confirmed.fence());
     }
     /** Invoke only after the tenant transaction commits; replay/reconcile repairs a crash in this gap. */
     public void releaseFinishedReservation(UUID practice, Encounter confirmed) {

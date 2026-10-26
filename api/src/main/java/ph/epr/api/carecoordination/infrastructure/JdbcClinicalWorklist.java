@@ -47,7 +47,8 @@ public class JdbcClinicalWorklist {
                 byId.containsKey(rs.getObject("source_id", UUID.class)) ? byId.get(rs.getObject("source_id", UUID.class)).patientName() : "",
                 byId.containsKey(rs.getObject("source_id", UUID.class)) ? byId.get(rs.getObject("source_id", UUID.class)).recordNumber() : "",
                 rs.getObject("encounter_id", UUID.class), rs.getObject("owner_id", UUID.class), rs.getString("kind"), rs.getString("instruction"), rs.getObject("due_date", LocalDate.class),
-                rs.getString("state"), rs.getLong("version"), rs.getObject("acknowledged_at", OffsetDateTime.class))).list().stream().filter(t -> ids.contains(t.sourceId())).toList();
+                byId.containsKey(rs.getObject("source_id", UUID.class)) && !byId.get(rs.getObject("source_id", UUID.class)).open() && "UNSIGNED_NOTE".equals(rs.getString("kind")) ? "RESOLVED" : rs.getString("state"),
+                rs.getLong("version"), rs.getObject("acknowledged_at", OffsetDateTime.class))).list().stream().filter(t -> ids.contains(t.sourceId())).toList();
     }
     public Task resolve(Context c, UUID id, UUID key, Resolve request) {
         if (request.reason() == null || request.reason().isBlank() || request.reason().length() > 500) throw new ClinicalAccessException("DISPOSITION_REQUIRED", 422);

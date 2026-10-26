@@ -4,4 +4,7 @@
 .confirmation-dialog > div { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; margin-top: 24px; }
 .confirmation-dialog button { min-height: 44px; font-size: 13px; }
 .confirmation-keep { border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; }
+.confirmation-dialog .confirmation-destructive { background: #a52c3d; color: #fff; }
+.confirmation-dialog .confirmation-destructive:hover { background: #872233; }
+.confirmation-dialog .confirmation-error { margin-top: 14px; color: #a52c3d; }
 @media (max-width: 600px) { .confirmation-dialog { padding: 22px; } }

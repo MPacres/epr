@@ -42,7 +42,6 @@ export function PatientContextHeader({ patient, sex, allergyStatus = 'Allergies/
       <div className="patient-context-identity">
         <h1>{patient.displayName}</h1>
         {patient.identityStatus === 'PROVISIONAL' ? <span className="badge amber">Provisional identity</span> : null}
-        <span className="badge blue patient-context-demo">Demo data</span>
       </div>
       <div className="patient-context-facts" aria-label="Patient identifiers, demographics, and alerts">
         <span><strong>Patient ID</strong> {patient.recordNumber}</span>

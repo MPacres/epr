@@ -29,6 +29,14 @@ class EncounterVitalController {
             return vitals.list(c, patient, encounter);
         });
     }
+    @GetMapping("/timeline") EncounterVitals.TimelinePage timeline(Authentication auth, @PathVariable UUID practice,
+        @PathVariable UUID patient, @PathVariable UUID encounter, @RequestParam UUID siteId,
+        @RequestParam(defaultValue = "0") int page) {
+        return tenants.execute(new AuthenticatedActor(auth.getName()), practice, siteId, false, c -> {
+            encounters.get(c, patient, encounter, true);
+            return vitals.timeline(c, patient, encounter, page);
+        });
+    }
     @PostMapping EncounterVitals.VitalSet create(Authentication auth, @PathVariable UUID practice,
         @PathVariable UUID patient, @PathVariable UUID encounter, @RequestParam UUID siteId,
         @RequestHeader("Idempotency-Key") UUID key, @RequestBody EncounterVitals.Create request) {
@@ -43,6 +51,14 @@ class EncounterVitalController {
         return tenants.execute(new AuthenticatedActor(auth.getName()), practice, siteId, false, c -> {
             encounters.get(c, patient, encounter, false);
             return vitals.correct(c, patient, encounter, id, key, request);
+        });
+    }
+    @PostMapping("/{id}/remove") EncounterVitals.Removal remove(Authentication auth, @PathVariable UUID practice,
+        @PathVariable UUID patient, @PathVariable UUID encounter, @PathVariable UUID id, @RequestParam UUID siteId,
+        @RequestHeader("Idempotency-Key") UUID key, @RequestBody EncounterVitals.Remove request) {
+        return tenants.execute(new AuthenticatedActor(auth.getName()), practice, siteId, false, c -> {
+            encounters.get(c, patient, encounter, false);
+            return vitals.remove(c, patient, encounter, id, key, request);
         });
     }
 }

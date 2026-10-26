@@ -15,7 +15,6 @@
 .patient-context-main { display: grid; gap: 3px; min-width: 0; }
 .patient-context-identity { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
 .patient-context h1 { font-size: 18px; line-height: 1.2; overflow-wrap: anywhere; }
-.patient-context-demo { display: none; }
 .patient-context-facts { display: flex; flex-wrap: wrap; gap: 2px 0; font-size: 11px; color: #43536d; font-variant-numeric: tabular-nums; }
 .patient-context-facts > span { padding-right: 10px; margin-right: 10px; border-right: 1px solid var(--border); }
 .patient-context-facts > span:last-child { border: 0; margin: 0; padding: 0; }
@@ -54,10 +53,18 @@
 .encounter-history-actions button { min-height: 40px; white-space: nowrap; }
 .encounter-history-actions svg { width: 16px; height: 16px; }
 .encounter-history-actions button:last-child { color: var(--blue); }
+.encounter-history-actions .encounter-history-delete { color: #a52c3d; }
+.encounter-history-actions .encounter-history-delete:hover { background: #fff0f0; }
+.encounter-print-sheet { width: min(1040px, 100%); }
 .encounter-print { display: grid; gap: 18px; }
 .encounter-print > p, .encounter-print-list > p, .encounter-print-preview > p { color: var(--secondary); font-size: 13px; line-height: 1.5; }
-.encounter-print-layout { display: grid; grid-template-columns: minmax(190px, 240px) minmax(0, 1fr); gap: 18px; min-width: 0; }
-.encounter-print-list { display: grid; align-content: start; gap: 8px; }
+.encounter-print-layout { display: grid; gap: 18px; min-width: 0; }
+.encounter-print-chooser-toggle { justify-self: start; }
+.encounter-print-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); align-content: start; gap: 8px; }
+.encounter-print-list[hidden] { display: none; }
+.encounter-print-section { display: grid; align-content: start; gap: 7px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; }
+.encounter-print-section h3 { font-size: 12px; font-weight: 700; color: var(--ink); }
+.encounter-print-section p { font-size: 12px; line-height: 1.4; color: var(--secondary); }
 .encounter-print-list button { justify-content: flex-start; width: 100%; min-height: 58px; text-align: left; white-space: normal; }
 .encounter-print-list button span { display: grid; gap: 4px; min-width: 0; }
 .encounter-print-list button small { color: var(--secondary); font-size: 11px; line-height: 1.35; }
@@ -65,7 +72,7 @@
 .encounter-print-preview { display: grid; align-content: start; gap: 12px; min-width: 0; }
 .encounter-print-preview-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
 .encounter-print-preview-heading h3 { font-size: 15px; }
-.encounter-print-preview iframe { width: 100%; height: 56vh; border: 1px solid var(--border); background: #fff; }
+.encounter-print-preview iframe { width: min(100%, 840px); height: 72vh; justify-self: center; border: 1px solid var(--border); background: #fff; }
 .encounter-history-empty, .encounter-history-message { padding: 22px 20px; border: 1px solid var(--border); border-radius: 10px; background: #fff; color: #53627a; font-size: 13px; }
 .encounter-history-note { color: var(--secondary); font-size: 11px; }
 .connected-chart-actions { display: flex; justify-content: flex-end; }
@@ -131,11 +138,8 @@
 .encounter-vitals-record-heading { font-size: 13px; }
 .encounter-vitals-record-heading span { color: var(--secondary); font-size: 12px; }
 .encounter-vitals-record p { font-size: 14px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.encounter-vitals-record details { padding-top: 6px; border-top: 1px solid var(--border); }
-.encounter-vitals-record summary { color: var(--blue); font-size: 12px; font-weight: 600; cursor: pointer; }
-.encounter-vitals-record > button { justify-self: start; }
-.encounter-vital-history { display: grid; gap: 4px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
-.encounter-vital-history:last-child { border-bottom: 0; }
+.encounter-vital-remove { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--input-border); border-radius: 8px; background: #f7faff; }
+.encounter-vital-remove .clinical-error { padding: 10px 12px; }
 .encounter-vitals-editor { display: grid; gap: 14px; padding: 18px; border: 1px solid var(--input-border); border-radius: 8px; background: #f7faff; }
 .encounter-vitals-meta { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; max-width: 440px; }
 .encounter-vitals-inputs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
@@ -294,7 +298,6 @@
   .connected-clinical.dashboard { padding-inline: 16px; padding-bottom: 95px; }
   .patient-context, .patient-context:has(.encounter-header-actions) { display: grid; gap: 5px; padding: 9px 12px; margin-bottom: 12px; }
   .patient-context h1 { font-size: 17px; }
-  .patient-context-demo { display: inline-flex; font-size: 9px; padding: 2px 5px; }
   .patient-context-facts { font-size: 11px; }
   .patient-context-facts > span { margin-right: 7px; padding-right: 7px; }
   .patient-context-safety { font-size: 10px; }
@@ -306,9 +309,6 @@
   .encounter-history-meta { display: grid; gap: 3px; }
   .encounter-history-meta > span:not(:first-child)::before { content: none; }
   .encounter-history-actions { grid-column: 2; justify-self: start; justify-content: flex-start; }
-  .encounter-print-layout { grid-template-columns: minmax(0, 1fr); }
-  .encounter-print-list { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
-  .encounter-print-list > p { grid-column: 1 / -1; }
   .connected-chart-actions { justify-content: stretch; }
   .connected-chart-actions button { width: 100%; }
   .connected-chart .chart-source-records > summary { padding: 16px; font-size: 14px; }

@@ -5,22 +5,27 @@ import java.util.*;
 import org.springframework.stereotype.Service;
 import org.springframework.context.annotation.Profile;
 import ph.epr.api.encountertemplates.EncounterInterventionLinks;
+import ph.epr.api.encountertemplates.EncounterSigningDocumentIssuer;
 import ph.epr.api.encountertemplates.EncounterInterventionLinks.*;
 import ph.epr.api.identitytenancy.*;
 import ph.epr.api.platformoperations.*;
 import ph.epr.api.platformoperations.TenantTransactions.Context;
 import ph.epr.api.documentscommunication.PrivateClinicalArtifacts;
+import ph.epr.api.documentscommunication.ClinicalHandoffDocuments;
+import ph.epr.api.documentscommunication.ClinicalHandoffDocuments.Field;
+import ph.epr.api.documentscommunication.ClinicalHandoffDocuments.Section;
 
 /** ServiceRequest records and revisions belong exclusively to ordersresults. */
 @Service
 @Profile("local")
-public class ServiceRequestService {
+public class ServiceRequestService implements EncounterSigningDocumentIssuer {
     private final EncounterInterventionLinks links;
     private final TenantCommandJournal journal;
     private final PrivateClinicalArtifacts artifacts;
+    private final ClinicalHandoffDocuments documents;
     private final ph.epr.api.carecoordination.OwnedClinicalWork work;
-    public ServiceRequestService(EncounterInterventionLinks links,TenantCommandJournal journal,PrivateClinicalArtifacts artifacts, ph.epr.api.carecoordination.OwnedClinicalWork work) {
-        this.links=links;this.journal=journal;this.artifacts=artifacts;this.work=work;
+    public ServiceRequestService(EncounterInterventionLinks links,TenantCommandJournal journal,PrivateClinicalArtifacts artifacts, ph.epr.api.carecoordination.OwnedClinicalWork work, ClinicalHandoffDocuments documents) {
+        this.links=links;this.journal=journal;this.artifacts=artifacts;this.work=work;this.documents=documents;
     }
     public record ServiceRequestData(String kind, UUID groupId, String catalogCode, String catalogVersion, String serviceName, String indication, String priority, String destination, String specimen, String bodySite, String laterality, String instructions, LocalDate requestedDate) {}
     public record ServiceRequestRecord(UUID id,UUID patientId,UUID encounterId,UUID siteId,long version,String state,
@@ -33,6 +38,25 @@ public class ServiceRequestService {
     public record ServiceRequestAuthorize(long expectedVersion,UUID preparationId,String reviewedArtifactHash,boolean confirmSyntheticReview,String lateActionReason,String duplicateReason) {}
     public record ServiceRequestReason(long expectedVersion,String reason) {}
     public record ServiceRequestEvidence(long expectedVersion,String outcome,String evidence,OffsetDateTime occurredAt) {}
+    @Override public boolean supports(Kind kind) { return kind == Kind.LAB_ORDER || kind == Kind.IMAGING_ORDER; }
+    @Override public void checkForSigning(Context c, UUID patient, UUID encounter, Item item) {
+        var source = get(c, patient, item.summary().sourceId());
+        if (!supports(item.summary().kind()) || !source.encounterId().equals(encounter) || !source.authorId().equals(c.actorId())
+            || !source.state().equals("DRAFT") || source.version() != item.summary().sourceVersion()
+            || kind(source.data()) != item.summary().kind()) throw new ClinicalAccessException("SIGN_CANDIDATE_STALE", 409);
+        candidateContent(c, patient, source.id(), new ServiceRequestPrepare(UUID.randomUUID(), source.version()));
+    }
+    @Override public void issueWithSignature(Context c, UUID patient, UUID encounter, Item item, UUID signaturePreparationId, String duplicateIntentReason) {
+        checkForSigning(c, patient, encounter, item);
+        var source = get(c, patient, item.summary().sourceId());
+        var kind = item.summary().kind();
+        var preparationId = EncounterSigningDocumentIssuer.key(signaturePreparationId, kind, source.id(), "document");
+        var prepared = prepare(c, patient, source.id(), EncounterSigningDocumentIssuer.key(signaturePreparationId, kind, source.id(), "prepare"),
+            new ServiceRequestPrepare(preparationId, source.version()));
+        var lateReason = links.context(c, patient, encounter).careState().equals("IN_PROGRESS") ? null : "Issued with the clinician's encounter signature after care was finished";
+        authorize(c, patient, source.id(), EncounterSigningDocumentIssuer.key(signaturePreparationId, kind, source.id(), "issue"),
+            new ServiceRequestAuthorize(source.version(), prepared.preparationId(), prepared.artifactHash(), true, lateReason, duplicateIntentReason));
+    }
     public List<ServiceRequestRecord> list(Context c,UUID patient,int page) {
         if(page<0)throw new ClinicalAccessException("INVALID_PAGE",422);
         var ids=c.jdbc().sql("SELECT id FROM service_request WHERE practice_id=:p AND patient_id=:patient AND site_id=:s AND author_id=:a ORDER BY received_at DESC,id LIMIT 30 OFFSET :offset")
@@ -61,9 +85,9 @@ public class ServiceRequestService {
     }
     public ServiceRequestRecord create(Context c,UUID patient,UUID key,ServiceRequestCreate request) {
         if(request.id()==null||request.encounterId()==null||request.occurredAt()==null||request.data()==null) fail("CONTEXT_REQUIRED");
-        validate(request.data(),false);
         links.context(c,patient,request.encounterId());links.require(c,kind(request.data()),InterventionAuthorization.Action.PREPARE);
         return journal.execute(c,"create-service_request/"+patient,key,request,ServiceRequestRecord.class,()->{
+            validate(request.data(),true);
             var encounter=links.lock(c,patient,request.encounterId());newDecision(encounter);
             if(request.data().groupId()!=null && !c.jdbc().sql("SELECT EXISTS(SELECT 1 FROM requisition_group WHERE practice_id=:p AND patient_id=:patient AND encounter_id=:e AND id=:g AND created_by=:a)").param("p",c.practiceId()).param("patient",patient).param("e",request.encounterId()).param("g",request.data().groupId()).param("a",c.actorId()).query(Boolean.class).single())fail("REQUISITION_GROUP_REQUIRED");
             if(request.supersedesId()!=null) {
@@ -80,8 +104,9 @@ public class ServiceRequestService {
         });
     }
     public ServiceRequestRecord update(Context c,UUID patient,UUID id,UUID key,ServiceRequestUpdate request) {
-        var before=get(c,patient,id);links.require(c,kind(before.data()),InterventionAuthorization.Action.PREPARE);validate(request.data(),false);
+        var before=get(c,patient,id);links.require(c,kind(before.data()),InterventionAuthorization.Action.PREPARE);
         return journal.execute(c,"update-service_request/"+id,key,request,ServiceRequestRecord.class,()->{
+            validate(request.data(),true);
             var encounter=lockSource(c,patient,before);newDecision(encounter);
             var current=get(c,patient,id);version(current,request.expectedVersion());draft(current);
             if(kind(current.data())!=kind(request.data())) fail("KIND_IMMUTABLE");
@@ -120,7 +145,7 @@ public class ServiceRequestService {
             var encounter=links.context(c,patient,before.encounterId());unsigned(encounter);var current=get(c,patient,id);version(current,request.expectedVersion());draft(current);
             if(!request.confirmSyntheticReview()) fail("DELIBERATE_SYNTHETIC_REVIEW_REQUIRED");
             if(!encounter.careState().equals("IN_PROGRESS")) required(request.lateActionReason(),"LATE_ACTION_REASON_REQUIRED");
-            validate(current.data(),true);prerequisites(c,current);duplicates(c,current,request.duplicateReason());
+            validate(current.data(),true);prerequisites(c,current);var repeated=duplicates(c,current,request.duplicateReason());
             var prep=c.jdbc().sql("SELECT preparation_id,source_version,artifact_id,artifact_hash FROM service_request_preparation WHERE practice_id=:p AND id=:id AND preparation_id=:candidate AND prepared_by=:a")
                 .param("p",c.practiceId()).param("id",id).param("candidate",request.preparationId()).param("a",c.actorId())
                 .query((r,n)->new ServiceRequestPreparation(r.getObject(1,UUID.class),r.getLong(2),r.getObject(3,UUID.class),r.getString(4)))
@@ -129,7 +154,8 @@ public class ServiceRequestService {
             artifacts.archive(c,prep.artifactId(),prep.artifactHash());
             c.jdbc().sql("UPDATE service_request SET state='AUTHORIZED',version=version+1,authorized_at=CURRENT_TIMESTAMP,artifact_id=:artifact,artifact_hash=:hash,delivery_state='NOT_SENT' WHERE practice_id=:p AND id=:id")
                 .param("artifact",prep.artifactId()).param("hash",prep.artifactHash()).param("p",c.practiceId()).param("id",id).update();
-            revision(c,id,current.version()+1,current.data(),request.lateActionReason());
+            var recordedReason=request.lateActionReason()!=null?request.lateActionReason():repeated?request.duplicateReason():null;
+            revision(c,id,current.version()+1,current.data(),recordedReason);
             var result=get(c,patient,id);publish(c,result);obligation(c,result);
             if(original!=null) {
                 var previous=get(c,patient,original.id());
@@ -140,7 +166,7 @@ public class ServiceRequestService {
                     revision(c,previous.id(),previous.version()+1,previous.data(),"Superseded by "+result.id());publish(c,get(c,patient,previous.id()));
                     journal.audit(c,previous.id(),"SERVICEREQUEST_SUPERSEDED","Replacement "+result.id());
                 }
-            }journal.audit(c,id,"SYNTHETIC_AUTHORIZED",request.lateActionReason());journal.event(c,id,"AUTHORIZED/"+result.version(),result.ownerId());return result;
+            }journal.audit(c,id,"SYNTHETIC_AUTHORIZED",recordedReason);journal.event(c,id,"AUTHORIZED/"+result.version(),result.ownerId());return result;
         });
     }
     public ServiceRequestRecord abandon(Context c,UUID patient,UUID id,UUID key,ServiceRequestReason request) { return end(c,patient,id,key,request,true); }
@@ -184,18 +210,21 @@ public class ServiceRequestService {
     }
     private void publish(Context c,ServiceRequestRecord record) {
         var data=record.data();
-        links.append(c,record.patientId(),record.encounterId(),new Summary(kind(data),record.id(),record.version(),data.serviceName(),List.of(text(data.indication()),text(data.destination()),text(data.specimen()),text(data.bodySite()),text(data.laterality()),text(data.instructions())),
+        links.append(c,record.patientId(),record.encounterId(),new Summary(kind(data),record.id(),record.version(),data.serviceName(),List.of(
+            "Clinical question: "+text(data.indication()),"Destination: "+text(data.destination()),"Priority: "+text(data.priority()),
+            "Requested date: "+(data.requestedDate()==null?"":data.requestedDate()),"Specimen: "+text(data.specimen()),
+            "Body site: "+text(data.bodySite()),"Laterality: "+text(data.laterality()),"Instructions: "+text(data.instructions())),
             record.state(),record.deliveryState(),record.fulfillmentState(),record.reviewState(),record.ownerId(),data.requestedDate(),record.authorizedAt()==null?record.occurredAt():record.authorizedAt(),record.artifactId(),record.artifactHash(),data.groupId()));
     }
     private byte[] render(Context c,ServiceRequestRecord record) {
         var encounter=record.authorId().equals(c.actorId())?links.context(c,record.patientId(),record.encounterId()):links.acceptedWorkContext(c,record.patientId(),record.encounterId());var data=record.data();
-        var lines=new ArrayList<String>();lines.add("Synthetic ServiceRequest · reviewed source version "+record.version());
-        lines.add("Engineering validation only. Not valid for real-patient issuance.");lines.add(encounter.patientName()+" · "+encounter.recordNumber());
-        lines.add("Practice "+c.practiceId()+" · site "+c.siteId());lines.add("Responsible clinician "+record.ownerId());
-        lines.add(data.serviceName());lines.addAll(List.of(text(data.indication()),text(data.destination()),text(data.specimen()),text(data.bodySite()),text(data.laterality()),text(data.instructions())));lines.add("Priority: "+text(data.priority()));lines.add("Requested date: "+(data.requestedDate()==null?"Not recorded":data.requestedDate()));lines.add("Clinical time "+record.occurredAt());
-        lines.add("Authorization is separate from dispensing, performance, receipt and review.");
-        return ("<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><title>Synthetic ServiceRequest</title><style>body{font:16px/1.6 sans-serif;color:#192943;max-width:760px;margin:32px auto;padding:24px}p{white-space:pre-wrap;overflow-wrap:anywhere}</style><body>"+
-            lines.stream().map(s->"<p>"+escape(s)+"</p>").collect(java.util.stream.Collectors.joining())+"</body></html>").getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        return documents.render(c,record.authorId(),kind(data)==Kind.LAB_ORDER?"Laboratory requisition":"Imaging request",
+            encounter.patientName(),encounter.recordNumber(),record.id(),List.of(
+                new Section("Requested service",List.of(new Field("Test or examination",data.serviceName()),new Field("Receiving facility",data.destination()),
+                    new Field("Priority",data.priority()),new Field("Requested date",data.requestedDate()==null?null:data.requestedDate().toString()),
+                    new Field("Order recorded",ClinicalHandoffDocuments.clinicalTime(record.occurredAt())))),
+                new Section("Clinical details",List.of(new Field("Clinical question / indication",data.indication()),new Field("Specimen",data.specimen()),
+                    new Field("Body site",data.bodySite()),new Field("Laterality",data.laterality()),new Field("Patient / service instructions",data.instructions())))));
     }
     private Kind kind(ServiceRequestData data) { return Kind.valueOf(data.kind()); }
     private void bump(Context c,UUID id) { c.jdbc().sql("UPDATE service_request SET version=version+1 WHERE practice_id=:p AND id=:id").param("p",c.practiceId()).param("id",id).update(); }
@@ -225,15 +254,17 @@ public record ServiceCatalogEntry(String code,String version,String kind,String 
         required(data.serviceName(),"SERVICE_REQUIRED");
         boolean hasCode=data.catalogCode()!=null&&!data.catalogCode().isBlank(), hasVersion=data.catalogVersion()!=null&&!data.catalogVersion().isBlank();
         if(hasCode!=hasVersion)fail("CATALOG_REFERENCE_INCOMPLETE");
-        if(authorize){required(data.indication(),"CLINICAL_QUESTION_REQUIRED");required(data.destination(),"DESTINATION_REQUIRED");required(data.priority(),"PRIORITY_REQUIRED");if(data.requestedDate()==null)fail("REQUESTED_DATE_REQUIRED");}
+        if(authorize){required(data.indication(),"CLINICAL_QUESTION_REQUIRED");if(kind(data)==Kind.IMAGING_ORDER)required(data.destination(),"DESTINATION_REQUIRED");required(data.priority(),"PRIORITY_REQUIRED");if(data.requestedDate()==null)fail("REQUESTED_DATE_REQUIRED");}
     }
-    private void duplicates(Context c,ServiceRequestRecord record,String reason){
+    private boolean duplicates(Context c,ServiceRequestRecord record,String reason){
         var data=record.data();
         boolean coded=data.catalogCode()!=null&&!data.catalogCode().isBlank();
         var match=coded?"r.catalog_code=:code":"(r.catalog_code IS NULL OR btrim(r.catalog_code)='') AND lower(btrim(r.service_name))=lower(btrim(:name))";
         var query=c.jdbc().sql("SELECT EXISTS(SELECT 1 FROM service_request s JOIN service_request_revision r ON r.practice_id=s.practice_id AND r.id=s.id AND r.version=s.version WHERE s.practice_id=:p AND s.patient_id=:patient AND s.id<>:id AND s.state='AUTHORIZED' AND s.fulfillment_state<>'FULFILLED' AND "+match+")").param("p",c.practiceId()).param("patient",record.patientId()).param("id",record.id());
         if(coded)query.param("code",data.catalogCode());else query.param("name",data.serviceName());
-        if(query.query(Boolean.class).single())required(reason,"DUPLICATE_INTENT_REASON_REQUIRED");
+        var repeated=query.query(Boolean.class).single();
+        if(repeated)required(reason,"DUPLICATE_INTENT_REASON_REQUIRED");
+        return repeated;
     }
     public record ServiceRequestBatch(UUID groupId,List<ServiceRequestCreate> requests) {}
     public record ServiceRequestBatchResult(UUID groupId,List<ServiceRequestRecord> requests) {}
@@ -331,12 +362,29 @@ public record ServiceCatalogEntry(String code,String version,String kind,String 
         return journal.execute(c,"capture-requisition-group/"+group,key,request,GroupCapture.class,()->{
             lockSource(c,patient,initial.getFirst());var records=group(c,patient,group);
             if(records.stream().anyMatch(x->x.authorizedAt()==null))fail("GROUP_HAS_UNAUTHORIZED_REQUESTS");
+            if(records.stream().anyMatch(x->!"AUTHORIZED".equals(x.state())||x.artifactId()==null))fail("GROUP_HAS_NONCURRENT_REQUESTS");
             var identity=links.acceptedWorkContext(c,patient,records.getFirst().encounterId());
-            var html=new StringBuilder("<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><title>Synthetic grouped requisition</title><style>body{font:16px/1.6 sans-serif;margin:32px;color:#192943}p{white-space:pre-wrap;overflow-wrap:anywhere}section{break-inside:avoid;border-top:1px solid #ddd}</style><body><h1>Synthetic grouped requisition</h1><p>Engineering validation only. Not valid for real-patient issuance.</p><p>").append(escape(identity.patientName())).append(" · ").append(escape(identity.recordNumber())).append("</p>");
-            for(var source:records)html.append("<section><h2>").append(escape(source.data().serviceName())).append("</h2><p>").append(escape(source.data().indication())).append("</p><p>").append(escape(source.data().destination())).append("</p><p>").append(escape(source.data().instructions())).append("</p><p>Priority: ").append(escape(source.data().priority())).append(" · requested date: ").append(source.data().requestedDate()).append(" · specimen: ").append(escape(source.data().specimen())).append(" · body site: ").append(escape(source.data().bodySite())).append(" · laterality: ").append(escape(source.data().laterality())).append("</p><p>Request ").append(source.id()).append(" · ").append(source.state()).append(" · authorized ").append(source.authorizedAt()).append(" · authorizer ").append(source.authorId()).append("</p></section>");
-            html.append("<p>Printing is separate from delivery, performance and review.</p></body></html>");
-            return new GroupCapture(request.documentId(),group,records.stream().map(x->new GroupMember(x.id(),x.version(),x.state(),x.artifactId(),x.artifactHash())).toList(),html.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            var orderFields=List.of(
+                new Field("Receiving facility",groupValue(records,x->x.data().destination())),
+                new Field("Requested date",groupValue(records,x->x.data().requestedDate()==null?null:x.data().requestedDate().toString())),
+                new Field("Order recorded",groupValue(records,x->ClinicalHandoffDocuments.clinicalTime(x.occurredAt()))),
+                new Field("Clinical question / indication",groupValue(records,x->x.data().indication())),
+                new Field("Priority",groupValue(records,x->x.data().priority())),
+                new Field("Request reference",group.toString()));
+            var sections=new ArrayList<Section>();
+            for(var source:records){var data=source.data();sections.add(new Section(data.serviceName(),List.of(
+                new Field("Specimen",data.specimen()),new Field("Body site",data.bodySite()),
+                new Field("Laterality",data.laterality()),new Field("Patient / service instructions",data.instructions()))));}
+            var bytes=documents.renderLabOrder(c,records.getFirst().authorId(),identity.patientName(),identity.recordNumber(),request.documentId(),orderFields,sections);
+            return new GroupCapture(request.documentId(),group,records.stream().map(x->new GroupMember(x.id(),x.version(),x.state(),x.artifactId(),x.artifactHash())).toList(),bytes);
         });
+    }
+    private static String groupValue(List<ServiceRequestRecord> records,java.util.function.Function<ServiceRequestRecord,String> value){
+        var values=records.stream().map(value).map(v->v==null?"":v.trim()).toList();
+        if(values.stream().distinct().count()==1)return values.getFirst();
+        var lines=new ArrayList<String>();
+        for(int i=0;i<records.size();i++)lines.add(records.get(i).data().serviceName()+": "+(values.get(i).isBlank()?"Not specified":values.get(i)));
+        return String.join("\n",lines);
     }
     public GroupDocument finalizeGroup(Context c,UUID patient,UUID key,GroupCapture capture,PrivateClinicalArtifacts.Artifact staged){
         var initial=group(c,patient,capture.groupId());

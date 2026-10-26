@@ -142,7 +142,7 @@ function AccessForm({ scope, member, sites, sitesReady, onReload }: { scope: Tea
 function readinessMessage(scope: TeamScope) {
   const readiness = scope.clinicalReadiness
   if (readiness.state === 'SCHEMA_UPGRADE_REQUIRED') return `Provider Support must upgrade this Practice from schema ${readiness.currentSchemaVersion ?? 'unavailable'} to ${readiness.requiredSchemaVersion}.`
-  if (readiness.state === 'CLINICAL_DISABLED') return 'Provider Support must enable synthetic clinical workflows for this Practice.'
+  if (readiness.state === 'CLINICAL_DISABLED') return 'Provider Support must enable clinical workflows for this Practice.'
   if (readiness.state === 'SOURCE_CAPABILITY_DISABLED') return 'One or more clinical-list source capabilities are disabled.'
   if (readiness.state === 'MIGRATION_IN_PROGRESS') return 'A tenant schema upgrade is currently in progress.'
   if (readiness.state === 'QUARANTINED') return readiness.latestFailure ?? 'The most recent clinical rollout needs Provider Support attention.'

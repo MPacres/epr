@@ -35,7 +35,7 @@ class LocalSyntheticClinicalPractice implements SyntheticClinicalPractice {
             clinicianName, username, new InitialTenantSite(site, siteName, "", "", "PH", "1300000000", "1300000000", "1380300000"),
             UUID.fromString("c6ac9aeb-3196-4a76-b9df-ff090eac77d1")));
         if (!result.tenant().isRoutable()) throw new IllegalStateException("Synthetic tenant provisioning is unavailable");
-        if (!ClinicalReadiness.REQUIRED_SCHEMA_VERSION.equals(result.tenant().schemaVersion())) upgrades.upgrade(admin, practice, UUID.nameUUIDFromBytes((practice + "/clinical-schema-17").getBytes(java.nio.charset.StandardCharsets.UTF_8)), result.tenant().version(), "Upgrade opt-in synthetic workspace to schema 17");
+        if (!ClinicalReadiness.REQUIRED_SCHEMA_VERSION.equals(result.tenant().schemaVersion())) upgrades.upgrade(admin, practice, UUID.nameUUIDFromBytes((practice + "/clinical-schema-19").getBytes(java.nio.charset.StandardCharsets.UTF_8)), result.tenant().version(), "Upgrade opt-in synthetic workspace to schema 19");
         identities.grant(clinician, practice, site, admin.id());
     }
 }

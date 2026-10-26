@@ -117,6 +117,8 @@ public interface ClinicalLists {
     List<Proposal> proposals(Context context, UUID patientId);
     ReviewManifest reconcile(Context context, UUID patientId, UUID idempotencyKey, Reconcile command);
     List<ReviewManifest> reviews(Context context, UUID patientId, UUID encounterId);
+    /** Historical links and reconciliations keep a draft from being withdrawn. */
+    boolean hasEncounterEvidence(Context context, UUID patientId, UUID encounterId);
     ReviewManifest requireCurrentReview(Context context, UUID patientId, UUID reviewId);
     SafetyManifest requireCurrentSafety(Context context, UUID patientId, UUID reviewId);
     List<Code> terminology(Context context, SourceKind kind, String query);

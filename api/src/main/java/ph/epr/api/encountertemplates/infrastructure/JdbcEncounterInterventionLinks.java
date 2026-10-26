@@ -28,7 +28,7 @@ public class JdbcEncounterInterventionLinks implements EncounterInterventionLink
     }
     public EncounterContext context(Context c, UUID patient, UUID encounter) { return loadContext(c,patient,encounter,false); }
     private EncounterContext loadContext(Context c,UUID patient,UUID encounter,boolean acceptedWork) {
-        var row=c.jdbc().sql("SELECT site_id,responsible_clinician_id,release_id,care_state,note_state FROM clinical_encounter WHERE practice_id=:p AND patient_id=:patient AND encounter_id=:e")
+        var row=c.jdbc().sql("SELECT site_id,responsible_clinician_id,release_id,care_state,note_state FROM clinical_encounter WHERE practice_id=:p AND patient_id=:patient AND encounter_id=:e AND deleted_at IS NULL")
             .param("p",c.practiceId()).param("patient",patient).param("e",encounter)
             .query((r,n)->new Row(r.getObject(1,UUID.class),r.getObject(2,UUID.class),r.getObject(3,UUID.class),r.getString(4),r.getString(5)))
             .optional().orElseThrow(()->new ClinicalAccessException("ENCOUNTER_UNAVAILABLE",404));
@@ -80,6 +80,10 @@ public class JdbcEncounterInterventionLinks implements EncounterInterventionLink
         context(c,patient,encounter);
         return c.jdbc().sql("SELECT version FROM encounter_intervention_set WHERE practice_id=:p AND patient_id=:patient AND encounter_id=:e")
             .param("p",c.practiceId()).param("patient",patient).param("e",encounter).query(Long.class).optional().orElse(0L);
+    }
+    public boolean hasHistory(Context c, UUID patient, UUID encounter) {
+        return c.jdbc().sql("SELECT EXISTS(SELECT 1 FROM encounter_intervention_set WHERE practice_id=:p AND patient_id=:patient AND encounter_id=:e)")
+            .param("p", c.practiceId()).param("patient", patient).param("e", encounter).query(Boolean.class).single();
     }
     private List<Item> all(Context c, UUID patient, UUID encounter) {
         context(c,patient,encounter);

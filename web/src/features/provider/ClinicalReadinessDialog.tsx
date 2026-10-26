@@ -37,10 +37,10 @@ export function ClinicalReadinessDialog({ open, action, practiceName, requiredSc
         openerRef.current?.focus({ preventScroll: true })
       }}>
         <div className="practice-lifecycle-icon clinical">{upgrading ? <DatabaseZap aria-hidden="true" /> : <Stethoscope aria-hidden="true" />}</div>
-        <Dialog.Title>{upgrading ? 'Upgrade tenant schema?' : 'Enable synthetic clinical workflows?'}</Dialog.Title>
+        <Dialog.Title>{upgrading ? 'Upgrade tenant schema?' : 'Enable clinical workflows?'}</Dialog.Title>
         <Dialog.Description>{upgrading
           ? `${practiceName} will run the guarded tenant migration to schema ${requiredSchemaVersion}. A failed rollout is quarantined and remains unavailable to clinical traffic.`
-          : `${practiceName} will receive the local synthetic clinical capability and all three longitudinal-list source capabilities. No doctor receives individual access automatically.`}</Dialog.Description>
+          : `${practiceName} will receive the clinical workflow capability and all three longitudinal-list source capabilities. No doctor receives individual access automatically.`}</Dialog.Description>
         <label htmlFor={inputId}>Reason <span aria-hidden="true">*</span></label>
         <textarea id={inputId} value={reason} onChange={event => setReason(event.target.value)} rows={4} maxLength={500} required disabled={pending} aria-describedby={`${inputId}-hint`} />
         <p id={`${inputId}-hint`}>Recorded with the support operation. Up to 500 characters.</p>

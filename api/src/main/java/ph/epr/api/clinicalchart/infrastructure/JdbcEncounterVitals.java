@@ -16,6 +16,11 @@ class JdbcEncounterVitals implements EncounterVitals {
     private final TenantCommandJournal journal;
     JdbcEncounterVitals(TenantCommandJournal journal) { this.journal = journal; }
 
+    @Override public boolean hasHistory(Context c, UUID patient, UUID encounter) {
+        return c.jdbc().sql("SELECT EXISTS(SELECT 1 FROM encounter_vital_set WHERE practice_id=:p AND patient_id=:patient AND encounter_id=:encounter)")
+            .param("p", c.practiceId()).param("patient", patient).param("encounter", encounter).query(Boolean.class).single();
+    }
+
     @Override public List<VitalSet> list(Context c, UUID patient, UUID encounter) {
         requireEncounter(c, patient, encounter);
         var ids = c.jdbc().sql("""
@@ -24,11 +29,40 @@ class JdbcEncounterVitals implements EncounterVitals {
                 AND revision.patient_id=head.patient_id AND revision.encounter_id=head.encounter_id
                 AND revision.vital_set_id=head.vital_set_id AND revision.version=head.current_version
             WHERE head.practice_id=:practice AND head.patient_id=:patient AND head.encounter_id=:encounter
+                AND head.removed_at IS NULL
             ORDER BY revision.measured_at DESC, head.vital_set_id LIMIT 101
             """).param("practice", c.practiceId()).param("patient", patient).param("encounter", encounter)
             .query(UUID.class).list();
         if (ids.size() > 100) throw new ClinicalAccessException("VITAL_SET_CAPACITY", 503);
         return ids.stream().map(id -> get(c, patient, encounter, id)).toList();
+    }
+
+    @Override public TimelinePage timeline(Context c, UUID patient, UUID encounter, int page) {
+        requireEncounter(c, patient, encounter);
+        if (page < 0 || page > 10000) throw new ClinicalAccessException("INVALID_VITAL_TIMELINE_PAGE", 422);
+        var rows = c.jdbc().sql("""
+            SELECT head.vital_set_id, head.encounter_id, revision.*
+            FROM encounter_vital_set head
+            JOIN clinical_encounter visit ON visit.practice_id=head.practice_id
+                AND visit.patient_id=head.patient_id AND visit.encounter_id=head.encounter_id
+            JOIN encounter_vital_revision revision ON revision.practice_id=head.practice_id
+                AND revision.patient_id=head.patient_id AND revision.encounter_id=head.encounter_id
+                AND revision.vital_set_id=head.vital_set_id AND revision.version=head.current_version
+            WHERE head.practice_id=:practice AND head.patient_id=:patient AND head.removed_at IS NULL
+                AND visit.site_id=:site AND visit.responsible_clinician_id=:actor AND visit.deleted_at IS NULL
+            ORDER BY revision.measured_at DESC, head.vital_set_id DESC LIMIT 51 OFFSET :offset
+            """).param("practice", c.practiceId()).param("patient", patient).param("site", c.siteId())
+            .param("actor", c.actorId()).param("offset", page * 50)
+            .query((r, n) -> new Reading(r.getObject("vital_set_id", UUID.class),
+                r.getObject("encounter_id", UUID.class), new Revision(r.getLong("version"),
+                    r.getObject("measured_at", OffsetDateTime.class), r.getString("source"),
+                    new Values(r.getBigDecimal("systolic_mmhg"), r.getBigDecimal("diastolic_mmhg"),
+                        r.getBigDecimal("pulse_bpm"), r.getBigDecimal("respiratory_rate_bpm"),
+                        r.getBigDecimal("temperature_c"), r.getBigDecimal("oxygen_saturation_percent"),
+                        r.getBigDecimal("weight_kg"), r.getBigDecimal("height_cm")),
+                    r.getString("correction_reason"), r.getObject("recorded_by", UUID.class),
+                    r.getObject("received_at", OffsetDateTime.class)))).list();
+        return new TimelinePage(rows.subList(0, Math.min(rows.size(), 50)), page, rows.size() > 50);
     }
 
     @Override public VitalSet create(Context c, UUID patient, UUID encounter, UUID key, Create request) {
@@ -59,7 +93,8 @@ class JdbcEncounterVitals implements EncounterVitals {
             lockEncounter(c, patient, encounter);
             var version = c.jdbc().sql("""
                 SELECT current_version FROM encounter_vital_set
-                WHERE practice_id=:p AND patient_id=:patient AND encounter_id=:encounter AND vital_set_id=:id FOR UPDATE
+                WHERE practice_id=:p AND patient_id=:patient AND encounter_id=:encounter
+                    AND vital_set_id=:id AND removed_at IS NULL FOR UPDATE
                 """).param("p", c.practiceId()).param("patient", patient).param("encounter", encounter)
                 .param("id", id).query(Long.class).optional()
                 .orElseThrow(() -> new ClinicalAccessException("VITAL_SET_UNAVAILABLE", 404));
@@ -73,6 +108,30 @@ class JdbcEncounterVitals implements EncounterVitals {
                 .param("encounter", encounter).param("id", id).update();
             journal.audit(c, id, "ENCOUNTER_VITAL_SET_CORRECTED", request.reason().trim());
             return get(c, patient, encounter, id);
+        });
+    }
+
+    @Override public Removal remove(Context c, UUID patient, UUID encounter, UUID id, UUID key, Remove request) {
+        requireEncounter(c, patient, encounter);
+        return journal.execute(c, "remove-vital-set/" + id, key, request, Removal.class, () -> {
+            if ("SIGNED".equals(lockEncounter(c, patient, encounter)))
+                throw new ClinicalAccessException("SIGNED_NOTE_IMMUTABLE", 409);
+            var version = c.jdbc().sql("""
+                SELECT current_version FROM encounter_vital_set
+                WHERE practice_id=:p AND patient_id=:patient AND encounter_id=:encounter
+                    AND vital_set_id=:id AND removed_at IS NULL FOR UPDATE
+                """).param("p", c.practiceId()).param("patient", patient).param("encounter", encounter)
+                .param("id", id).query(Long.class).optional()
+                .orElseThrow(() -> new ClinicalAccessException("VITAL_SET_UNAVAILABLE", 404));
+            if (version != request.expectedVersion()) throw new ClinicalAccessException("VERSION_CONFLICT", 409);
+            c.jdbc().sql("""
+                UPDATE encounter_vital_set SET removed_at=CURRENT_TIMESTAMP,
+                    removed_by=:actor, removal_reason='Entered in error'
+                WHERE practice_id=:p AND patient_id=:patient AND encounter_id=:encounter AND vital_set_id=:id
+                """).param("actor", c.actorId()).param("p", c.practiceId()).param("patient", patient)
+                .param("encounter", encounter).param("id", id).update();
+            journal.audit(c, id, "ENCOUNTER_VITAL_SET_REMOVED", "Entered in error");
+            return new Removal(id, true);
         });
     }
 
@@ -97,18 +156,18 @@ class JdbcEncounterVitals implements EncounterVitals {
     private void requireEncounter(Context c, UUID patient, UUID encounter) {
         var allowed = c.jdbc().sql("""
             SELECT EXISTS(SELECT 1 FROM clinical_encounter WHERE practice_id=:p AND patient_id=:patient
-                AND encounter_id=:encounter AND site_id=:site AND responsible_clinician_id=:actor)
+                AND encounter_id=:encounter AND site_id=:site AND responsible_clinician_id=:actor AND deleted_at IS NULL)
             """).param("p", c.practiceId()).param("patient", patient).param("encounter", encounter)
             .param("site", c.siteId()).param("actor", c.actorId()).query(Boolean.class).single();
         if (!allowed) throw new ClinicalAccessException("ENCOUNTER_UNAVAILABLE", 404);
     }
 
-    private void lockEncounter(Context c, UUID patient, UUID encounter) {
-        c.jdbc().sql("""
-            SELECT encounter_id FROM clinical_encounter WHERE practice_id=:p AND patient_id=:patient
-                AND encounter_id=:encounter AND site_id=:site AND responsible_clinician_id=:actor FOR UPDATE
+    private String lockEncounter(Context c, UUID patient, UUID encounter) {
+        return c.jdbc().sql("""
+            SELECT note_state FROM clinical_encounter WHERE practice_id=:p AND patient_id=:patient
+                AND encounter_id=:encounter AND site_id=:site AND responsible_clinician_id=:actor AND deleted_at IS NULL FOR UPDATE
             """).param("p", c.practiceId()).param("patient", patient).param("encounter", encounter)
-            .param("site", c.siteId()).param("actor", c.actorId()).query(UUID.class).optional()
+            .param("site", c.siteId()).param("actor", c.actorId()).query(String.class).optional()
             .orElseThrow(() -> new ClinicalAccessException("ENCOUNTER_UNAVAILABLE", 404));
     }
 

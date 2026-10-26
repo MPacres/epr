@@ -5,22 +5,27 @@ import java.util.*;
 import org.springframework.stereotype.Service;
 import org.springframework.context.annotation.Profile;
 import ph.epr.api.encountertemplates.EncounterInterventionLinks;
+import ph.epr.api.encountertemplates.EncounterSigningDocumentIssuer;
 import ph.epr.api.encountertemplates.EncounterInterventionLinks.*;
 import ph.epr.api.identitytenancy.*;
 import ph.epr.api.platformoperations.*;
 import ph.epr.api.platformoperations.TenantTransactions.Context;
 import ph.epr.api.documentscommunication.PrivateClinicalArtifacts;
+import ph.epr.api.documentscommunication.ClinicalHandoffDocuments;
+import ph.epr.api.documentscommunication.ClinicalHandoffDocuments.Field;
+import ph.epr.api.documentscommunication.ClinicalHandoffDocuments.Section;
 
 /** Referral records and revisions belong exclusively to carecoordination. */
 @Service
 @Profile("local")
-public class ReferralService {
+public class ReferralService implements EncounterSigningDocumentIssuer {
     private final EncounterInterventionLinks links;
     private final TenantCommandJournal journal;
     private final PrivateClinicalArtifacts artifacts;
+    private final ClinicalHandoffDocuments documents;
     private final ph.epr.api.carecoordination.OwnedClinicalWork work;
-    public ReferralService(EncounterInterventionLinks links,TenantCommandJournal journal,PrivateClinicalArtifacts artifacts, ph.epr.api.carecoordination.OwnedClinicalWork work) {
-        this.links=links;this.journal=journal;this.artifacts=artifacts;this.work=work;
+    public ReferralService(EncounterInterventionLinks links,TenantCommandJournal journal,PrivateClinicalArtifacts artifacts, ph.epr.api.carecoordination.OwnedClinicalWork work, ClinicalHandoffDocuments documents) {
+        this.links=links;this.journal=journal;this.artifacts=artifacts;this.work=work;this.documents=documents;
     }
     public record ReferralData(String destination, String clinicalQuestion, String clinicalSummary, String priority, LocalDate requestedDate, String disclosureReason) {}
     public record ReferralRecord(UUID id,UUID patientId,UUID encounterId,UUID siteId,long version,String state,
@@ -33,6 +38,25 @@ public class ReferralService {
     public record ReferralAuthorize(long expectedVersion,UUID preparationId,String reviewedArtifactHash,boolean confirmSyntheticReview,String lateActionReason,String duplicateReason) {}
     public record ReferralReason(long expectedVersion,String reason) {}
     public record ReferralEvidence(long expectedVersion,String outcome,String evidence,OffsetDateTime occurredAt) {}
+    @Override public boolean supports(Kind kind) { return kind == Kind.REFERRAL; }
+    @Override public void checkForSigning(Context c, UUID patient, UUID encounter, Item item) {
+        var source = get(c, patient, item.summary().sourceId());
+        if (item.summary().kind() != Kind.REFERRAL || !source.encounterId().equals(encounter)
+            || !source.authorId().equals(c.actorId()) || !source.state().equals("DRAFT")
+            || source.version() != item.summary().sourceVersion()) throw new ClinicalAccessException("SIGN_CANDIDATE_STALE", 409);
+        candidateContent(c, patient, source.id(), new ReferralPrepare(UUID.randomUUID(), source.version()));
+    }
+    @Override public void issueWithSignature(Context c, UUID patient, UUID encounter, Item item, UUID signaturePreparationId, String duplicateIntentReason) {
+        checkForSigning(c, patient, encounter, item);
+        var source = get(c, patient, item.summary().sourceId());
+        var kind = item.summary().kind();
+        var preparationId = EncounterSigningDocumentIssuer.key(signaturePreparationId, kind, source.id(), "document");
+        var prepared = prepare(c, patient, source.id(), EncounterSigningDocumentIssuer.key(signaturePreparationId, kind, source.id(), "prepare"),
+            new ReferralPrepare(preparationId, source.version()));
+        var lateReason = links.context(c, patient, encounter).careState().equals("IN_PROGRESS") ? null : "Released with the clinician's encounter signature after care was finished";
+        authorize(c, patient, source.id(), EncounterSigningDocumentIssuer.key(signaturePreparationId, kind, source.id(), "issue"),
+            new ReferralAuthorize(source.version(), prepared.preparationId(), prepared.artifactHash(), true, lateReason, duplicateIntentReason));
+    }
     public List<ReferralRecord> list(Context c,UUID patient,int page) {
         if(page<0)throw new ClinicalAccessException("INVALID_PAGE",422);
         var ids=c.jdbc().sql("SELECT id FROM referral WHERE practice_id=:p AND patient_id=:patient AND site_id=:s AND author_id=:a ORDER BY received_at DESC,id LIMIT 30 OFFSET :offset")
@@ -117,7 +141,7 @@ public class ReferralService {
             var encounter=links.context(c,patient,before.encounterId());unsigned(encounter);var current=get(c,patient,id);version(current,request.expectedVersion());draft(current);
             if(!request.confirmSyntheticReview()) fail("DELIBERATE_SYNTHETIC_REVIEW_REQUIRED");
             if(!encounter.careState().equals("IN_PROGRESS")) required(request.lateActionReason(),"LATE_ACTION_REASON_REQUIRED");
-            validate(current.data(),true);prerequisites(c,current);duplicates(c,current,request.duplicateReason());
+            validate(current.data(),true);prerequisites(c,current);var repeated=duplicates(c,current,request.duplicateReason());
             var prep=c.jdbc().sql("SELECT preparation_id,source_version,artifact_id,artifact_hash FROM referral_preparation WHERE practice_id=:p AND id=:id AND preparation_id=:candidate AND prepared_by=:a")
                 .param("p",c.practiceId()).param("id",id).param("candidate",request.preparationId()).param("a",c.actorId())
                 .query((r,n)->new ReferralPreparation(r.getObject(1,UUID.class),r.getLong(2),r.getObject(3,UUID.class),r.getString(4)))
@@ -126,7 +150,8 @@ public class ReferralService {
             artifacts.archive(c,prep.artifactId(),prep.artifactHash());
             c.jdbc().sql("UPDATE referral SET state='RELEASED',version=version+1,authorized_at=CURRENT_TIMESTAMP,artifact_id=:artifact,artifact_hash=:hash,delivery_state='NOT_SENT' WHERE practice_id=:p AND id=:id")
                 .param("artifact",prep.artifactId()).param("hash",prep.artifactHash()).param("p",c.practiceId()).param("id",id).update();
-            revision(c,id,current.version()+1,current.data(),request.lateActionReason());
+            var recordedReason=request.lateActionReason()!=null?request.lateActionReason():repeated?request.duplicateReason():null;
+            revision(c,id,current.version()+1,current.data(),recordedReason);
             var result=get(c,patient,id);publish(c,result);obligation(c,result);
             if(original!=null) {
                 var previous=get(c,patient,original.id());
@@ -137,7 +162,7 @@ public class ReferralService {
                     revision(c,previous.id(),previous.version()+1,previous.data(),"Superseded by "+result.id());publish(c,get(c,patient,previous.id()));
                     journal.audit(c,previous.id(),"REFERRAL_SUPERSEDED","Replacement "+result.id());
                 }
-            }journal.audit(c,id,"SYNTHETIC_RELEASED",request.lateActionReason());journal.event(c,id,"RELEASED/"+result.version(),result.ownerId());return result;
+            }journal.audit(c,id,"SYNTHETIC_RELEASED",recordedReason);journal.event(c,id,"RELEASED/"+result.version(),result.ownerId());return result;
         });
     }
     public ReferralRecord abandon(Context c,UUID patient,UUID id,UUID key,ReferralReason request) { return end(c,patient,id,key,request,true); }
@@ -181,18 +206,20 @@ public class ReferralService {
     }
     private void publish(Context c,ReferralRecord record) {
         var data=record.data();
-        links.append(c,record.patientId(),record.encounterId(),new Summary(kind(data),record.id(),record.version(),"Referral to " + data.destination(),List.of(text(data.clinicalQuestion()),text(data.clinicalSummary()),text(data.disclosureReason())),
+        links.append(c,record.patientId(),record.encounterId(),new Summary(kind(data),record.id(),record.version(),"Referral to " + data.destination(),List.of(
+            "Clinical question: "+text(data.clinicalQuestion()),"Selected summary: "+text(data.clinicalSummary()),
+            "Priority: "+text(data.priority()),"Intended date: "+(data.requestedDate()==null?"":data.requestedDate()),
+            "Disclosure review: "+text(data.disclosureReason())),
             record.state(),record.deliveryState(),record.fulfillmentState(),record.reviewState(),record.ownerId(),data.requestedDate(),record.authorizedAt()==null?record.occurredAt():record.authorizedAt(),record.artifactId(),record.artifactHash()));
     }
     private byte[] render(Context c,ReferralRecord record) {
         var encounter=record.authorId().equals(c.actorId())?links.context(c,record.patientId(),record.encounterId()):links.acceptedWorkContext(c,record.patientId(),record.encounterId());var data=record.data();
-        var lines=new ArrayList<String>();lines.add("Synthetic Referral · reviewed source version "+record.version());
-        lines.add("Engineering validation only. Not valid for real-patient issuance.");lines.add(encounter.patientName()+" · "+encounter.recordNumber());
-        lines.add("Practice "+c.practiceId()+" · site "+c.siteId());lines.add("Responsible clinician "+record.ownerId());
-        lines.add("Referral to " + data.destination());lines.addAll(List.of(text(data.clinicalQuestion()),text(data.clinicalSummary()),text(data.disclosureReason())));lines.add("Priority: "+text(data.priority()));lines.add("Requested date: "+(data.requestedDate()==null?"Not recorded":data.requestedDate()));lines.add("Clinical time "+record.occurredAt());
-        lines.add("Authorization is separate from dispensing, performance, receipt and review.");
-        return ("<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><title>Synthetic Referral</title><style>body{font:16px/1.6 sans-serif;color:#192943;max-width:760px;margin:32px auto;padding:24px}p{white-space:pre-wrap;overflow-wrap:anywhere}</style><body>"+
-            lines.stream().map(s->"<p>"+escape(s)+"</p>").collect(java.util.stream.Collectors.joining())+"</body></html>").getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        return documents.render(c,record.authorId(),"Referral letter",encounter.patientName(),encounter.recordNumber(),record.id(),List.of(
+            new Section("Receiving service",List.of(new Field("Doctor / service / facility",data.destination()),new Field("Priority",data.priority()),
+                new Field("Intended date",data.requestedDate()==null?null:data.requestedDate().toString()),
+                new Field("Referral recorded",ClinicalHandoffDocuments.clinicalTime(record.occurredAt())))),
+            new Section("Clinical information selected for referral",List.of(new Field("Clinical question",data.clinicalQuestion()),
+                new Field("Clinical summary",data.clinicalSummary())))));
     }
     private Kind kind(ReferralData data) { return Kind.REFERRAL; }
     private void bump(Context c,UUID id) { c.jdbc().sql("UPDATE referral SET version=version+1 WHERE practice_id=:p AND id=:id").param("p",c.practiceId()).param("id",id).update(); }
@@ -211,8 +238,10 @@ private void validate(ReferralData data,boolean release){
         if(data==null)fail("REFERRAL_DETAILS_REQUIRED");required(data.destination(),"DESTINATION_REQUIRED");
         if(release){required(data.clinicalQuestion(),"CLINICAL_QUESTION_REQUIRED");required(data.clinicalSummary(),"SELECTED_SUMMARY_REQUIRED");required(data.disclosureReason(),"DISCLOSURE_REVIEW_REQUIRED");required(data.priority(),"PRIORITY_REQUIRED");if(data.requestedDate()==null)fail("REQUESTED_DATE_REQUIRED");}
     }
-    private void duplicates(Context c,ReferralRecord record,String reason){
-        if(c.jdbc().sql("SELECT EXISTS(SELECT 1 FROM referral s JOIN referral_revision r ON r.practice_id=s.practice_id AND r.id=s.id AND r.version=s.version WHERE s.practice_id=:p AND s.patient_id=:patient AND s.id<>:id AND s.state='RELEASED' AND s.review_state<>'REVIEWED' AND r.destination=:destination)").param("p",c.practiceId()).param("patient",record.patientId()).param("id",record.id()).param("destination",record.data().destination()).query(Boolean.class).single())required(reason,"DUPLICATE_INTENT_REASON_REQUIRED");
+    private boolean duplicates(Context c,ReferralRecord record,String reason){
+        var repeated=c.jdbc().sql("SELECT EXISTS(SELECT 1 FROM referral s JOIN referral_revision r ON r.practice_id=s.practice_id AND r.id=s.id AND r.version=s.version WHERE s.practice_id=:p AND s.patient_id=:patient AND s.id<>:id AND s.state='RELEASED' AND s.review_state<>'REVIEWED' AND r.destination=:destination)").param("p",c.practiceId()).param("patient",record.patientId()).param("id",record.id()).param("destination",record.data().destination()).query(Boolean.class).single();
+        if(repeated)required(reason,"DUPLICATE_INTENT_REASON_REQUIRED");
+        return repeated;
     }
 
 

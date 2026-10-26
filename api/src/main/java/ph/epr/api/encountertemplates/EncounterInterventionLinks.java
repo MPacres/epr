@@ -29,4 +29,6 @@ public interface EncounterInterventionLinks {
     Manifest capture(Context c, UUID patient, UUID encounter, UUID manifestId);
     Manifest manifest(Context c, UUID patient, UUID encounter, UUID manifestId);
     long version(Context c, UUID patient, UUID encounter);
+    /** Includes abandoned and historical interventions; withdrawal cannot hide their provenance. */
+    boolean hasHistory(Context c, UUID patient, UUID encounter);
 }

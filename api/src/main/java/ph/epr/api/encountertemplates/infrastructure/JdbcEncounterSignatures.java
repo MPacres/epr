@@ -7,6 +7,8 @@ import java.util.*;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import ph.epr.api.documentscommunication.PrivateClinicalArtifacts;
+import ph.epr.api.encountertemplates.EncounterSigningDocumentIssuer;
+import ph.epr.api.encountertemplates.EncounterInterventionLinks;
 import ph.epr.api.encountertemplates.domain.*;
 import ph.epr.api.identitytenancy.ClinicalAccessException;
 import ph.epr.api.identitytenancy.ClinicalDocumentIdentity;
@@ -25,13 +27,18 @@ public class JdbcEncounterSignatures {
     private final ph.epr.api.clinicalchart.EncounterVitals vitals;
     private final PracticeProvisioningRegistry practices;
     private final ClinicalDocumentIdentity identities;
-    public JdbcEncounterSignatures(JdbcEncounterService encounters, PrivateClinicalArtifacts artifacts, TenantCommandJournal journal, ph.epr.api.encountertemplates.EncounterInterventionLinks links,ph.epr.api.clinicalchart.ClinicalLists clinicalLists, ph.epr.api.clinicalchart.EncounterVitals vitals, PracticeProvisioningRegistry practices, ClinicalDocumentIdentity identities) {
+    private final List<EncounterSigningDocumentIssuer> issuers;
+    public JdbcEncounterSignatures(JdbcEncounterService encounters, PrivateClinicalArtifacts artifacts, TenantCommandJournal journal, ph.epr.api.encountertemplates.EncounterInterventionLinks links,ph.epr.api.clinicalchart.ClinicalLists clinicalLists, ph.epr.api.clinicalchart.EncounterVitals vitals, PracticeProvisioningRegistry practices, ClinicalDocumentIdentity identities, List<EncounterSigningDocumentIssuer> issuers) {
         this.encounters = encounters; this.artifacts = artifacts; this.journal = journal; this.links=links;this.clinicalLists=clinicalLists;
-        this.vitals = vitals; this.practices = practices; this.identities = identities;
+        this.vitals = vitals; this.practices = practices; this.identities = identities; this.issuers = List.copyOf(issuers);
     }
     public record Prepare(UUID preparationId, long expectedVersion) {}
     public record Preparation(UUID preparationId, long responseRevision, long encounterVersion, UUID artifactId, String artifactHash, String releaseChecksum, Long interventionSetVersion, UUID interventionManifestId,UUID clinicalReviewId,String clinicalReviewHash) {}
-    public record Sign(UUID preparationId, long expectedVersion, String reviewedArtifactHash, boolean confirmSyntheticReview) {}
+    public record Sign(UUID preparationId, long expectedVersion, String reviewedArtifactHash, boolean confirmSyntheticReview, String duplicateIntentReason) {
+        public Sign(UUID preparationId, long expectedVersion, String reviewedArtifactHash, boolean confirmSyntheticReview) {
+            this(preparationId, expectedVersion, reviewedArtifactHash, confirmSyntheticReview, null);
+        }
+    }
     public record Signature(UUID signatureId, UUID preparationId, long responseRevision, UUID artifactId, String artifactHash,
                             UUID signerId, OffsetDateTime signedAt, String assuranceMethod, UUID amendmentOf, String amendmentReason, boolean interventionSnapshotCaptured) {}
     public record Amendment(long expectedVersion, UUID originalSignatureId, String reason) {}
@@ -45,6 +52,7 @@ public class JdbcEncounterSignatures {
             var errors=new AnswerValidator().validate(current.release().definition(),current.answers(),AnswerValidator.Stage.SIGN);
             if(!errors.isEmpty())throw new ClinicalAccessException("SIGN_REVIEW_REQUIRED:"+String.join(",",errors),422);
             var manifest=links.capture(c,patient,encounter,request.preparationId());
+            checkDocuments(c, patient, encounter, manifest);
             var clinicalReview=clinicalReview(c,patient,encounter);
             return new NoteCandidate(request.preparationId(),current.version(),render(c,current,manifest,clinicalReview));
         });
@@ -66,6 +74,7 @@ public class JdbcEncounterSignatures {
             if (!errors.isEmpty()) throw new ClinicalAccessException("SIGN_REVIEW_REQUIRED:" + String.join(",", errors), 422);
             var manifest=staged==null?links.capture(c,patient,encounter,request.preparationId()):links.manifest(c,patient,encounter,request.preparationId());
             if(manifest.interventionSetVersion()!=links.version(c,patient,encounter))throw new ClinicalAccessException("SIGN_CANDIDATE_STALE",409);
+            checkDocuments(c, patient, encounter, manifest);
             var clinicalReview=clinicalReview(c,patient,encounter);
             var artifact = staged==null?artifacts.stage(c, request.preparationId(), render(c, current, manifest,clinicalReview)):staged;
             if(staged!=null){if(!PrivateClinicalArtifacts.sha256(render(c,current,manifest,clinicalReview)).equals(staged.sha256()))throw new ClinicalAccessException("SIGN_CANDIDATE_STALE",409);artifacts.attach(c,staged);}
@@ -104,6 +113,9 @@ public class JdbcEncounterSignatures {
             var manifest = links.manifest(c,patient,encounter,preparation.interventionManifestId());
             if (!preparation.artifactHash().equals(PrivateClinicalArtifacts.sha256(render(c,current,manifest,clinicalReview))))
                 throw new ClinicalAccessException("SIGN_CANDIDATE_STALE", 409);
+            for (var item : manifest.items()) if ("DRAFT".equals(item.summary().clinicalState())
+                && item.summary().kind() != EncounterInterventionLinks.Kind.FOLLOW_UP)
+                issuer(item.summary().kind()).issueWithSignature(c, patient, encounter, item, preparation.preparationId(), request.duplicateIntentReason());
             artifacts.archive(c, preparation.artifactId(), preparation.artifactHash());
             var amendment = c.jdbc().sql("SELECT amendment_of_signature_id, amendment_reason FROM clinical_encounter WHERE practice_id = :practice AND patient_id = :patient AND encounter_id = :id")
                 .param("practice", c.practiceId()).param("patient", patient).param("id", encounter)
@@ -173,6 +185,15 @@ public class JdbcEncounterSignatures {
                 rs.getLong("response_revision"), rs.getLong("encounter_version"), rs.getObject("artifact_id", UUID.class), rs.getString("artifact_hash"), rs.getString("release_checksum"), rs.getObject("intervention_set_version",Long.class), rs.getObject("intervention_manifest_id",UUID.class),rs.getObject("clinical_review_id",UUID.class),rs.getString("clinical_review_hash")))
             .optional().orElseThrow(() -> new ClinicalAccessException("SIGN_PREPARATION_UNAVAILABLE", 404));
     }
+    private void checkDocuments(Context c, UUID patient, UUID encounter, EncounterInterventionLinks.Manifest manifest) {
+        for (var item : manifest.items()) if ("DRAFT".equals(item.summary().clinicalState())
+            && item.summary().kind() != EncounterInterventionLinks.Kind.FOLLOW_UP)
+            issuer(item.summary().kind()).checkForSigning(c, patient, encounter, item);
+    }
+    private EncounterSigningDocumentIssuer issuer(EncounterInterventionLinks.Kind kind) {
+        return issuers.stream().filter(service -> service.supports(kind)).findFirst()
+            .orElseThrow(() -> new ClinicalAccessException("DOCUMENT_ISSUER_UNAVAILABLE", 503));
+    }
     private byte[] render(Context c, JdbcEncounterService.Encounter encounter, ph.epr.api.encountertemplates.EncounterInterventionLinks.Manifest manifest,ph.epr.api.clinicalchart.ClinicalLists.ReviewManifest clinicalReview) {
         var fields = new TemplateCompiler().validate(encounter.release().definition());
         var hasCommonFindings = fields.values().stream().anyMatch(field -> "visit.ros".equals(field.concept()));
@@ -182,8 +203,8 @@ public class JdbcEncounterSignatures {
             .param("practice", c.practiceId()).param("site", encounter.siteId()).query(String.class)
             .optional().orElseThrow(() -> new ClinicalAccessException("SITE_UNAVAILABLE", 503));
         var clinicianNames = new HashMap<UUID, String>();
-        var html = new StringBuilder("<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><title>Synthetic encounter record</title><style>body{font:16px/1.6 sans-serif;max-width:800px;margin:32px auto;padding:24px;color:#192943}h1{font-size:24px}h2{font-size:20px;border-bottom:1px solid #ddd}h3{font-size:16px}p{white-space:pre-wrap;overflow-wrap:anywhere}small{color:#555}</style><body>");
-        html.append("<h1>Synthetic encounter record</h1><p>Engineering validation only. Not approved for real-patient issuance.</p><p>")
+        var html = new StringBuilder("<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><title>Encounter note</title><style>body{font:16px/1.6 sans-serif;max-width:800px;margin:32px auto;padding:24px;color:#192943}h1{font-size:24px}h2{font-size:20px;border-bottom:1px solid #ddd}h3{font-size:16px}p{white-space:pre-wrap;overflow-wrap:anywhere}small{color:#555}</style><body>");
+        html.append("<h1>Encounter note</h1><p>Training copy · Not for patient care.</p><p>")
             .append("Practice: ").append(escape(practiceName)).append("<br>Site: ").append(escape(siteName)).append("</p><p>").append(escape(encounter.patient().displayName())).append(" · ").append(escape(encounter.patient().recordNumber())).append("</p><p>Care time: ")
             .append(escape(encounter.clinicalTime().toString())).append("<br>Release: ").append(escape(encounter.release().definition().title())).append(" · ")
             .append(escape(encounter.release().definition().businessVersion())).append("<br>Response revision: ").append(encounter.responseRevision()).append("</p>");
@@ -245,15 +266,12 @@ public class JdbcEncounterSignatures {
         if(manifest.items().isEmpty()) html.append("<p>No interventions recorded at this review.</p>");
         for(var item:manifest.items()) {
             var summary=item.summary();
-            var plannedRequest=summary.clinicalState().equals("DRAFT") &&
-                (summary.kind()==ph.epr.api.encountertemplates.EncounterInterventionLinks.Kind.LAB_ORDER ||
-                    summary.kind()==ph.epr.api.encountertemplates.EncounterInterventionLinks.Kind.IMAGING_ORDER);
+            var pendingDocument=summary.clinicalState().equals("DRAFT") && summary.kind()!=EncounterInterventionLinks.Kind.FOLLOW_UP;
             html.append("<h3>").append(escape(summary.title())).append("</h3><p>")
-                .append(plannedRequest ? "PLANNED REQUEST · NOT ISSUED" : escape(summary.clinicalState()))
+                .append(pendingDocument ? "REQUEST INCLUDED IN THIS SIGNATURE" : escape(summary.clinicalState()))
                 .append(" · responsible clinician: ").append(escape(clinicianName(c, summary.ownerId(), clinicianNames))).append("</p>");
             for(var detail:summary.details()) html.append("<p>").append(escape(detail)).append("</p>");
-            if(plannedRequest) html.append("<p>Planned request only. No requisition was issued; the responsible clinician retains ownership.</p>");
-            else if(summary.clinicalState().equals("DRAFT")) html.append("<p>Unissued draft plan; responsible clinician retains ownership. Note signature does not authorize this draft.</p>");
+            if(pendingDocument) html.append("<p>This document is issued with successful confirmation of this exact encounter signature. Printing and delivery remain separate.</p>");
         }
         html.append("<p>Responsible clinician: ").append(escape(clinicianName(c, encounter.responsibleClinicianId(), clinicianNames))).append("</p><p>Clinical signing assurance remains unapproved. The local synthetic confirmation is bound separately to these exact archived bytes.</p></body></html>");
         return html.toString().getBytes(StandardCharsets.UTF_8);

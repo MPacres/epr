@@ -87,7 +87,7 @@ export function MyPatients() {
       <button id="patients-tab-directory" role="tab" aria-selected={tab === 'directory'} aria-controls="patient-directory-panel" tabIndex={tab === 'directory' ? 0 : -1} onClick={() => switchTab('directory')} onKeyDown={tabKey}>Patient directory</button>
       <button id="patients-tab-recent" role="tab" aria-selected={tab === 'recent'} aria-controls="patient-directory-panel" tabIndex={tab === 'recent' ? 0 : -1} onClick={() => switchTab('recent')} onKeyDown={tabKey}>Recent patients{recentCount > 0 ? <span className="tab-count">{recentCount}</span> : null}</button>
     </div>
-    <div className="directory-context"><div className="practice-field"><label htmlFor="directory-practice"><Building2 aria-hidden="true" />Practice</label><select id="directory-practice" value={practiceId} onChange={event => switchPractice(event.target.value)}>{doctorClinics.map(item => <option key={item.practiceId} value={item.practiceId}>{item.site}</option>)}</select><span>{total} patients</span></div><span className="directory-snapshot"><CalendarDays aria-hidden="true" />Demo snapshot · <time dateTime={demoDate}>{formatPatientDate(demoDate)}</time></span></div>
+    <div className="directory-context"><div className="practice-field"><label htmlFor="directory-practice"><Building2 aria-hidden="true" />Practice</label><select id="directory-practice" value={practiceId} onChange={event => switchPractice(event.target.value)}>{doctorClinics.map(item => <option key={item.practiceId} value={item.practiceId}>{item.site}</option>)}</select><span>{total} patients</span></div><span className="directory-snapshot"><CalendarDays aria-hidden="true" />Snapshot · <time dateTime={demoDate}>{formatPatientDate(demoDate)}</time></span></div>
     {practiceId !== activeSession.practiceId ? <p className="directory-scope-alert"><ShieldCheck aria-hidden="true" />Viewing {clinic.site} records. Hospital A remains your active clinical session.</p> : null}
     <div role="tabpanel" id="patient-directory-panel" aria-labelledby={`patients-tab-${tab}`} className="directory-grid">
       <section className="surface directory-list" aria-label={`${clinic.site} patient directory`}>
@@ -100,8 +100,8 @@ export function MyPatients() {
       </section>
       {!compact ? <aside className="surface directory-preview" aria-label="Selected patient details">{selected ? <PatientDetails key={patientKey(selected)} patient={selected} onOpenOverview={openOverview} /> : <div className="directory-empty"><Users aria-hidden="true" /><h2>Select a patient</h2><p>Patient details will appear here when a record is available.</p></div>}</aside> : null}
     </div>
-    <footer className="dashboard-footer patients-footer"><span><ShieldCheck aria-hidden="true" />Showing {clinic.site} records only</span><span>Synthetic data · Preview only</span></footer>
-    <Sheet open={!!dialog && !!dialogPatient} onClose={closeDialog} title={dialog === 'overview' ? 'Patient overview' : 'Patient details'} description={`${clinic.site} · Synthetic patient record`}>
+    <footer className="dashboard-footer patients-footer"><span><ShieldCheck aria-hidden="true" />Showing {clinic.site} records only</span></footer>
+    <Sheet open={!!dialog && !!dialogPatient} onClose={closeDialog} title={dialog === 'overview' ? 'Patient overview' : 'Patient details'} description={`${clinic.site} · Patient record`}>
       {dialogPatient ? <PatientDetails key={patientKey(dialogPatient)} patient={dialogPatient} overview={dialog === 'overview'} onOpenOverview={openOverview} /> : null}
     </Sheet>
   </main>

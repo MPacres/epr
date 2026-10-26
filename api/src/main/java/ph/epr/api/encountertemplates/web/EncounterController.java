@@ -47,6 +47,14 @@ class EncounterController {
         @RequestHeader("Idempotency-Key") UUID key, @RequestBody JdbcEncounterService.Save request) {
         return tenants.execute(new AuthenticatedActor(auth.getName()), practice, siteId, false, c -> encounters.save(c, patient, id, key, request));
     }
+    @PostMapping("/{id}/delete-draft")
+    JdbcEncounterService.DeletedDraft deleteDraft(Authentication auth, @PathVariable UUID practice, @PathVariable UUID patient, @PathVariable UUID id, @RequestParam UUID siteId,
+        @RequestHeader("Idempotency-Key") UUID key, @RequestBody JdbcEncounterService.DeleteDraft request) {
+        var result = tenants.execute(new AuthenticatedActor(auth.getName()), practice, siteId, false,
+            c -> encounters.deleteDraft(c, patient, id, key, request));
+        encounters.releaseDeletedReservation(practice, result);
+        return result;
+    }
     @PostMapping("/{id}/follow-up-intents")
     JdbcEncounterService.FollowUpReceipt followUp(Authentication auth, @PathVariable UUID practice, @PathVariable UUID patient, @PathVariable UUID id, @RequestParam UUID siteId,
         @RequestHeader("Idempotency-Key") UUID key, @RequestBody JdbcEncounterService.FollowUp request) {

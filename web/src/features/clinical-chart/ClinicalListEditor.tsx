@@ -25,7 +25,7 @@ function Field({ label, requiredField = false, optional = false, hint, error, ch
 }
 
 function TerminologyPicker<T extends FieldValues & { codeSystem: string; codeValue: string; codeVersion: string }>({ terminology, displayName, register, setValue }: { terminology: TerminologyCode[]; displayName: keyof T; register: UseFormRegister<T>; setValue: UseFormSetValue<T> }) {
-  return <Field label="Terminology match" optional hint="Synthetic local catalog only. Free text is saved but does not participate in coded safety matching."><select {...register('codeValue' as never)} onChange={event => {
+  return <Field label="Terminology match" optional hint="Free text is saved without a coded match and is excluded from coded safety checks."><select {...register('codeValue' as never)} onChange={event => {
     const selected = terminology.find(item => item.code === event.target.value)
     setValue('codeValue' as never, (selected?.code ?? '') as never, { shouldDirty: true })
     setValue('codeSystem' as never, (selected?.system ?? '') as never, { shouldDirty: true })
